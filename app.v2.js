@@ -11,9 +11,9 @@ app.use(express.json({ limit: '10mb' }));
 
 // ── Serve dashboard ───────────────────────────────────────────────
 app.get('/', (req, res) => {
-  res.sendFile('index.html.html', {
-    root: 'C:\\Users\\USER\\Downloads\\mt5- assistant\\dashboard'
-  });
+ res.sendFile('index.html', {
+  root: __dirname
+});
 });
 
 // ── State ─────────────────────────────────────────────────────────
