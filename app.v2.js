@@ -11,7 +11,7 @@ app.use(express.json({ limit: '10mb' }));
 
 // ── Serve dashboard ───────────────────────────────────────────────
 app.get('/', (req, res) => {
- res.sendFile('index.html', {
+res.sendFile('index.html.html', {
   root: __dirname
 });
 });
