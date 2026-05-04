@@ -1,9 +1,9 @@
 {
   "name": "mt5-assistant",
   "version": "1.0.0",
-  "main": "app.js",
+ "main": "app.v2.js"
   "scripts": {
-    "start": "node app.js"
+  "start": "node app.v2.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
