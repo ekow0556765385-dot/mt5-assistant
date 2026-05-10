@@ -1,7 +1,7 @@
 {
   "name": "mt5-assistant",
   "version": "1.0.0",
- "main": "app.v2.js",
+ "main": "node app.js"
   "scripts": {
   "start": "node app.js"
   },
