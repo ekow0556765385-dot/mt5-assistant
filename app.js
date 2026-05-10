@@ -349,10 +349,19 @@ function getPlaceholderNews() {
 fetchNews();
 cron.schedule('*/30 * * * *', fetchNews);
 
-// ── Journal ───────────────────────────────────────────────────────
-const { appendTrade } = require('./journalWriter');
+// ── Journal (optional — only runs when journalWriter.js exists) ──
+let appendTrade = null;
+try {
+  appendTrade = require('./journalWriter').appendTrade;
+  console.log('[JOURNAL] journalWriter loaded OK');
+} catch (e) {
+  console.log('[JOURNAL] journalWriter not found — journal disabled (Railway mode)');
+}
 
 app.post('/journal/trade', async (req, res) => {
+  if (!appendTrade) {
+    return res.status(503).json({ error: 'Journal not available on this server (local only)' });
+  }
   const trade = req.body;
   if (!trade || !trade.ticket || !trade.symbol)
     return res.status(400).json({ error: 'Invalid trade payload' });
@@ -373,6 +382,7 @@ app.post('/journal/trade', async (req, res) => {
 });
 
 app.get('/journal/status', (req, res) => {
+  if (!appendTrade) return res.json({ journalFound: false, note: 'Journal runs locally only' });
   const fs   = require('fs');
   const p    = require('path').join(__dirname, 'TradingJournal.xlsx');
   const exists = fs.existsSync(p);
