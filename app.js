@@ -6,7 +6,8 @@ const wss = new WebSocket.Server({ server: http });
 const axios = require('axios');
 const cron = require('node-cron');
 const { detectPatterns } = require('./patternDetector');
-
+const smcRoute = require('./smc-route');
+app.use(smcRoute);
 app.use(require('cors')());
 app.use(express.json({ limit: '10mb' }));
 
