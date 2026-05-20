@@ -1,0 +1,161 @@
+<!-- smc-panel.html -->
+<!-- Drop this anywhere in your existing index.html, or load as a separate tab -->
+<!-- It polls GET /smc every 5 seconds and renders a live SMC card per symbol -->
+
+<style>
+  .smc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+    padding: 16px;
+    font-family: 'Segoe UI', sans-serif;
+  }
+  .smc-card {
+    background: #1a1a2e;
+    border: 1px solid #2a2a4a;
+    border-radius: 10px;
+    padding: 14px;
+    color: #e0e0f0;
+  }
+  .smc-card h3 {
+    margin: 0 0 10px;
+    font-size: 15px;
+    color: #a0a8ff;
+    display: flex;
+    justify-content: space-between;
+  }
+  .smc-card h3 span.tf {
+    font-size: 11px;
+    color: #666;
+    font-weight: normal;
+    margin-top: 3px;
+  }
+  .smc-section { margin-bottom: 10px; }
+  .smc-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #888;
+    margin-bottom: 5px;
+  }
+  .smc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 5px;
+    margin-bottom: 3px;
+    font-size: 12px;
+  }
+  .bull { background: rgba(0,200,100,0.12); color: #00c864; }
+  .bear { background: rgba(255,80,80,0.12);  color: #ff6060; }
+  .bos-bull  { background: rgba(50,130,255,0.12); color: #5090ff; }
+  .bos-bear  { background: rgba(255,140,0,0.12);  color: #ff8c00; }
+  .choch-bull { background: rgba(180,0,255,0.12); color: #cc55ff; }
+  .choch-bear { background: rgba(255,200,0,0.12); color: #ffd700; }
+  .smc-row .level { font-family: monospace; font-size: 11px; opacity: 0.8; }
+  .smc-timestamp { font-size: 10px; color: #555; text-align: right; margin-top: 8px; }
+  .no-data { color: #555; font-size: 12px; font-style: italic; }
+  .smc-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: bold;
+    margin-right: 6px;
+  }
+</style>
+
+<div class="smc-grid" id="smcGrid">
+  <p style="color:#555;padding:16px;font-size:13px;">Waiting for SMC data from MT5...</p>
+</div>
+
+<script>
+(function () {
+  const grid = document.getElementById('smcGrid');
+
+  function typeClass(type) {
+    if (type === 'BOS_Bull')   return 'bos-bull';
+    if (type === 'BOS_Bear')   return 'bos-bear';
+    if (type === 'CHoCH_Bull') return 'choch-bull';
+    if (type === 'CHoCH_Bear') return 'choch-bear';
+    return '';
+  }
+
+  function badge(type) {
+    const map = {
+      BOS_Bull:   ['BOS ↑', '#5090ff'],
+      BOS_Bear:   ['BOS ↓', '#ff8c00'],
+      CHoCH_Bull: ['CHoCH ↑', '#cc55ff'],
+      CHoCH_Bear: ['CHoCH ↓', '#ffd700'],
+    };
+    const [label, color] = map[type] || [type, '#aaa'];
+    return `<span class="smc-badge" style="background:${color}22;color:${color}">${label}</span>`;
+  }
+
+  function renderCard(sym, data) {
+    const structs  = data.structure   || [];
+    const obs      = data.orderBlocks || [];
+    const fvgs     = data.fvgs        || [];
+
+    let structHTML = structs.length === 0
+      ? '<div class="no-data">No recent structure events</div>'
+      : structs.map(s => `
+          <div class="smc-row ${typeClass(s.type)}">
+            ${badge(s.type)}
+            <span>${s.time}</span>
+            <span class="level">${parseFloat(s.level).toFixed(5)}</span>
+          </div>`).join('');
+
+    let obHTML = obs.length === 0
+      ? '<div class="no-data">No active order blocks</div>'
+      : obs.map(o => `
+          <div class="smc-row ${o.direction === 'Bullish' ? 'bull' : 'bear'}">
+            <span>${o.direction} OB</span>
+            <span class="level">${parseFloat(o.high).toFixed(5)} – ${parseFloat(o.low).toFixed(5)}</span>
+          </div>`).join('');
+
+    let fvgHTML = fvgs.length === 0
+      ? '<div class="no-data">No unfilled FVGs</div>'
+      : fvgs.map(f => `
+          <div class="smc-row ${f.direction === 'Bullish' ? 'bull' : 'bear'}">
+            <span>${f.direction} FVG</span>
+            <span class="level">${parseFloat(f.high).toFixed(5)} – ${parseFloat(f.low).toFixed(5)}</span>
+          </div>`).join('');
+
+    return `
+      <div class="smc-card" id="smc-${sym}">
+        <h3>${sym} <span class="tf">${data.timeframe || ''}</span></h3>
+        <div class="smc-section">
+          <div class="smc-section-title">📐 Structure (BOS / CHoCH)</div>
+          ${structHTML}
+        </div>
+        <div class="smc-section">
+          <div class="smc-section-title">🧱 Order Blocks</div>
+          ${obHTML}
+        </div>
+        <div class="smc-section">
+          <div class="smc-section-title">⬜ Fair Value Gaps</div>
+          ${fvgHTML}
+        </div>
+        <div class="smc-timestamp">Updated: ${data.receivedAt ? new Date(data.receivedAt).toLocaleTimeString() : data.timestamp}</div>
+      </div>`;
+  }
+
+  async function refresh() {
+    try {
+      const res  = await fetch('/smc');
+      const data = await res.json();
+      const syms = Object.keys(data);
+      if (syms.length === 0) return;
+
+      grid.innerHTML = syms.map(sym => renderCard(sym, data[sym])).join('');
+    } catch (e) {
+      console.warn('SMC fetch error:', e);
+    }
+  }
+
+  refresh();
+  setInterval(refresh, 5000);
+})();
+</script>
