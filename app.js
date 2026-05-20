@@ -72,7 +72,10 @@ async function pollTelegramCommands() {
           `🔔 Alerts this session: ${s.patternAlerts.length}\n` +
           `🔕 Alerts paused: ${TELEGRAM_PAUSED ? 'YES' : 'No'}\n` +
           `⚙️ Min confidence: ${TELEGRAM_MIN_CONF}%`;
-
+app.get('/smc-panel', (req, res) => {
+  const path = require('path');
+  res.sendFile(path.join(__dirname, 'smc-panel.html'));
+});
       } else if (text === '/trades') {
         if (!s.openTrades.length) {
           reply = '📭 No open trades right now.';
