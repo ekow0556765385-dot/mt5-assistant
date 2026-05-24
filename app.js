@@ -407,7 +407,8 @@ app.get('/journal/status', (req, res) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────────
-http.listen(3000, '0.0.0.0', () => {
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔══════════════════════════════════════════════╗
   ║   MT5 Assistant Server                       ║
