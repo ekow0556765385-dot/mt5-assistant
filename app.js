@@ -452,8 +452,7 @@ app.get('/journal/status', (req, res) => {
 // ── Start ─────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 http.listen(3000, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-});
+  console.log(`
   ╔══════════════════════════════════════════════╗
   ║   MT5 Assistant Server                       ║
   ║   Running on port ${PORT}                     
