@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pattern Detector — Live Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0d0d14;color:#e0e0e8;font-size:13px}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#13131e;border-bottom:1px solid #2a2a40}
+.logo{font-size:14px;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.status{font-size:11px;color:#6b7280}
+.status.live{color:#22c55e}
+.controls{display:flex;gap:8px;padding:10px 16px;background:#13131e;border-bottom:1px solid #2a2a40}
+select,button{padding:5px 10px;border:1px solid #2a2a40;border-radius:6px;background:#1e1e30;color:#e0e0e8;font-size:12px;cursor:pointer}
+button:hover{background:#2a2a40}
+button.active{background:#185FA5;border-color:#185FA5;color:#fff}
+.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:10px 16px}
+.mc{background:#13131e;border:1px solid #2a2a40;border-radius:8px;padding:10px 12px}
+.mc-lbl{font-size:10px;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
+.mc-val{font-size:18px;font-weight:600;color:#e0e0e8}
+.main{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:10px;padding:0 16px 16px}
+.panel{background:#13131e;border:1px solid #2a2a40;border-radius:10px;padding:12px}
+.panel-title{font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.pat-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #1e1e30}
+.pat-row:last-child{border-bottom:none}
+.pat-name{font-size:12px;font-weight:500;color:#e0e0e8}
+.badge{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600}
+.badge-bull{background:#14532d;color:#4ade80}
+.badge-bear{background:#450a0a;color:#f87171}
+.badge-neu{background:#1c1917;color:#a8a29e}
+.badge-recent{background:#1e3a5f;color:#60a5fa}
+.conf-wrap{display:flex;align-items:center;gap:5px;min-width:90px}
+.conf-track{flex:1;height:5px;border-radius:3px;background:#1e1e30;overflow:hidden}
+.conf-fill{height:100%;border-radius:3px}
+.conf-pct{font-size:11px;font-weight:600;min-width:28px;text-align:right}
+.zone-row{display:flex;align-items:center;justify-content:space-between;padding:4px 7px;border-radius:5px;font-size:11px;margin-bottom:4px}
+.z-demand{background:#0f2e1e;border:1px solid #14532d;color:#4ade80}
+.z-supply{background:#2d0f0f;border:1px solid #450a0a;color:#f87171}
+.z-support{background:#0f1e3a;border:1px solid #1e3a5f;color:#60a5fa}
+.z-resist{background:#2d1a0f;border:1px solid #4a2010;color:#fb923c}
+.sig-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #1e1e30;font-size:12px}
+.sig-row:last-child{border-bottom:none}
+.sl{color:#6b7280}
+.sv-bull{color:#4ade80;font-weight:600}
+.sv-bear{color:#f87171;font-weight:600}
+.sv-neu{color:#a8a29e;font-weight:600}
+.sig-bar-track{height:7px;border-radius:4px;background:#1e1e30;overflow:hidden;margin:8px 0 3px}
+.sig-bar-fill{height:100%;border-radius:4px;transition:width .6s,background .6s}
+.sig-bar-labels{display:flex;justify-content:space-between;font-size:9px;color:#4b5563}
+.plist{max-height:320px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2a2a40 transparent}
+.scroll{max-height:200px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2a2a40 transparent}
+.empty{font-size:12px;color:#4b5563;padding:8px 0;text-align:center}
+.last-update{font-size:10px;color:#4b5563;text-align:right;padding:4px 16px 10px}
+.str-dots{display:flex;gap:2px}
+.d{width:6px;height:6px;border-radius:50%;background:#2a2a40}
+.d-bull{background:#4ade80}
+.d-bear{background:#f87171}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <span class="dot"></span>
+    Pattern Detector — Live Dashboard
+  </div>
+  <span class="status" id="connStatus">Connecting...</span>
+</div>
+
+<div class="controls">
+  <select id="symSel" onchange="changeSymbol()">
+    <option value="">Auto (latest)</option>
+    <option value="EURUSD_M30">EUR/USD 30m</option>
+    <option value="EURUSD_H1">EUR/USD 1h</option>
+    <option value="EURUSD_H4">EUR/USD 4h</option>
+    <option value="GBPUSD_M30">GBP/USD 30m</option>
+    <option value="XAUUSD_M30">XAU/USD 30m</option>
+    <option value="USDJPY_M30">USD/JPY 30m</option>
+  </select>
+  <span style="font-size:11px;color:#6b7280;display:flex;align-items:center">
+    Auto-refreshes every 5s when MT5 EA is running
+  </span>
+</div>
+
+<div class="metrics" id="metrics">
+  <div class="mc"><div class="mc-lbl">Symbol</div><div class="mc-val" id="m-sym">—</div></div>
+  <div class="mc"><div class="mc-lbl">Price</div><div class="mc-val" id="m-price">—</div></div>
+  <div class="mc"><div class="mc-lbl">Bias</div><div class="mc-val" id="m-bias">—</div></div>
+  <div class="mc"><div class="mc-lbl">Score</div><div class="mc-val" id="m-score">—</div></div>
+  <div class="mc"><div class="mc-lbl">RSI</div><div class="mc-val" id="m-rsi">—</div></div>
+  <div class="mc"><div class="mc-lbl">EMA bias</div><div class="mc-val" id="m-ema">—</div></div>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-title">Detected patterns <span id="patCount" style="color:#4b5563"></span></div>
+    <div class="plist" id="patList"><div class="empty">Waiting for MT5 data...</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">Demand / Supply zones</div>
+    <div class="scroll" id="zoneList"><div class="empty">—</div></div>
+    <div class="panel-title" style="margin-top:12px">Support / Resistance</div>
+    <div class="scroll" id="srList"><div class="empty">—</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">Composite signal</div>
+    <div id="sigRows"><div class="empty">—</div></div>
+    <div class="sig-bar-track"><div class="sig-bar-fill" id="sigBar" style="width:50%"></div></div>
+    <div class="sig-bar-labels"><span>Bearish</span><span>Neutral</span><span>Bullish</span></div>
+  </div>
+</div>
+<div class="last-update" id="lastUpdate"></div>
+
+<script>
+const BASE = window.location.origin; // same origin as app.js
+let currentKey = '';
+let pollTimer  = null;
+
+function confColor(c) {
+  return c >= 75 ? '#4ade80' : c >= 60 ? '#fb923c' : '#f87171';
+}
+
+function changeSymbol() {
+  currentKey = document.getElementById('symSel').value;
+  fetchData();
+}
+
+async function fetchData() {
+  try {
+    let url = BASE + '/api/patterns/latest';
+    if (currentKey) url = BASE + '/api/patterns?symbol=' + encodeURIComponent(currentKey.split('_')[0]) + '&tf=' + currentKey.split('_')[1];
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    document.getElementById('connStatus').textContent = 'Live ●';
+    document.getElementById('connStatus').className   = 'status live';
+    if (data && data.symbol) renderData(data);
+    else document.getElementById('connStatus').textContent = 'Connected – no data yet';
+  } catch(e) {
+    document.getElementById('connStatus').textContent = 'Offline – MT5 not sending';
+    document.getElementById('connStatus').className   = 'status';
+  }
+}
+
+function renderData(d) {
+  const bias = d.bias || 'neutral';
+  const bCol = bias === 'bullish' ? '#4ade80' : bias === 'bearish' ? '#f87171' : '#a8a29e';
+
+  document.getElementById('m-sym').textContent   = (d.symbol || '—') + ' ' + (d.timeframe || '');
+  document.getElementById('m-price').textContent = d.price || '—';
+  document.getElementById('m-bias').textContent  = bias.charAt(0).toUpperCase() + bias.slice(1);
+  document.getElementById('m-bias').style.color  = bCol;
+  document.getElementById('m-score').textContent = (d.bias_score > 0 ? '+' : '') + (d.bias_score || 0);
+  document.getElementById('m-score').style.color = bCol;
+  document.getElementById('m-rsi').textContent   = d.rsi ? parseFloat(d.rsi).toFixed(1) : '—';
+  document.getElementById('m-ema').textContent   = d.ema_bias ? d.ema_bias.charAt(0).toUpperCase() + d.ema_bias.slice(1) : '—';
+  document.getElementById('m-ema').style.color   = d.ema_bias === 'bullish' ? '#4ade80' : '#f87171';
+
+  // Patterns
+  const pats = d.patterns || [];
+  document.getElementById('patCount').textContent = pats.length + ' total';
+  if (!pats.length) {
+    document.getElementById('patList').innerHTML = '<div class="empty">No patterns in last 10 bars</div>';
+  } else {
+    const sorted = [...pats].sort((a,b) => a.bar_index - b.bar_index);
+    document.getElementById('patList').innerHTML = sorted.map(p => {
+      const conf = p.confidence_pct || 55;
+      const cc   = confColor(conf);
+      const isR  = (p.bar_index || 99) <= 5;
+      const dots = [1,2,3,4,5].map(i => `<span class="d${i <= p.strength ? (p.type==='bull'?' d-bull':' d-bear') : ''}"></span>`).join('');
+      return `<div class="pat-row">
+        <span class="pat-name">${p.name}${isR ? '<span class="badge badge-recent" style="margin-left:5px">recent</span>' : ''}</span>
+        <span class="badge badge-${p.type}">${p.type === 'bull' ? '▲' : p.type === 'bear' ? '▼' : '●'} ${p.type}</span>
+        <div class="conf-wrap">
+          <div class="str-dots">${dots}</div>
+          <div class="conf-track"><div class="conf-fill" style="width:${conf}%;background:${cc}"></div></div>
+          <span class="conf-pct" style="color:${cc}">${conf}%</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Zones
+  const zones = d.zones || [];
+  document.getElementById('zoneList').innerHTML = zones.length
+    ? zones.map(z => `<div class="zone-row z-${z.type}">
+        <span>${z.type === 'demand' ? 'Demand' : 'Supply'}</span>
+        <span style="font-family:monospace;font-size:11px">${z.lo} – ${z.hi}</span>
+      </div>`).join('')
+    : '<div class="empty">No zones</div>';
+
+  // SR
+  const sr = d.sr_levels || [];
+  document.getElementById('srList').innerHTML = sr.length
+    ? sr.map(z => `<div class="zone-row z-${z.type === 'support' ? 'support' : 'resist'}">
+        <span>${z.type === 'support' ? 'Support' : 'Resistance'}</span>
+        <span style="font-family:monospace;font-size:11px">${z.price}</span>
+      </div>`).join('')
+    : '<div class="empty">No S/R</div>';
+
+  // Signal
+  const sc = bias === 'bullish' ? 'sv-bull' : bias === 'bearish' ? 'sv-bear' : 'sv-neu';
+  document.getElementById('sigRows').innerHTML = `
+    <div class="sig-row"><span class="sl">Score</span><span class="${sc}">${d.bias_score > 0 ? '+' : ''}${d.bias_score || 0} / 100</span></div>
+    <div class="sig-row"><span class="sl">Bias</span><span class="${sc}">${bias.charAt(0).toUpperCase() + bias.slice(1)}</span></div>
+    <div class="sig-row"><span class="sl">RSI</span><span style="color:#e0e0e8;font-weight:500">${d.rsi ? parseFloat(d.rsi).toFixed(1) : '—'}</span></div>
+    <div class="sig-row"><span class="sl">EMA bias</span><span class="${d.ema_bias === 'bullish' ? 'sv-bull' : 'sv-bear'}">${d.ema_bias || '—'}</span></div>
+    <div class="sig-row"><span class="sl">Patterns detected</span><span style="color:#e0e0e8;font-weight:500">${pats.length}</span></div>
+    <div class="sig-row"><span class="sl">Last update</span><span style="color:#6b7280;font-size:11px">${d.timestamp || '—'}</span></div>
+  `;
+  const pct = Math.min(100, Math.max(0, (d.bias_score || 0) + 50));
+  const bf  = bias === 'bullish' ? '#4ade80' : bias === 'bearish' ? '#f87171' : '#a8a29e';
+  document.getElementById('sigBar').style.cssText = `width:${pct}%;background:${bf};height:100%;border-radius:4px;transition:width .6s,background .6s`;
+
+  document.getElementById('lastUpdate').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+}
+
+// Poll every 5 seconds
+fetchData();
+pollTimer = setInterval(fetchData, 5000);
+</script>
+</body>
+</html>
