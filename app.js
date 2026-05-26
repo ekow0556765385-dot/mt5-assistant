@@ -9,7 +9,7 @@ const path = require('path');
 const { detectPatterns } = require('./patternDetector');
 const smcRoute = require('./smc-route');
 app.use(smcRoute);
-app.use(require('cors')());const PORT = process.env.PORT || 3000;
+app.use(require('cors')());
 app.use(express.json({ limit: '10mb' }));
 // ── Telegram config ───────────────────────────────────────────────
 const TELEGRAM_TOKEN    = '8591020831:AAF7m22h7gwmuDWklvbRvnXtpPlNolScwZw';
@@ -446,10 +446,8 @@ app.get('/journal/status', (req, res) => {
     sizeKB:        stat ? Math.round(stat.size / 1024) : null
   });
 });
-
-// ── Start ─────────────────────────────────────────────────────────
-// PORT must be defined before http.listen AND before the SMC axios call above
-http.listen(PORT, '0.0.0.0', () => {
+// ── Start ─────────────────────────────────────────────
+http.listen(3000, '0.0.0.0', () => {
   console.log(`
   ╔══════════════════════════════════════════════╗
   ║   MT5 Assistant Server                       ║
