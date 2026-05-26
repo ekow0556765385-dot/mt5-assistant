@@ -9,7 +9,7 @@ const path = require('path');
 const { detectPatterns } = require('./patternDetector');
 const smcRoute = require('./smc-route');
 app.use(smcRoute);
-app.use(require('cors')());
+app.use(require('cors')());const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '10mb' }));
 
 // ── Telegram config ───────────────────────────────────────────────
