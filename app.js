@@ -450,7 +450,6 @@ app.get('/journal/status', (req, res) => {
 
 // ── Start ─────────────────────────────────────────────────────────
 // PORT must be defined before http.listen AND before the SMC axios call above
-const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔══════════════════════════════════════════════╗
