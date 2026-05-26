@@ -11,7 +11,6 @@ const smcRoute = require('./smc-route');
 app.use(smcRoute);
 app.use(require('cors')());const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '10mb' }));
-
 // ── Telegram config ───────────────────────────────────────────────
 const TELEGRAM_TOKEN    = '8591020831:AAF7m22h7gwmuDWklvbRvnXtpPlNolScwZw';
 const TELEGRAM_CHAT_ID  = '770749859';
