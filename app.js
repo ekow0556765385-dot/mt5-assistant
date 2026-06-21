@@ -179,7 +179,7 @@ setInterval(pollTelegramCommands, 3000);
 app.get('/',         (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/smc-panel',(req, res) => res.sendFile(path.join(__dirname, 'smc-panel.html')));
 app.get('/patterns', (req, res) => res.sendFile(path.join(__dirname, 'patterns.html')));
-app.get('/brain',    (req, res) => res.sendFile(path.join(__dirname, 'mt5_trading_brain_v3.html')));
+app.get('/brain',    (req, res) => res.sendFile(path.join(__dirname, 'mt5_trading_brain_v4.html')));
 app.get('/agent',    (req, res) => res.sendFile(path.join(__dirname, 'agent-dashboard.html')));
 app.get('/math',     (req, res) => res.sendFile(path.join(__dirname, 'blackwood_math_dashboard_v2.html')));
 
