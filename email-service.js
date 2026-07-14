@@ -26,20 +26,35 @@ function buildWelcomeEmail(name, plan, licenceKey, expiresAt) {
   return `
 <!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#09090e;font-family:'Segoe UI',Arial,sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#09090e;padding:40px 20px">
-    <tr><td align="center">
-      <table width="100%" style="max-width:520px;background:#14141c;border:1px solid #22222e;border-radius:10px;overflow:hidden">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<style>
+  @media (prefers-color-scheme: dark) {
+    .logo-dark { display:block !important; max-height:none !important; }
+    .logo-light { display:none !important; }
+  }
+</style>
+</head>
 
-        <!-- Header -->
-        <tr><td style="padding:32px 32px 0;text-align:center">
-          <div style="display:inline-flex;align-items:center;gap:14px">
-            <div style="background:#f4f2ec;border-radius:8px;padding:6px 8px;line-height:0">
-              <img src="https://blackwoodmt5.com/logo.png" alt="Blackwood" width="34" height="34" style="display:block">
-            </div>
-            <span style="font-size:18px;font-weight:800;letter-spacing:.08em;color:#eceae0;text-transform:uppercase;line-height:1">Blackwood</span>
-          </div>
+      <!-- Header -->
+        <tr><td style="padding:32px 32px 0">
+          <table role="presentation" width="100%" style="border-collapse:collapse">
+            <tr>
+              <td style="width:33%;text-align:left;vertical-align:middle">
+                <img src="https://blackwoodmt5.com/logo-white.png" alt="Blackwood" width="30" height="30"
+                     style="display:none;max-height:0;overflow:hidden;mso-hide:all" class="logo-dark">
+                <img src="https://blackwoodmt5.com/logo-black.png" alt="Blackwood" width="30" height="30"
+                     style="display:block" class="logo-light">
+              </td>
+              <td style="width:34%;text-align:center;vertical-align:middle">
+                <span style="font-size:17px;font-weight:800;letter-spacing:.08em;color:#eceae0;text-transform:uppercase">Blackwood</span>
+              </td>
+              <td style="width:33%"></td>
+            </tr>
+          </table>
         </tr></td>
 
         <!-- Success banner -->
