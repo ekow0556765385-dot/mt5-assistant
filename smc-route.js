@@ -1,20 +1,31 @@
-// smc-route.js v2.3
-// Fix: GET /smc/:symbol now tries exact match, then uppercase, then strips
-//      trailing 'c' (Exness suffix) so GBPUSDc resolves correctly.
-//      v2.2 fix retained: no inline express.json() on POST handlers.
+// smc-route.js v3.0
+// CHANGE FROM v2.3: smcStore, confluenceStore, and global.patternStore are
+// now keyed by `${userId}::${symbol}` instead of just `${symbol}` — so one
+// customer's SMC data (order blocks, FVGs, structure) no longer bleeds into
+// another customer's dashboard. userId is resolved from the licenceKey the
+// EA now sends on every /smc and /smc/patterns POST (v3.8+ EA required).
+//
+// GET routes now require login (requirePlan('pro')) and only return the
+// logged-in user's own data — matching the pattern already used for
+// /api/state, /api/math-data, etc. in app.js.
 const express = require('express');
 const router  = express.Router();
 const axios   = require('axios');
+const { requirePlan, getUserIdForLicenceKey } = require('./auth-middleware');
 
 // ── Config ────────────────────────────────────────────────────────
 const TELEGRAM_TOKEN           = '8591020831:AAF7m22h7gwmuDWklvbRvnXtpPlNolScwZw';
 const TELEGRAM_CHAT_ID         = '770749859';
 const CONFLUENCE_PIP_TOLERANCE = 0.0010;
 
-// ── In-memory stores (exported so app.js can access directly) ─────
+// ── In-memory stores — now keyed by `${userId}::${symbol}` ─────────
+// Still exported so app.js can read directly (unchanged from v2.3), but
+// callers must now build the same `${userId}::${symbol}` key themselves.
 const smcStore        = {};
 const confluenceStore = {};
 const lastConfluence  = {};
+
+function storeKey(userId, symbol) { return `${userId}::${symbol}`; }
 
 // ── Helpers ───────────────────────────────────────────────────────
 async function sendTelegram(message) {
@@ -33,10 +44,11 @@ function priceInZone(price, high, low, tolerance) {
   return price >= (low - tolerance) && price <= (high + tolerance);
 }
 
-// ── Confluence detection ──────────────────────────────────────────
-function detectConfluence(symbol) {
-  const smc      = smcStore[symbol];
-  const patterns = global.patternStore && global.patternStore[symbol];
+// ── Confluence detection — now per user+symbol ─────────────────────
+function detectConfluence(userId, symbol) {
+  const key      = storeKey(userId, symbol);
+  const smc      = smcStore[key];
+  const patterns = global.patternStore && global.patternStore[key];
   if (!smc || !patterns || !patterns.length) return;
 
   const obs  = smc.orderBlocks || [];
@@ -60,9 +72,9 @@ function detectConfluence(symbol) {
     });
 
     if (matchingOB && matchingFVG) {
-      const confluenceKey = `${symbol}_${pattern.name}_${pattern.timeframe}`;
-      if (lastConfluence[symbol] === confluenceKey) continue;
-      lastConfluence[symbol] = confluenceKey;
+      const confluenceKey = `${key}_${pattern.name}_${pattern.timeframe}`;
+      if (lastConfluence[key] === confluenceKey) continue;
+      lastConfluence[key] = confluenceKey;
 
       const alert = {
         id:        Date.now(), symbol,
@@ -74,12 +86,16 @@ function detectConfluence(symbol) {
       };
 
       newAlerts.push(alert);
-      if (!confluenceStore[symbol]) confluenceStore[symbol] = [];
-      confluenceStore[symbol].unshift(alert);
-      if (confluenceStore[symbol].length > 20) confluenceStore[symbol].pop();
+      if (!confluenceStore[key]) confluenceStore[key] = [];
+      confluenceStore[key].unshift(alert);
+      if (confluenceStore[key].length > 20) confluenceStore[key].pop();
 
-      console.log(`[CONFLUENCE] ${symbol} ${direction} — ${pattern.name} on OB + FVG @ ${price}`);
+      console.log(`[CONFLUENCE] user=${userId} ${symbol} ${direction} — ${pattern.name} on OB + FVG @ ${price}`);
 
+      // Owner's ops bot still gets everything (unchanged, single chat).
+      // Per-customer Telegram alerts for confluence aren't wired up yet —
+      // same gap flagged earlier for pattern alerts in app.js; needs
+      // telegram-store.js's per-user chat-id lookup to close properly.
       const dirIcon = direction === 'bullish' ? '🟢' : '🔴';
       sendTelegram(
         `${dirIcon} <b>SMC CONFLUENCE ALERT</b>\n` +
@@ -97,52 +113,83 @@ function detectConfluence(symbol) {
 
 // ── POST /smc ─────────────────────────────────────────────────────
 // No inline express.json() — global middleware in app.js handles it
-router.post('/smc', (req, res) => {
+router.post('/smc', async (req, res) => {
   const data = req.body;
   if (!data || !data.symbol) return res.status(400).json({ error: 'Missing symbol' });
-  smcStore[data.symbol] = { ...data, receivedAt: new Date().toISOString() };
-  console.log(`[SMC] Updated ${data.symbol} — structure: ${(data.structure||[]).length} OBs: ${(data.orderBlocks||[]).length} FVGs: ${(data.fvgs||[]).length}`);
-  detectConfluence(data.symbol);
+
+  const userId = await getUserIdForLicenceKey(data.licenceKey);
+  if (!userId) {
+    console.warn('[SMC] Rejected — no valid licenceKey. Update EA to v3.8+.');
+    return res.status(401).json({ error: 'Missing or invalid licenceKey' });
+  }
+
+  const key = storeKey(userId, data.symbol);
+  smcStore[key] = { ...data, receivedAt: new Date().toISOString() };
+  console.log(`[SMC] user=${userId} updated ${data.symbol} — structure: ${(data.structure||[]).length} OBs: ${(data.orderBlocks||[]).length} FVGs: ${(data.fvgs||[]).length}`);
+  detectConfluence(userId, data.symbol);
   res.json({ ok: true, symbol: data.symbol });
 });
 
 // ── POST /smc/patterns ────────────────────────────────────────────
 // No inline express.json() — global middleware in app.js handles it
-router.post('/smc/patterns', (req, res) => {
-  const { symbol, patterns } = req.body;
+router.post('/smc/patterns', async (req, res) => {
+  const { symbol, patterns, licenceKey } = req.body;
   if (!symbol || !patterns) return res.status(400).json({ error: 'Missing fields' });
+
+  const userId = await getUserIdForLicenceKey(licenceKey);
+  if (!userId) return res.status(401).json({ error: 'Missing or invalid licenceKey' });
+
   if (!global.patternStore) global.patternStore = {};
-  global.patternStore[symbol] = patterns;
-  const alerts = detectConfluence(symbol);
+  const key = storeKey(userId, symbol);
+  global.patternStore[key] = patterns;
+  const alerts = detectConfluence(userId, symbol);
   res.json({ ok: true, confluenceFound: (alerts && alerts.length > 0) });
 });
 
-// ── GET /smc ──────────────────────────────────────────────────────
-router.get('/smc', (req, res) => res.json(smcStore));
+// ── GET /smc — only this user's own symbols, prefix stripped ──────
+router.get('/smc', requirePlan('pro'), (req, res) => {
+  const prefix = `${req.user.id}::`;
+  const out = {};
+  Object.keys(smcStore).forEach(k => {
+    if (k.startsWith(prefix)) out[k.slice(prefix.length)] = smcStore[k];
+  });
+  res.json(out);
+});
 
 // ── GET /smc/:symbol ──────────────────────────────────────────────
-// v2.3 fix: tries exact → uppercase → strip Exness 'c' suffix
-// so GBPUSDc, GBPUSDC, and GBPUSD all resolve correctly
-router.get('/smc/:symbol', (req, res) => {
+// v2.3 fix retained: tries exact → uppercase → strip Exness 'c' suffix
+// so GBPUSDc, GBPUSDC, and GBPUSD all resolve correctly — now scoped to
+// the logged-in user's own data only.
+router.get('/smc/:symbol', requirePlan('pro'), (req, res) => {
   const raw  = req.params.symbol;
   const up   = raw.toUpperCase();
-  const data = smcStore[raw]
-            || smcStore[up]
-            || smcStore[up.replace(/C$/, '')]
+  const uid  = req.user.id;
+  const data = smcStore[storeKey(uid, raw)]
+            || smcStore[storeKey(uid, up)]
+            || smcStore[storeKey(uid, up.replace(/C$/, ''))]
             || null;
   if (!data) return res.status(404).json({ error: `No SMC data for ${raw}` });
   res.json(data);
 });
 
 // ── GET /confluence ───────────────────────────────────────────────
-router.get('/confluence',         (req, res) => res.json(confluenceStore));
-router.get('/confluence/:symbol', (req, res) => {
+router.get('/confluence', requirePlan('pro'), (req, res) => {
+  const prefix = `${req.user.id}::`;
+  const out = {};
+  Object.keys(confluenceStore).forEach(k => {
+    if (k.startsWith(prefix)) out[k.slice(prefix.length)] = confluenceStore[k];
+  });
+  res.json(out);
+});
+router.get('/confluence/:symbol', requirePlan('pro'), (req, res) => {
   const sym = req.params.symbol.toUpperCase();
-  res.json(confluenceStore[sym] || []);
+  res.json(confluenceStore[storeKey(req.user.id, sym)] || []);
 });
 
 // ── EXPORT router AND smcStore ────────────────────────────────────
-// smcStore exported so app.js /api/analyse can read it directly
-// without making an internal HTTP call
+// smcStore exported so app.js /api/analyse can read it directly —
+// app.js now builds the same `${userId}::${symbol}` key itself (updated
+// alongside this file) instead of the old plain-symbol key.
 module.exports          = router;
 module.exports.smcStore = smcStore;
+module.exports.storeKey = storeKey;
