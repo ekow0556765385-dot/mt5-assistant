@@ -32,6 +32,36 @@ app.use((req, res, next) => {
 // ── SMC route registered AFTER middleware so req.body is parsed ───
 const smcRoute  = require('./smc-route');
 const smcStore  = smcRoute.smcStore;
+const smcStoreKey = smcRoute.storeKey; // `${userId}::${symbol}` — same helper smc-route.js uses
+
+// agent-module.js (and /api/analyse below) still expect a plain
+// {symbol: data} object, not the `${userId}::${symbol}`-keyed store —
+// this builds that view for one user without needing to touch
+// agent-module.js's own lookup code.
+function getSmcStoreForUser(userId) {
+  const prefix = `${userId}::`;
+  const out = {};
+  Object.keys(smcStore).forEach(k => {
+    if (k.startsWith(prefix)) out[k.slice(prefix.length)] = smcStore[k];
+  });
+  return out;
+}
+
+// registerAgentRoutes()/startAgentLoop() only run ONCE at server startup
+// and capture whatever object reference they're given inside a closure —
+// the original code relied on that captured reference being the SAME
+// object smc-route.js kept mutating (so it stayed "live" without ever
+// being reassigned). A freshly-built plain object from
+// getSmcStoreForUser() at boot time (when primaryUserId is still null)
+// would freeze forever as {} — so instead we keep ONE persistent object
+// here and refresh its contents in place right before the agent needs
+// them, preserving the original live-reference behavior.
+const livePrimarySmcView = {};
+function refreshPrimarySmcView() {
+  const fresh = getSmcStoreForUser(primaryUserId);
+  Object.keys(livePrimarySmcView).forEach(k => delete livePrimarySmcView[k]);
+  Object.assign(livePrimarySmcView, fresh);
+}
 app.use(smcRoute);
 
 // ── Agent ─────────────────────────────────────────────────────────
@@ -340,7 +370,7 @@ let newsEvents = [];
 // saveOpenSnapshots() defined next to loadMathTrades()/saveMathTrades() below.
 
 // ── Register agent routes — still single-account under the hood ───
-registerAgentRoutes(app, () => getState(primaryUserId), smcStore, getCandlesStore(primaryUserId));
+registerAgentRoutes(app, () => getState(primaryUserId), livePrimarySmcView, getCandlesStore(primaryUserId));
 
 // ── WebSocket — now identifies which account each browser tab belongs
 // to via the same signed session cookie HTTP routes use, and only
@@ -461,6 +491,7 @@ app.post('/api/update', async (req, res) => {
     return res.status(401).json({ error: 'Missing or invalid licenceKey. Update your EA and paste your Blackwood licence key into its inputs.' });
   }
   primaryUserId = userId; // agent still follows "whichever account is currently active"
+  refreshPrimarySmcView();
 
   const s  = getState(userId);
   const cs = getCandlesStore(userId);
@@ -601,7 +632,7 @@ app.post('/api/candles', async (req, res) => {
     };
     console.log(`[Candles] user=${userId} ${sym} ${tf} — ${d.candles.length} bars stored`);
     broadcast(userId, 'CANDLE_UPDATE', { symbol: sym, timeframe: tf, candles: d.candles });
-    if (userId === primaryUserId) triggerAgentOnCandle(s, smcStore, cs, tf);
+    if (userId === primaryUserId) { refreshPrimarySmcView(); triggerAgentOnCandle(s, livePrimarySmcView, cs, tf); }
     return res.json({ ok: true, symbol: sym, timeframe: tf, bars: d.candles.length });
   }
 
@@ -611,7 +642,7 @@ app.post('/api/candles', async (req, res) => {
       s.candles[sym][tf]  = arr;
       allPatterns[tf]      = runPatternDetection(userId, sym, tf, arr);
       s.patterns[sym][tf] = allPatterns[tf];
-      if (userId === primaryUserId) triggerAgentOnCandle(s, smcStore, cs, tf);
+      if (userId === primaryUserId) { refreshPrimarySmcView(); triggerAgentOnCandle(s, livePrimarySmcView, cs, tf); }
     });
     broadcast(userId, 'CANDLE_UPDATE', { symbol: sym, candles: s.candles[sym], patterns: allPatterns });
     return res.json({ ok: true, patternsDetected: Object.values(allPatterns).flat().length });
@@ -746,13 +777,14 @@ app.post('/api/analyse', requirePlan('pro'), async (req, res) => {
     }
   }
 
-  const s  = getState(req.user.id);
-  const cs = getCandlesStore(req.user.id);
+  const s   = getState(req.user.id);
+  const cs  = getCandlesStore(req.user.id);
+  const usc = getSmcStoreForUser(req.user.id); // this user's own SMC data, plain symbol-keyed
 
   const sym = s.symbol
     || Object.keys(cs)[0]
     || (Object.keys(s.livePatterns)[0] || '').split('_')[0]
-    || Object.keys(smcStore)[0] // smcStore is still global (symbol-keyed only) — pending smc-route.js rework
+    || Object.keys(usc)[0]
     || '';
 
   if (!sym) {
@@ -769,9 +801,9 @@ app.post('/api/analyse', requirePlan('pro'), async (req, res) => {
     accountInfo: s.accountInfo
   };
 
-  const smcData = smcStore[sym]
-    || smcStore[sym.replace('c','')]
-    || Object.values(smcStore)[0]
+  const smcData = usc[sym]
+    || usc[sym.replace('c','')]
+    || Object.values(usc)[0]
     || {};
 
   const patKey      = Object.keys(s.livePatterns).find(k => k.startsWith(sym)) || Object.keys(s.livePatterns)[0] || '';
@@ -1525,5 +1557,5 @@ http.listen(3000, '0.0.0.0', () => {
   ║   Email (Resend)    : Auto-sent on payment        ║
   ╚══════════════════════════════════════════════════╝
   `);
-  startAgentLoop(() => getState(primaryUserId), smcStore, getCandlesStore(primaryUserId));
+  startAgentLoop(() => getState(primaryUserId), livePrimarySmcView, getCandlesStore(primaryUserId));
 });
