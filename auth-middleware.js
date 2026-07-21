@@ -498,4 +498,4 @@ async function resetUserCredits(userId) {
   return resetAt;
 }
 
-module.exports = { requireAuth, requirePlan, getMe, validateKey, regenerateKey, getUserFromToken, getUserPlan, getUserIdForLicenceKey, isOwner, issueTicketRoute, SUPABASE_URL, SUPABASE_SERVICE, supabaseServiceHeaders, htmlRedirect, MONTHLY_CREDIT_USD, getUserCredits, deductCredits, resetUserCredits };
+module.exports = { requireAuth, requirePlan, getMe, validateKey, regenerateKey, getUserFromToken, getUserPlan, getUserIdForLicenceKey, verifyAppSession, isOwner, issueTicketRoute, SUPABASE_URL, SUPABASE_SERVICE, supabaseServiceHeaders, htmlRedirect, MONTHLY_CREDIT_USD, getUserCredits, deductCredits, resetUserCredits };
