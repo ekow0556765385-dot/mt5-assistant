@@ -1342,6 +1342,42 @@ app.post('/api/math-trades', async (req, res) => {
     const existing        = loadMathTrades(userId);
     const existingTickets = new Set((existing.closed_trades || []).map(t => String(t.ticket)));
 
+    // ── Account-switch detection ──────────────────────────────────
+    // This check already existed in /api/update (the main EA's endpoint)
+    // but was missing here — meaning if you switched MT5 accounts and
+    // MathReporter (a separate EA, its own connection) started reporting
+    // the new account, this route had no way to know the account had
+    // changed and just kept appending the new account's trades onto the
+    // old account's history forever, deduped only by ticket number. Same
+    // detection logic as /api/update, applied here too.
+    let accountSwitched = false;
+    if (body.account && body.account.login) {
+      const newLogin      = String(body.account.login || '');
+      const newCurrency   = String(body.account.currency || 'USD');
+      const storedLogin   = String(existing.account && existing.account.login    ? existing.account.login    : '');
+      const storedCurrency= String(existing.account && existing.account.currency ? existing.account.currency : 'USD');
+      const newBalance    = parseFloat(body.account.balance || 0);
+      const storedBalance = parseFloat(existing.account && existing.account.balance ? existing.account.balance : 0);
+
+      const loginChanged    = newLogin && storedLogin && newLogin !== storedLogin;
+      const currencyChanged = storedCurrency && newCurrency && newCurrency !== storedCurrency;
+      const balanceJumped   = storedBalance > 0 && newBalance > 0 &&
+                              Math.abs(newBalance - storedBalance) / storedBalance > 0.20 &&
+                              existing.closed_trades && existing.closed_trades.length > 0;
+
+      if (loginChanged || currencyChanged || balanceJumped) {
+        const reason = loginChanged    ? ('login '    + storedLogin    + ' -> ' + newLogin)
+                     : currencyChanged ? ('currency ' + storedCurrency + ' -> ' + newCurrency)
+                     : ('balance $' + storedBalance.toFixed(0) + ' -> $' + newBalance.toFixed(0));
+        console.log(`[MATH] user=${userId} account switched via MathReporter (${reason}) — clearing this user's math-trades history`);
+        existing.closed_trades = [];
+        existing.open_trades   = [];
+        existing.stats         = {};
+        existingTickets.clear();
+        accountSwitched = true;
+      }
+    }
+
     const incoming  = (body.closed_trades || [])
       .map((t, i) => normaliseClosedTrade(userId, t, i))
       .filter(t => t !== null);
@@ -1357,9 +1393,9 @@ app.post('/api/math-trades', async (req, res) => {
       last_update:   new Date().toISOString()
     };
     saveMathTrades(userId, data);
-    console.log(`[MATH] user=${userId} received: ${allClosed.length} total closed, ${newTrades.length} new, ${(body.open_trades||[]).length} open`);
+    console.log(`[MATH] user=${userId} received: ${allClosed.length} total closed, ${newTrades.length} new, ${(body.open_trades||[]).length} open${accountSwitched ? ' [ACCOUNT SWITCH — history reset]' : ''}`);
     res.set('Access-Control-Allow-Origin', '*');
-    res.json({ ok: true, closed: allClosed.length, new_trades: newTrades.length });
+    res.json({ ok: true, closed: allClosed.length, new_trades: newTrades.length, account_switched: accountSwitched });
   } catch(e) {
     console.error('[MATH] POST error:', e.message);
     res.status(500).json({ error: e.message });
@@ -1376,8 +1412,24 @@ app.get('/api/math-data', requirePlan('pro'), (req, res) => {
       ? normaliseAccount(st.accountInfo)
       : (math.account || {});
 
+    // The live feed (main EA) never includes float_r at all — only
+    // MathReporter's feed does. Previously, whenever the live feed had
+    // any open trades, it was used exclusively and float_r was silently
+    // lost even when MathReporter had it. Now we take the live feed as
+    // the base (it's more current) but backfill float_r by ticket from
+    // MathReporter's feed when the live entry is missing it.
+    const mathOpenByTicket = {};
+    (math.open_trades || []).forEach(t => { if (t && t.ticket) mathOpenByTicket[String(t.ticket)] = t; });
+
     const liveOpen = (st.openTrades && st.openTrades.length > 0)
-      ? st.openTrades.map(normaliseOpenTrade)
+      ? st.openTrades.map(t => {
+          const n = normaliseOpenTrade(t);
+          if (n.float_r == null) {
+            const match = mathOpenByTicket[String(n.ticket)];
+            if (match && match.float_r != null) n.float_r = parseFloat(match.float_r);
+          }
+          return n;
+        })
       : (math.open_trades || []).map(normaliseOpenTrade);
 
     let mathClosed   = math.closed_trades || [];
