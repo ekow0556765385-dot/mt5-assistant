@@ -1,0 +1,661 @@
+<!-- smc-panel.html v4 — Blackwood SMC Dashboard (light theme) -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SMC Panel — Blackwood</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #13131e;
+  --bg-sec:    #1e1e30;
+  --bg-ter:    #16161f;
+  --border:    #2a2a40;
+  --border-md: #3a3a55;
+  --text-pri:  #e0e0e8;
+  --text-sec:  #9898b0;
+  --text-ter:  #6b7280;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --bull:       #4ade80;
+  --bull-mid:   #22c55e;
+  --bull-light: #14532d;
+  --bull-border:#166534;
+
+  --bear:       #f87171;
+  --bear-mid:   #ef4444;
+  --bear-light: #450a0a;
+  --bear-border:#7f1d1d;
+
+  --warn:       #fb923c;
+  --warn-mid:   #f97316;
+  --warn-light: #431407;
+  --warn-border:#9a3412;
+
+  --info:       #60a5fa;
+  --info-mid:   #3b82f6;
+  --info-light: #1e3a5f;
+  --info-border:#1e40af;
+
+  --purple:       #c084fc;
+  --purple-light: #3b0764;
+  --purple-border:#6b21a8;
+}
+
+body {
+  background: #0d0d14;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: var(--text-pri);
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+.header {
+  padding: 14px 20px;
+  background: var(--bg);
+  border-bottom: 0.5px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.header-left { display: flex; align-items: center; gap: 10px; }
+.header h1 { font-size: 15px; font-weight: 500; color: var(--text-pri); }
+.live-dot { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-ter); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--bull-mid); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.header-right { font-size: 11px; color: var(--text-ter); }
+
+/* ── Pair tabs ── */
+.pair-tabs {
+  display: flex; gap: 6px; padding: 12px 20px;
+  background: var(--bg); border-bottom: 0.5px solid var(--border);
+  flex-wrap: wrap;
+}
+.tab {
+  font-size: 12px; font-weight: 500; padding: 4px 12px;
+  border-radius: var(--radius-md); border: 0.5px solid var(--border);
+  background: transparent; color: var(--text-sec); cursor: pointer;
+  transition: all 0.15s;
+}
+.tab.active, .tab:hover {
+  background: var(--bg-sec); color: var(--text-pri); border-color: var(--border-md);
+}
+
+/* ── Main ── */
+.main { padding: 16px 20px; max-width: 1200px; margin: 0 auto; }
+
+/* ── Alert banners ── */
+.alert-banner {
+  border-radius: var(--radius-lg); padding: 12px 16px;
+  margin-bottom: 10px; display: flex; gap: 12px; align-items: flex-start;
+}
+.alert-banner.confluence-bull { background: var(--bull-light); border: 0.5px solid var(--bull-border); }
+.alert-banner.confluence-bear { background: var(--bear-light); border: 0.5px solid var(--bear-border); }
+.alert-banner.sweep-warning   { background: var(--warn-light); border: 0.5px solid var(--warn-border); }
+.alert-banner.no-signal       { background: var(--bg-ter);     border: 0.5px solid var(--border); }
+
+.alert-icon { font-size: 17px; margin-top: 1px; flex-shrink: 0; }
+.alert-icon.bull  { color: var(--bull-mid); }
+.alert-icon.bear  { color: var(--bear-mid); }
+.alert-icon.warn  { color: var(--warn-mid); }
+.alert-icon.muted { color: var(--text-ter); }
+
+.alert-title { font-size: 12px; font-weight: 500; margin-bottom: 3px; }
+.alert-title.bull  { color: var(--bull); }
+.alert-title.bear  { color: var(--bear); }
+.alert-title.warn  { color: var(--warn); }
+.alert-title.muted { color: var(--text-ter); }
+
+.alert-desc { font-size: 11px; line-height: 1.55; }
+.alert-desc.bull  { color: var(--bull-mid); }
+.alert-desc.bear  { color: var(--bear-mid); }
+.alert-desc.warn  { color: var(--warn); }
+.alert-desc.muted { color: var(--text-ter); }
+
+/* ── Section labels ── */
+.section-label {
+  font-size: 11px; font-weight: 500; color: var(--text-ter);
+  letter-spacing: 0.07em; text-transform: uppercase;
+  margin-bottom: 10px; margin-top: 20px;
+}
+
+/* ── Order block cards ── */
+.ob-card {
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  border-left: 3px solid transparent;
+}
+.ob-card.bullish { border-left-color: var(--bull-mid); }
+.ob-card.bearish { border-left-color: var(--bear-mid); }
+
+.ob-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.ob-title { display: flex; align-items: center; gap: 8px; }
+.ob-title-text { font-size: 13px; font-weight: 500; color: var(--text-pri); }
+
+.ob-direction-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: var(--radius-md); }
+.ob-direction-badge.bull { background: var(--bull-light); color: var(--bull); }
+.ob-direction-badge.bear { background: var(--bear-light); color: var(--bear); }
+
+.ob-tf {
+  font-size: 11px; color: var(--text-ter);
+  background: var(--bg-sec); padding: 2px 8px;
+  border-radius: var(--radius-md); border: 0.5px solid var(--border);
+}
+.ob-desc { font-size: 12px; color: var(--text-sec); line-height: 1.55; margin-bottom: 12px; }
+
+.ob-meta { display: flex; gap: 20px; flex-wrap: wrap; }
+.ob-meta-item { display: flex; flex-direction: column; gap: 2px; }
+.meta-label { font-size: 10px; color: var(--text-ter); text-transform: uppercase; letter-spacing: 0.05em; }
+.meta-val { font-size: 12px; font-weight: 500; color: var(--text-pri); font-family: monospace; }
+.meta-val.bull { color: var(--bull); }
+.meta-val.bear { color: var(--bear); }
+
+.strength-bar { height: 3px; border-radius: 2px; background: var(--bg-ter); margin-top: 12px; overflow: hidden; }
+.strength-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+.strength-fill.bull { background: var(--bull-mid); }
+.strength-fill.bear { background: var(--bear-mid); }
+
+/* ── FVG rows ── */
+.fvg-row {
+  background: var(--bg); border: 0.5px solid var(--border);
+  border-radius: var(--radius-md); padding: 10px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.fvg-title { font-size: 12px; font-weight: 500; color: var(--text-pri); margin-bottom: 3px; }
+.fvg-sub   { font-size: 11px; color: var(--text-ter); }
+.fvg-range { font-size: 12px; font-weight: 500; font-family: monospace; }
+.fvg-range.bull { color: var(--bull); }
+.fvg-range.bear { color: var(--bear); }
+.fvg-meta  { font-size: 10px; color: var(--text-ter); margin-top: 3px; text-align: right; }
+
+/* ── Structure rows ── */
+.struct-row {
+  background: var(--bg); border: 0.5px solid var(--border);
+  border-radius: var(--radius-md); padding: 10px 14px;
+  display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
+}
+.struct-icon {
+  width: 32px; height: 32px; border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+}
+.struct-icon.bos-bull   { background: var(--info-light);   color: var(--info); }
+.struct-icon.bos-bear   { background: var(--bear-light);   color: var(--bear-mid); }
+.struct-icon.choch-bull { background: var(--purple-light); color: var(--purple); }
+.struct-icon.choch-bear { background: var(--warn-light);   color: var(--warn-mid); }
+
+.struct-name { font-size: 12px; font-weight: 500; color: var(--text-pri); }
+.struct-desc { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+.struct-level { font-size: 11px; font-family: monospace; color: var(--text-sec); }
+.struct-time  { font-size: 10px; color: var(--text-ter); margin-top: 2px; }
+
+/* ── Pair cards grid ── */
+.pair-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px,1fr)); gap: 16px; }
+.pair-card {
+  background: var(--bg); border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg); padding: 14px; cursor: pointer;
+  transition: border-color 0.15s;
+}
+.pair-card:hover { border-color: var(--border-md); }
+.pair-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.pair-card-title { font-size: 14px; font-weight: 500; color: var(--text-pri); }
+.pair-card-tf    { font-size: 11px; color: var(--text-ter); }
+.pair-updated    { font-size: 10px; color: var(--text-ter); margin-top: 12px; text-align: right; }
+.no-data         { font-size: 12px; color: var(--text-ter); font-style: italic; }
+
+/* ── Confluence section (grid view) ── */
+.conf-section-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-ter); margin-bottom: 10px;
+}
+.conf-alert {
+  border-radius: var(--radius-md); padding: 10px 14px;
+  margin-bottom: 8px; display: flex;
+  justify-content: space-between; align-items: flex-start;
+  flex-wrap: wrap; gap: 8px;
+}
+.conf-alert.bull { background: var(--bull-light); border: 0.5px solid var(--bull-border); }
+.conf-alert.bear { background: var(--bear-light); border: 0.5px solid var(--bear-border); }
+.conf-label      { font-size: 13px; font-weight: 500; }
+.conf-label.bull { color: var(--bull); }
+.conf-label.bear { color: var(--bear); }
+.conf-detail     { font-size: 11px; color: var(--text-sec); margin-top: 3px; }
+.conf-badge      { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; margin-left: 6px; }
+.conf-badge.bull { background: var(--bull-light); color: var(--bull); }
+.conf-badge.bear { background: var(--bear-light); color: var(--bear); }
+.conf-price      { font-family: monospace; font-size: 12px; color: var(--text-pri); text-align: right; }
+.conf-zones      { font-size: 10px; color: var(--text-ter); margin-top: 3px; text-align: right; }
+
+/* ── Card mini rows ── */
+.mini-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12px;
+}
+.mini-row.bull { background: var(--bull-light); color: var(--bull); }
+.mini-row.bear { background: var(--bear-light); color: var(--bear); }
+.mini-row.bos-bull   { background: var(--info-light);   color: var(--info); }
+.mini-row.bos-bear   { background: var(--bear-light);   color: var(--bear-mid); }
+.mini-row.choch-bull { background: var(--purple-light); color: var(--purple); }
+.mini-row.choch-bear { background: var(--warn-light);   color: var(--warn-mid); }
+.mini-mono { font-family: monospace; font-size: 11px; color: var(--text-sec); }
+
+.divider { height: 0.5px; background: var(--border); margin: 16px 0; }
+
+/* ── Recent badge ── */
+.recent-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 600; padding: 2px 7px;
+  border-radius: 20px;
+  background: #14532d; color: #4ade80;
+  border: 0.5px solid #166534;
+}
+.recent-badge .rdot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #22c55e; animation: pulse 2s infinite;
+}
+.age-label {
+  font-size: 10px; color: var(--text-ter);
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="live-dot"><div class="dot"></div><span>Live</span></div>
+    <h1>Smart Money Concepts — Blackwood</h1>
+  </div>
+  <div class="header-right" id="lastUpdate">Waiting for data...</div>
+</div>
+
+<div class="pair-tabs" id="pairTabs" style="display:flex;align-items:center;justify-content:space-between">
+  <div style="display:flex;gap:6px" id="pairTabsInner">
+    <button class="tab active" data-sym="ALL">All Pairs</button>
+  </div>
+  <div style="display:flex;gap:4px" id="smcTfToggle">
+    <button class="tab active" data-tf="H1" onclick="window.__selectSmcTF('H1',this)">H1</button>
+    <button class="tab" data-tf="H4" onclick="window.__selectSmcTF('H4',this)">H4</button>
+  </div>
+</div>
+
+<div class="main">
+  <div id="alertsSection"></div>
+  <div id="detailSection" style="display:none">
+    <div id="obSection"></div>
+    <div id="fvgSection"></div>
+    <div id="structSection"></div>
+  </div>
+  <div id="gridSection">
+    <p style="color:var(--text-ter);font-size:13px;padding:20px 0">Waiting for SMC data from MT5...</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  let smcData  = {};
+  let confData = {};
+  let activeSym = 'ALL';
+  let activeTF  = 'H1'; // SMC panel's own toggle — independent of the main MT5 Assistant's timeframe selection
+
+  function selectSmcTF(tf, btn){
+    if(tf===activeTF) return;
+    activeTF=tf;
+    document.querySelectorAll('#smcTfToggle .tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    refresh(); // re-fetch immediately using the new timeframe's endpoint
+  }
+  window.__selectSmcTF = selectSmcTF;
+
+  const pairTabs  = document.getElementById('pairTabsInner');
+  const alertsSec = document.getElementById('alertsSection');
+  const detailSec = document.getElementById('detailSection');
+  const obSec     = document.getElementById('obSection');
+  const fvgSec    = document.getElementById('fvgSection');
+  const structSec = document.getElementById('structSection');
+  const gridSec   = document.getElementById('gridSection');
+  const lastUpd   = document.getElementById('lastUpdate');
+
+  // ── Recency helpers ──────────────────────────────────────────
+  function parseAge(timeStr) {
+    if (!timeStr) return null;
+    // MT5 format: "2025.06.15 14:00" or ISO string
+    const iso = timeStr.replace(/(\d{4})\.(\d{2})\.(\d{2})/, '$1-$2-$3');
+    const d = new Date(iso);
+    return isNaN(d) ? null : (Date.now() - d.getTime());
+  }
+
+  function recentBadge(ageMs) {
+    if (ageMs === null) return '';
+    const mins = Math.floor(ageMs / 60000);
+    const hrs  = Math.floor(mins / 60);
+    if (mins < 1)   return `<span class="recent-badge"><span class="rdot"></span>Just now</span>`;
+    if (mins < 60)  return `<span class="recent-badge"><span class="rdot"></span>${mins}m ago</span>`;
+    if (hrs  < 2)   return `<span class="recent-badge"><span class="rdot"></span>${hrs}h ${mins%60}m ago</span>`;
+    // Older — show muted age only
+    if (hrs  < 24)  return `<span class="age-label">${hrs}h ago</span>`;
+    return `<span class="age-label">${Math.floor(hrs/24)}d ago</span>`;
+  }
+
+  function obDesc(dir) {
+    return dir === 'Bullish'
+      ? 'Institutions placed large buy orders here. Price is likely to return to this zone to fill remaining orders before pushing higher. First touch is the strongest.'
+      : 'Institutions distributed sell positions here. This overhead zone is likely to cap any rally and push price back down. Avoid longs near this level.';
+  }
+  function fvgDesc(dir) {
+    return dir === 'Bullish'
+      ? 'Price left an imbalance moving up — likely to retrace and fill this gap before continuing higher.'
+      : 'Overhead imbalance from a strong bearish move — acts as a magnet for price on any push up.';
+  }
+  function structDesc(type) {
+    return {
+      BOS_Bull:   'Break of structure to the upside — trend shifting in favour of buyers.',
+      BOS_Bear:   'Break of structure to the downside — sellers gaining control.',
+      CHoCH_Bull: 'Change of character — short-term momentum flipped bullish. Watch for continuation or bear trap.',
+      CHoCH_Bear: 'Change of character — short-term momentum flipped bearish. Watch for bull trap or continuation down.'
+    }[type] || type;
+  }
+  function structLabel(type) {
+    return { BOS_Bull:'BOS — Bullish', BOS_Bear:'BOS — Bearish', CHoCH_Bull:'CHoCH — Bullish', CHoCH_Bear:'CHoCH — Bearish' }[type] || type;
+  }
+  function structIcon(type) {
+    return {
+      BOS_Bull:   ['ti-trending-up',    'bos-bull'],
+      BOS_Bear:   ['ti-trending-down',  'bos-bear'],
+      CHoCH_Bull: ['ti-arrows-exchange','choch-bull'],
+      CHoCH_Bear: ['ti-arrows-exchange','choch-bear']
+    }[type] || ['ti-activity','bos-bull'];
+  }
+  function obStrength(ob) {
+    const r = Math.abs(parseFloat(ob.high) - parseFloat(ob.low));
+    if (r > 0.0015) return { label:'High',   pct:85 };
+    if (r > 0.0008) return { label:'Medium', pct:55 };
+    return               { label:'Low',    pct:28 };
+  }
+  function sweepWarning(obs, price) {
+    if (!obs || !obs.length || !price) return null;
+    const p = parseFloat(price);
+    if (!p || isNaN(p)) return null;
+
+    for (const ob of obs) {
+      const hi  = parseFloat(ob.high);
+      const lo  = parseFloat(ob.low);
+      const buf = (hi - lo) * 3; // 3x OB size as approach buffer
+
+      if (ob.direction === 'Bullish') {
+        // Price is approaching the OB from above (within buffer) but hasn't swept below lo yet
+        const approaching = p > lo && p < lo + buf;
+        if (approaching) {
+          return { msg: `Price is approaching Bullish OB (${lo.toFixed(5)}–${hi.toFixed(5)}) but the low at ${lo.toFixed(5)} has not been swept yet. Wait for price to wick below ${lo.toFixed(5)}, reject, and close back inside before entering long.` };
+        }
+      } else {
+        // Price is approaching Bearish OB from below but hasn't swept above hi yet
+        const approaching = p < hi && p > hi - buf;
+        if (approaching) {
+          return { msg: `Price is approaching Bearish OB (${lo.toFixed(5)}–${hi.toFixed(5)}) but the high at ${hi.toFixed(5)} has not been swept yet. Wait for price to wick above ${hi.toFixed(5)}, reject, and close back inside before entering short.` };
+        }
+      }
+    }
+    return null;
+  }
+
+  function renderAlerts(sym, data) {
+    const allConf = Object.values(confData).flat()
+      .filter(a => a.symbol === sym)
+      .sort((a,b) => new Date(b.time) - new Date(a.time))
+      .slice(0, 3);
+
+    let html = '';
+    if (allConf.length) {
+      allConf.forEach(a => {
+        const isBull = a.direction === 'bullish';
+        const cls = isBull ? 'bull' : 'bear';
+        const icon = isBull ? 'ti-circle-check' : 'ti-circle-x';
+        const time = new Date(a.time).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+        html += `
+          <div class="alert-banner confluence-${cls}">
+            <i class="ti ${icon} alert-icon ${cls}"></i>
+            <div>
+              <div class="alert-title ${cls}">${isBull?'Bullish':'Bearish'} confluence — ${a.confidence}% confidence</div>
+              <div class="alert-desc ${cls}">${a.pattern} aligns with OB (${parseFloat(a.ob.high).toFixed(5)}–${parseFloat(a.ob.low).toFixed(5)}) and FVG at ${parseFloat(a.price).toFixed(5)} · ${time}</div>
+            </div>
+          </div>`;
+      });
+    } else {
+      html += `
+        <div class="alert-banner no-signal">
+          <i class="ti ti-clock alert-icon muted"></i>
+          <div>
+            <div class="alert-title muted">No confluence detected</div>
+            <div class="alert-desc muted">Waiting for OB + FVG + pattern to align on ${sym}.</div>
+          </div>
+        </div>`;
+    }
+
+    const sw = sweepWarning(data.orderBlocks, data.price || data.currentPrice || null);
+    if (sw) {
+      html += `
+        <div class="alert-banner sweep-warning">
+          <i class="ti ti-alert-triangle alert-icon warn"></i>
+          <div>
+            <div class="alert-title warn">Liquidity sweep not confirmed — do not enter yet</div>
+            <div class="alert-desc warn">${sw.msg}</div>
+          </div>
+        </div>`;
+    }
+    alertsSec.innerHTML = html;
+  }
+
+  function renderOBs(obs, tf) {
+    if (!obs || !obs.length) {
+      obSec.innerHTML = `<div class="section-label">Order blocks</div><div class="no-data" style="margin-bottom:16px">No active order blocks</div>`;
+      return;
+    }
+    obSec.innerHTML = `<div class="section-label">Order blocks</div>` + obs.map((ob, i) => {
+      const isBull = ob.direction === 'Bullish';
+      const cls = isBull ? 'bullish' : 'bearish';
+      const bc  = isBull ? 'bull' : 'bear';
+      const s   = obStrength(ob);
+      // Use ob.timeStart (MT5 format "2025.06.15 14:00") for accurate age
+      const ageMs = parseAge(ob.timeStart || null);
+      const badge = recentBadge(ageMs);
+      return `
+        <div class="ob-card ${cls}">
+          <div class="ob-top">
+            <div class="ob-title">
+              <i class="ti ti-building-bank" style="font-size:15px;color:${isBull?'var(--bull-mid)':'var(--bear-mid)'}"></i>
+              <span class="ob-title-text">${ob.direction} OB — ${isBull?'Buy zone':'Sell zone'}</span>
+              <span class="ob-direction-badge ${bc}">${isBull?'BUY':'SELL'}</span>
+              ${badge}
+            </div>
+            <span class="ob-tf">${tf||''}</span>
+          </div>
+          <div class="ob-desc">${obDesc(ob.direction)}</div>
+          <div class="ob-meta">
+            <div class="ob-meta-item"><span class="meta-label">Top</span><span class="meta-val ${bc}">${parseFloat(ob.high).toFixed(5)}</span></div>
+            <div class="ob-meta-item"><span class="meta-label">Bottom</span><span class="meta-val ${bc}">${parseFloat(ob.low).toFixed(5)}</span></div>
+            <div class="ob-meta-item"><span class="meta-label">Strength</span><span class="meta-val">${s.label}</span></div>
+            <div class="ob-meta-item"><span class="meta-label">Timeframe</span><span class="meta-val">${tf||'—'}</span></div>
+          </div>
+          <div class="strength-bar"><div class="strength-fill ${bc}" style="width:${s.pct}%"></div></div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderFVGs(fvgs, tf) {
+    if (!fvgs || !fvgs.length) {
+      fvgSec.innerHTML = `<div class="section-label">Fair value gaps</div><div class="no-data" style="margin-bottom:16px">No unfilled FVGs</div>`;
+      return;
+    }
+    fvgSec.innerHTML = `<div class="section-label">Fair value gaps</div>` + fvgs.map((f, i) => {
+      const isBull = f.direction === 'Bullish';
+      // Use f.timeStart (MT5 format "2025.06.15 14:00") for accurate age
+      const ageMs  = parseAge(f.timeStart || null);
+      const badge  = recentBadge(ageMs);
+      return `
+        <div class="fvg-row">
+          <div>
+            <div class="fvg-title" style="display:flex;align-items:center;gap:6px">${f.direction} FVG ${badge}</div>
+            <div class="fvg-sub">${fvgDesc(f.direction)}</div>
+          </div>
+          <div><div class="fvg-range ${isBull?'bull':'bear'}">${parseFloat(f.high).toFixed(5)} – ${parseFloat(f.low).toFixed(5)}</div><div class="fvg-meta">${tf||''} · Unfilled</div></div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderStructure(structs) {
+    if (!structs || !structs.length) {
+      structSec.innerHTML = `<div class="section-label">Market structure</div><div class="no-data" style="margin-bottom:16px">No recent structure events</div>`;
+      return;
+    }
+    structSec.innerHTML = `<div class="section-label">Market structure</div>` + structs.map(s => {
+      const [icon, iconCls] = structIcon(s.type);
+      const ageMs = parseAge(s.time);
+      const badge = recentBadge(ageMs);
+      return `
+        <div class="struct-row">
+          <div class="struct-icon ${iconCls}"><i class="ti ${icon}"></i></div>
+          <div style="flex:1">
+            <div class="struct-name" style="display:flex;align-items:center;gap:6px">${structLabel(s.type)} ${badge}</div>
+            <div class="struct-desc">${structDesc(s.type)}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="struct-level">${parseFloat(s.level).toFixed(5)}</div>
+            <div class="struct-time">${s.time}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderDetailView(sym) {
+    const data = smcData[sym];
+    if (!data) return;
+    gridSec.style.display  = 'none';
+    detailSec.style.display = 'block';
+    renderAlerts(sym, data);
+    renderOBs(data.orderBlocks, data.timeframe);
+    renderFVGs(data.fvgs, data.timeframe);
+    renderStructure(data.structure);
+  }
+
+  function miniRow(cls, label, level) {
+    return `<div class="mini-row ${cls}"><span>${label}</span><span class="mini-mono">${level}</span></div>`;
+  }
+
+  function renderGridView() {
+    detailSec.style.display = 'none';
+    gridSec.style.display   = 'block';
+
+    const allConf = Object.values(confData).flat()
+      .sort((a,b) => new Date(b.time) - new Date(a.time)).slice(0, 8);
+
+    let alertHTML = allConf.length
+      ? allConf.map(a => {
+          const isBull = a.direction === 'bullish';
+          const cls = isBull ? 'bull' : 'bear';
+          const time = new Date(a.time).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+          return `
+            <div class="conf-alert ${cls}">
+              <div>
+                <div class="conf-label ${cls}">${a.symbol} · ${a.timeframe}<span class="conf-badge ${cls}">${a.confidence}%</span></div>
+                <div class="conf-detail">${a.pattern} · ${isBull?'Bullish':'Bearish'} · ${time}</div>
+              </div>
+              <div>
+                <div class="conf-price">${parseFloat(a.price).toFixed(5)}</div>
+                <div class="conf-zones">OB: ${parseFloat(a.ob.high).toFixed(5)}–${parseFloat(a.ob.low).toFixed(5)}</div>
+              </div>
+            </div>`;
+        }).join('')
+      : `<div class="no-data" style="padding:8px 0">No confluence signals detected yet...</div>`;
+
+    const syms = Object.keys(smcData);
+    const cardsHTML = syms.length
+      ? syms.map(sym => {
+          const data = smcData[sym];
+          const obs     = data.orderBlocks || [];
+          const fvgs    = data.fvgs        || [];
+          const structs = data.structure   || [];
+          const updated = data.receivedAt
+            ? new Date(data.receivedAt).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' })
+            : data.timestamp;
+
+          const obHTML = obs.length
+            ? obs.map(o => miniRow(o.direction==='Bullish'?'bull':'bear', `${o.direction} OB · ${o.direction==='Bullish'?'Buy':'Sell'}`, `${parseFloat(o.high).toFixed(5)} – ${parseFloat(o.low).toFixed(5)}`)).join('')
+            : '<div class="no-data">No active order blocks</div>';
+
+          const fvgHTML = fvgs.length
+            ? fvgs.map(f => miniRow(f.direction==='Bullish'?'bull':'bear', `${f.direction} FVG`, `${parseFloat(f.high).toFixed(5)} – ${parseFloat(f.low).toFixed(5)}`)).join('')
+            : '<div class="no-data">No unfilled FVGs</div>';
+
+          const structHTML = structs.length
+            ? structs.map(s => {
+                const cls = { BOS_Bull:'bos-bull', BOS_Bear:'bos-bear', CHoCH_Bull:'choch-bull', CHoCH_Bear:'choch-bear' }[s.type] || 'bos-bull';
+                return miniRow(cls, structLabel(s.type), parseFloat(s.level).toFixed(5));
+              }).join('')
+            : '<div class="no-data">No recent structure</div>';
+
+          return `
+            <div class="pair-card" onclick="window.__selectSym('${sym}')">
+              <div class="pair-card-header">
+                <span class="pair-card-title">${sym}</span>
+                <span class="pair-card-tf">${data.timeframe||''}</span>
+              </div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-ter);margin-bottom:6px">Order blocks</div>
+              ${obHTML}
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-ter);margin:10px 0 6px">Fair value gaps</div>
+              ${fvgHTML}
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-ter);margin:10px 0 6px">Structure</div>
+              ${structHTML}
+              <div class="pair-updated">Updated ${updated} · Click for detail</div>
+            </div>`;
+        }).join('')
+      : '<p style="color:var(--text-ter);font-size:13px;padding:20px 0">Waiting for SMC data from MT5...</p>';
+
+    alertsSec.innerHTML = `<div class="conf-section-title">Confluence alerts — all pairs</div>${alertHTML}`;
+    gridSec.innerHTML   = `<div class="pair-grid" style="margin-top:20px">${cardsHTML}</div>`;
+  }
+
+  function buildTabs() {
+    const existing = new Set([...pairTabs.querySelectorAll('.tab')].map(t => t.dataset.sym));
+    Object.keys(smcData).forEach(sym => {
+      if (!existing.has(sym)) {
+        const btn = document.createElement('button');
+        btn.className = 'tab'; btn.dataset.sym = sym; btn.textContent = sym;
+        btn.onclick = () => selectSym(sym);
+        pairTabs.appendChild(btn);
+      }
+    });
+  }
+
+  function selectSym(sym) {
+    activeSym = sym;
+    pairTabs.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.sym === sym));
+    sym === 'ALL' ? renderGridView() : renderDetailView(sym);
+  }
+
+  window.__selectSym = selectSym;
+  pairTabs.querySelector('[data-sym="ALL"]').onclick = () => selectSym('ALL');
+
+  async function refresh() {
+    try {
+      const smcUrl = activeTF==='H1' ? '/smc' : `/smc/tf/${activeTF}`;
+      const [smcRes, confRes] = await Promise.all([fetch(smcUrl), fetch('/confluence')]);
+      smcData  = await smcRes.json();
+      confData = await confRes.json();
+      buildTabs();
+      lastUpd.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+      activeSym === 'ALL' ? renderGridView() : renderDetailView(activeSym);
+    } catch (e) { console.warn('SMC fetch error:', e); }
+  }
+
+  refresh();
+  setInterval(refresh, 5000);
+})();
+</script>
+</body>
+</html>
