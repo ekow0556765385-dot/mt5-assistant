@@ -1,0 +1,295 @@
+/* ═══════════════════════════════════════════════════════════════════
+   BLACKWOOD — TRADING BRAIN v5 : ADAPTER
+   ───────────────────────────────────────────────────────────────────
+   The page is the approved prototype. The original Brain script is
+   embedded byte-identical and still owns: fetchAll, runAnalysis,
+   showPage, selectBrainPair/TF, buildSnapshot, buildSSIPage,
+   renderSweepBanner, renderPatternFilter, renderLog, credits.
+
+   This file fills the panels the prototype has that the host has no
+   concept of, and dresses the verdict. It never writes to cachedData
+   or ssiResult.
+   ═══════════════════════════════════════════════════════════════════ */
+(function boot(){
+'use strict';
+if(typeof showPage!=='function' || typeof normalisePair!=='function'){
+  if(boot.tries===undefined) boot.tries=0;
+  if(++boot.tries>160){ console.error('[BrainSkin] host never initialised'); return; }
+  setTimeout(boot,250); return;
+}
+console.log('[BrainSkin] ready');
+
+const $=id=>document.getElementById(id);
+const esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ── tab icons + sliding ink ─────────────────────────────────────── */
+function nudge(tab){
+  const ic=tab.querySelector('.tab-ico'); if(!ic) return;
+  ic.classList.remove('go'); void ic.offsetWidth; ic.classList.add('go');
+}
+function moveInk(tab){
+  const ink=$('navInk'), nav=$('brainNav');
+  if(!ink||!nav||!tab||!tab.offsetWidth) return;
+  ink.style.left=(tab.offsetLeft-nav.scrollLeft+13)+'px';
+  ink.style.width=(tab.offsetWidth-26)+'px';
+}
+document.querySelectorAll('.nav-tab').forEach(t=>{
+  t.addEventListener('click',()=>{ nudge(t); t.classList.remove('has-new'); setTimeout(()=>moveInk(t),0); });
+});
+const nav=$('brainNav');
+if(nav) nav.addEventListener('scroll',()=>moveInk(document.querySelector('.nav-tab.active')),{passive:true});
+window.addEventListener('resize',()=>moveInk(document.querySelector('.nav-tab.active')));
+[60,400,1200].forEach(d=>setTimeout(()=>moveInk(document.querySelector('.nav-tab.active')),d));
+
+function markNew(page){
+  const t=[...document.querySelectorAll('.nav-tab')]
+    .find(x=>(x.getAttribute('onclick')||'').indexOf("'"+page+"'")>=0);
+  if(t && !t.classList.contains('active')) t.classList.add('has-new');
+}
+function bump(el){ if(!el) return; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+
+/* ── candle helpers (EA sends {t,o,h,l,c,v}) ─────────────────────── */
+const cC=b=>parseFloat(b&&(b.c!==undefined?b.c:b.close));
+function candles(){ try{ return (cachedData&&cachedData.candles)||[]; }catch(e){ return []; } }
+function priceNow(){ const c=candles(); return c.length?cC(c[c.length-1]):NaN; }
+
+/* ── VERDICT dressing ────────────────────────────────────────────
+   Reads what the host wrote and lifts call / confidence / levels into
+   the prototype's header. #verdict-body keeps Claude's full text. */
+function paintVerdict(){
+  const badge=$('verdict-signal-badge'), body=$('verdict-body');
+  if(!badge||!body) return;
+  const call=(badge.textContent||'').trim();
+  const txt=body.textContent||'';
+  if(!call||call==='—'||!txt) return;
+
+  const col = call==='BULLISH'?'var(--green)' : call==='BEARISH'?'var(--red)' : 'var(--gold-lt)';
+  const set=(id,v)=>{ const e=$(id); if(e&&v!==undefined&&e.textContent!==v) e.textContent=v; };
+
+  set('vCall', call==='BULLISH'?'Buy bias' : call==='BEARISH'?'Sell bias' : 'No clear bias');
+  const c=$('vCall'); if(c) c.style.color=col;
+
+  const cm=txt.match(/confidence[^0-9]{0,12}(\d{1,3})\s*%/i);
+  const conf=cm?Math.min(100,+cm[1]):null;
+  set('vScore', conf===null?'—':String(conf));
+  const arc=$('vArc');
+  if(arc){ arc.setAttribute('stroke',col);
+    arc.setAttribute('stroke-dashoffset', String(Math.round(207-((conf||0)/100)*207))); }
+
+  /* Levels are only shown when Claude actually quoted them — a dash is
+     honest, an invented number is not. */
+  const grab=re=>{ const m=txt.match(re); return m?m[1]:'—'; };
+  const entry=grab(/entry[^0-9]{0,24}(\d+\.\d{2,5})/i);
+  const stop =grab(/(?:stop|\bsl\b)[^0-9]{0,24}(\d+\.\d{2,5})/i);
+  const tgt  =grab(/(?:target|take profit|\btp\b)[^0-9]{0,24}(\d+\.\d{2,5})/i);
+  set('vEntry',entry); set('vStop',stop); set('vTgt',tgt);
+  if(entry!=='—'&&stop!=='—'&&tgt!=='—'){
+    const r=Math.abs(+tgt-+entry)/Math.max(1e-9,Math.abs(+entry-+stop));
+    set('vRR', isFinite(r)?r.toFixed(2)+'R':'—');
+  } else set('vRR','—');
+
+  /* The one-line summary above the body: first meaningful sentence. */
+  const sub=$('vSub');
+  if(sub){
+    const line=txt.split(/\n/).map(s=>s.trim())
+      .filter(s=>s && !/^verdict:/i.test(s) && !/^confidence/i.test(s))[0]||'';
+    if(line) sub.textContent=line;
+  }
+  const vi=$('vInputs');
+  if(vi){
+    let n=0; try{ ['update','smc','patterns','candles'].forEach(k=>{
+      const d=$('dot-'+k); if(d&&/ok/.test(d.className)) n++; }); }catch(e){}
+    vi.innerHTML='Inputs <b class="n">'+n+' of 4</b> fresh';
+  }
+}
+
+/* ── WHAT THE VERDICT IS BUILT ON ────────────────────────────────
+   The prototype's checklist, driven by the real SSI reading. */
+function paintInputs(){
+  const box=$('brain-inputs'); if(!box) return;
+  let r={}; try{ r=(typeof ssiResult!=='undefined'&&ssiResult)||{}; }catch(e){}
+  if(!r || r.signal===undefined){
+    box.innerHTML='<div class="empty">Fetch data to see what the verdict would be built on.</div>';
+    return;
+  }
+  const pats=(r.patterns||[]);
+  const aligned=pats.filter(p=>p.aligned!==false).length;
+  const against=pats.filter(p=>p.aligned===false).length;
+  const trend=r.htfBull?'bullish':r.htfBear?'bearish':'no clear direction';
+  const rows=[
+    [r.htfBull||r.htfBear?'y':'w','H4 trend',
+     r.htfBull?'Bullish':r.htfBear?'Bearish':'No clear H4 direction right now'],
+    [r.structBuy||r.structSell?'y':'n','Market structure',
+     r.structBuy?'Structure is bullish':r.structSell?'Structure is bearish':'No structural break either way'],
+    [pats.length?'y':'w','Candlestick patterns',
+     pats.length?(pats.length+' detected · '+aligned+' with the trend, '+against+' against'):'None detected on this timeframe'],
+    [against?'w':'y','Agreement',
+     against?(against+' pattern'+(against===1?'':'s')+' point against the '+trend+' trend'):'Nothing contradicts the trend'],
+    [isFinite(+r.rsi)?'y':'w','RSI',
+     isFinite(+r.rsi)?((+r.rsi).toFixed(1)+((+r.rsi>=70)?' — overbought':(+r.rsi<=30)?' — oversold':'')):'Not available'],
+    [r.signal?'y':'n','SSI signal',
+     r.signal===1?'BUY (structure + trend)':r.signal===-1?'SELL (structure + trend)':
+     r.signal===2?'BUY (pattern)':r.signal===-2?'SELL (pattern)':'No signal — nothing lines up yet']
+  ];
+  box.innerHTML=rows.map(x=>
+    '<div class="chk '+x[0]+'"><i>'+(x[0]==='y'?'✓':x[0]==='n'?'✕':'!')+'</i>'+
+    '<div><div class="chk-t">'+esc(x[1])+'</div><div class="chk-s">'+esc(x[2])+'</div></div></div>').join('');
+}
+
+/* ── SSI CONTRADICTIONS ──────────────────────────────────────────
+   The host already marks each pattern aligned:false when it fights the
+   trend. This surfaces them and says whether each one actually reached
+   the analysis or was filtered out first. */
+function paintContradictions(){
+  const box=$('ssi-contradictions'); if(!box) return;
+  let r={}; try{ r=(typeof ssiResult!=='undefined'&&ssiResult)||{}; }catch(e){}
+  const cnt=$('contra-count');
+  if(!r.patterns){
+    box.innerHTML='<div class="empty">Fetch data to check for contradictions.</div>';
+    if(cnt) cnt.textContent=''; return;
+  }
+  if(!r.htfBull && !r.htfBear){
+    box.innerHTML='<div class="empty">No clear H4 trend right now, so nothing can contradict it.</div>';
+    if(cnt) cnt.textContent=''; return;
+  }
+  const trend=r.htfBull?'bullish':'bearish';
+  let minConf=70; try{ minConf=parseInt(($('filter-confidence')||{}).value,10)||70; }catch(e){}
+  /* Field names, confirmed against getEAPatterns(): the EA sends
+     `type` + `confidence_pct`, which the host maps to `direction` +
+     `confidence`. Read both shapes so this works either side of that map. */
+  const rows=r.patterns.filter(p=>p.aligned===false).map(p=>{
+    const conf=+(p.confidence!==undefined?p.confidence:p.confidence_pct)||0;
+    const raw=String(p.direction||p.type||'').toLowerCase();
+    const dir=raw.indexOf('bull')>=0?'bullish':raw.indexOf('bear')>=0?'bearish':raw||'unclear';
+    const state = conf<minConf ? 'excluded · below '+minConf+'%' : 'live';
+    return {name:p.name||'Pattern', dir, conf, state};
+  });
+  const live=rows.filter(x=>x.state==='live').length;
+  if(cnt) cnt.textContent=rows.length+' found · '+live+' affects this verdict';
+  box.innerHTML = rows.length ? rows.map(x=>
+    '<div class="chk '+(x.state==='live'?'w':'n')+'"><i>'+(x.state==='live'?'!':'✕')+'</i><div>'+
+    '<div class="chk-t">'+esc(x.name)+(x.conf?' ('+x.conf+'%)':'')+' is '+esc(x.dir)+
+    ' while H4 trend is '+trend+
+    ' <span class="tag '+(x.state==='live'?'t-gold':'t-mute')+'">'+esc(x.state)+'</span></div>'+
+    '<div class="chk-s">'+(x.state==='live'
+      ? 'This one reached the analysis and is actively working against the trend.'
+      : 'Below your confidence filter, so it was not sent to Claude — listed so you know it exists. '+
+        'Patterns older than 2 bars are dropped upstream and never appear here at all.')+'</div></div></div>').join('')
+   : '<div class="empty">No pattern currently contradicts the '+trend+' H4 trend.</div>';
+}
+
+/* ── VERDICT HISTORY ─────────────────────────────────────────────── */
+const LS='bw-brain-history';
+let hist=[];
+try{ const j=JSON.parse(localStorage.getItem(LS)||'[]'); if(Array.isArray(j)) hist=j; }catch(e){}
+const save=()=>{ try{ localStorage.setItem(LS,JSON.stringify(hist.slice(0,200))); }catch(e){} };
+
+function record(){
+  const call=(($('verdict-signal-badge')||{}).textContent||'').trim();
+  if(!call||call==='—') return;
+  const stamp=(($('verdict-ts')||{}).textContent||'').trim();
+  const sym=(typeof brainSym!=='undefined'&&brainSym)||'';
+  const tf=(typeof brainTF!=='undefined'&&brainTF)||'';
+  if(hist[0] && hist[0].stamp===stamp && hist[0].sym===sym) return;
+  const conf=(($('vScore')||{}).textContent||'').trim();
+  hist.unshift({t:Date.now(),stamp,sym:normalisePair(sym),tf,call,conf,
+    price:priceNow(),h1:null,h4:null});
+  if(hist.length>200) hist.pop();
+  save(); markNew('history'); renderHist();
+}
+function outcomes(){
+  const p=priceNow(); if(!isFinite(p)) return;
+  let ch=false;
+  hist.forEach(h=>{
+    if(!isFinite(h.price)) return;
+    const mins=(Date.now()-h.t)/60000, pips=(p-h.price)/h.price*10000;
+    if(h.h1===null&&mins>=60){ h.h1=pips; ch=true; }
+    if(h.h4===null&&mins>=240){ h.h4=pips; ch=true; }
+  });
+  if(ch){ save(); renderHist(); }
+}
+function verdictOf(h){
+  const v=h.h4!==null?h.h4:h.h1;
+  if(v===null) return 'pending';
+  if(h.call==='BULLISH') return v>0?'correct':'wrong';
+  if(h.call==='BEARISH') return v<0?'correct':'wrong';
+  return Math.abs(v)<10?'correct':'wrong';
+}
+function renderHist(){
+  const tb=$('hist-tbody');
+  const done=hist.filter(h=>verdictOf(h)!=='pending');
+  const ok=done.filter(h=>verdictOf(h)==='correct').length;
+  const b=$('histBadge'); if(b&&b.textContent!==String(hist.length)){ b.textContent=hist.length; bump(b); }
+  const set=(id,v)=>{ const e=$(id); if(e) e.textContent=v; };
+  set('histTotal',hist.length);
+  set('histCorrect',done.length?String(ok):'—');
+  set('histAvg',done.length?Math.round(ok/done.length*100)+'%':'—');
+  if(!tb) return;
+  const cell=v=> v===null?'<span class="mut">…</span>'
+    :'<span class="'+(v>=0?'up':'dn')+'">'+(v>=0?'+':'')+v.toFixed(1)+'</span>';
+  tb.innerHTML = hist.length ? hist.slice(0,40).map(h=>
+    '<tr><td class="n mut">'+esc(h.stamp)+'</td><td><b>'+esc(h.sym)+'</b></td>'+
+    '<td class="n">'+esc(h.tf)+'</td>'+
+    '<td><span class="tag '+(h.call==='BULLISH'?'t-bull':h.call==='BEARISH'?'t-bear':'t-mute')+'">'+esc(h.call)+'</span></td>'+
+    '<td class="n">'+esc(h.conf||'—')+'</td>'+
+    '<td class="n">'+cell(h.h1)+'</td><td class="n">'+cell(h.h4)+'</td>'+
+    '<td><span class="tag '+(verdictOf(h)==='correct'?'t-bull':verdictOf(h)==='wrong'?'t-bear':'t-gold')+'">'+verdictOf(h)+'</span></td>'+
+    '<td class="n mut">—</td></tr>').join('')
+   : '<tr><td colspan="9" class="empty">No verdicts recorded yet. Each analysis is logged here with what price did next.</td></tr>';
+}
+
+/* ── WHAT CHANGED SINCE LAST ANALYSIS ────────────────────────────── */
+function snap(){
+  try{
+    const r=(typeof ssiResult!=='undefined'&&ssiResult)||{};
+    return {signal:r.signal, trend:r.htfBull?'bull':r.htfBear?'bear':'flat',
+      rsi:r.rsi, names:(r.patterns||[]).map(p=>p.name).sort().join(',')};
+  }catch(e){ return {signal:null,trend:'flat',rsi:null,names:''}; }
+}
+function diffs(){
+  const box=$('brain-diffs'); if(!box) return;
+  const key='bw-brain-snap:'+((typeof brainSym!=='undefined'&&brainSym)||'')+':'+((typeof brainTF!=='undefined'&&brainTF)||'');
+  let prev=null; try{ prev=JSON.parse(localStorage.getItem(key)||'null'); }catch(e){}
+  const now=snap();
+  if(!prev){
+    box.innerHTML='<div class="empty">First analysis for this pair and timeframe — nothing to compare against yet.</div>';
+    try{ localStorage.setItem(key,JSON.stringify(now)); }catch(e){} return;
+  }
+  const sig=s=>s===1?'BUY':s===-1?'SELL':s===2?'BUY (pattern)':s===-2?'SELL (pattern)':'none';
+  const rows=[];
+  if(prev.signal!==now.signal) rows.push(['chg','~','SSI signal moved from '+sig(prev.signal)+' to '+sig(now.signal)]);
+  if(prev.trend!==now.trend)   rows.push(['chg','~','H4 trend flipped from '+prev.trend+' to '+now.trend]);
+  if(isFinite(+prev.rsi)&&isFinite(+now.rsi)&&Math.abs(prev.rsi-now.rsi)>=2)
+    rows.push(['chg','~','RSI moved '+(+prev.rsi).toFixed(1)+' → '+(+now.rsi).toFixed(1)]);
+  const a=(prev.names||'').split(',').filter(Boolean), b=(now.names||'').split(',').filter(Boolean);
+  b.filter(x=>a.indexOf(x)<0).forEach(x=>rows.push(['add','+',x+' appeared since the last run']));
+  a.filter(x=>b.indexOf(x)<0).forEach(x=>rows.push(['rem','−',x+' is no longer present']));
+  box.innerHTML = rows.length ? rows.map(d=>'<div class="diff '+d[0]+'"><i>'+d[1]+'</i><div>'+esc(d[2])+'</div></div>').join('')
+    : '<div class="empty">Nothing meaningful has changed since your last analysis of this pair and timeframe. '+
+      'Running again would spend a credit to be told the same thing.</div>';
+  try{ localStorage.setItem(key,JSON.stringify(now)); }catch(e){}
+}
+
+/* ── loop ────────────────────────────────────────────────────────── */
+function tick(){
+  try{ paintVerdict(); paintInputs(); paintContradictions(); outcomes(); }
+  catch(e){ console.warn('[BrainSkin]',e); }
+}
+renderHist(); tick();
+setInterval(tick,3000);
+
+/* A new verdict has landed when the host's timestamp changes. */
+let lastTs='';
+setInterval(()=>{
+  const ts=(($('verdict-ts')||{}).textContent||'').trim();
+  if(ts && ts!=='—' && ts!==lastTs){
+    lastTs=ts;
+    setTimeout(()=>{ paintVerdict(); record(); diffs(); },150);
+    const card=$('verdict-card');
+    if(card){ card.classList.add('flash'); setTimeout(()=>card.classList.remove('flash'),1000); }
+  }
+},700);
+
+window.BWBrainSkin={paintVerdict,paintInputs,paintContradictions,renderHist,record,diffs,moveInk,
+  get history(){return hist;}};
+})();
