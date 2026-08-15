@@ -2705,8 +2705,31 @@ function paintMiniAlerts(){
    host's renderPatterns() for #patternList. The tab badges count what is
    ACTUALLY VISIBLE under the current toggle. */
 let patFilter='All', alertFilter='All';
-/* Per-pair, per-timeframe pattern store — see renderPatFilter() for why. */
+/* Per-pair, per-timeframe pattern store, filled from the server rather than
+   from dataBySymbol — see renderPatFilter() for why that matters. */
 const patCache={};
+const patFetchAt={};
+function brokerSymbolFor(bare){
+  const list=(typeof state!=='undefined'&&state.watchlist)||[];
+  const hit=list.find(w=>normalisePair(w.symbol)===bare);
+  return hit?hit.symbol:bare;
+}
+function fetchTF(sym,tf){
+  const k=sym+':'+tf;
+  if(Date.now()-(patFetchAt[k]||0) < 15000) return;   // at most once every 15s
+  patFetchAt[k]=Date.now();
+  const q='/api/patterns?symbol='+encodeURIComponent(brokerSymbolFor(sym))+'&tf='+tf;
+  fetch(q,{credentials:'same-origin',headers:{Accept:'application/json'}})
+    .then(r=>r.ok?r.json():null)
+    .then(j=>{
+      if(!j) return;
+      const arr=Array.isArray(j.patterns)?j.patterns:(Array.isArray(j)?j:null);
+      if(!arr) return;
+      patCache[sym]=patCache[sym]||{};
+      patCache[sym][tf]=arr;
+    })
+    .catch(()=>{});
+}
 
 function setPatFilter(f,btn){
   patFilter=f;
@@ -2735,25 +2758,25 @@ function renderPatFilter(){
   const dbs=(typeof dataBySymbol!=='undefined'&&dataBySymbol[sym])||{};
   const chartTF=(typeof activeChartTF!=='undefined'&&activeChartTF)||'H1';
 
-  /* WHY THIS CACHE EXISTS.
-     The host stores incoming patterns as
+  /* WHERE THE PATTERNS COME FROM.
+     Not from dataBySymbol. The host stores incoming patterns as
        patternsByTF[d.timeframe || activeChartTF] = d.patterns
-     so a payload that arrives WITHOUT a timeframe field is filed under
-     whichever timeframe the CHART happens to be on. With the chart on H4,
-     the H1 bucket gets overwritten by H4 data a moment later — which is
-     why the count showed the right number for H1, then changed, and the
-     list changed with it.
-     Only the bucket matching the current chart timeframe is authoritative,
-     so that is the only one we refresh. The other keeps its last known
-     good value instead of absorbing the wrong timeframe's patterns. */
+     so any payload without a timeframe field lands in whichever bucket
+     the CHART is on — H1 patterns get written into the H4 slot. Nothing
+     on the page can tell afterwards which timeframe a bucket really
+     holds, which is why every attempt to repair it client-side kept
+     flipping.
+     The server can tell: GET /api/patterns?symbol=&tf= returns one
+     timeframe, authoritatively. fetchTF() below keeps its own per-pair,
+     per-timeframe store from that endpoint, so the two timeframes are
+     genuinely independent and nothing overwrites anything. */
   patCache[sym]=patCache[sym]||{};
-  const live=(dbs.patternsByTF||{})[chartTF];
-  if(Array.isArray(live)) patCache[sym][chartTF]=live.slice();
+  fetchTF(sym,'H1'); fetchTF(sym,'H4');
 
   const rows=[];
   ['H1','H4'].forEach(tf=>{
     if(patFilter!=='All' && patFilter!==tf) return;
-    (patCache[sym][tf]||[]).forEach(p=>rows.push({...p,tf,stale:tf!==chartTF}));
+    (patCache[sym][tf]||[]).forEach(p=>rows.push({...p,tf}));
   });
   rows.sort((a,b)=>(+b.confidence||0)-(+a.confidence||0));
 
@@ -2771,8 +2794,7 @@ function renderPatFilter(){
     return '<div class="pattern-row"><div style="flex:1">'+
       '<div class="pname">'+esc(p.name||'')+' <span class="tag t-tf">'+p.tf+'</span> '+
       '<span class="tag '+(d==='bull'?'t-bull':d==='bear'?'t-bear':'t-mute')+'">'+d+'</span></div>'+
-      '<div class="pmeta">'+(p.stale?'from the last H'+(p.tf==='H1'?'1':'4')+' sync · ':'')+
-      (p.price?'at '+esc(p.price):'')+
+      '<div class="pmeta">'+(p.price?'at '+esc(p.price):'')+
       (conf>=70?' · alertable':' · below the 70% alert threshold')+ageTxt+'</div></div>'+
       '<span class="pconf" style="color:'+(conf>=70?'var(--text)':'var(--muted)')+'">'+conf+'%</span></div>';
   }).join('')
