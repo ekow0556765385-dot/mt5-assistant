@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pattern Detector — redesign prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Shell tokens — identical to blackwood_dashboard.html, BOTH themes.
+   The current patterns.html invents its own palette (#0d0d14 / #185FA5)
+   and has no light theme at all, so it inverts wrongly the moment the
+   shell's day-mode toggle is used. */
+:root{--bg:#09090e;--surface:#0f0f16;--card:#14141c;--border:#22222e;--border2:#2e2e3e;
+  --gold:#c9820a;--gold-lt:#e09b2a;--green:#17a97a;--red:#e0504f;--blue:#5b87c9;
+  --text:#eceae0;--muted:#72706a;--muted2:#9a9890;
+  --bull-bg:rgba(23,169,122,.09);--bear-bg:rgba(224,80,79,.09)}
+[data-theme="light"]{--bg:#f6f6f4;--surface:#fff;--card:#fff;--border:#e3e2dd;--border2:#d2d1ca;
+  --gold:#b0720a;--gold-lt:#c9820a;--green:#0f8a62;--red:#c93f3e;--blue:#3f6bb0;
+  --text:#1b1b1f;--muted:#8a8880;--muted2:#5f5e59;
+  --bull-bg:rgba(15,138,98,.08);--bear-bg:rgba(201,63,62,.08)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Archivo,-apple-system,sans-serif;background:var(--bg);color:var(--text);
+  font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.n{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+
+/* header */
+.head{background:var(--surface);border-bottom:.5px solid var(--border);padding:11px 16px;flex-shrink:0}
+.hrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.title{font-size:14px;font-weight:700;letter-spacing:-.01em}
+.sub{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.live{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2)}
+.pdot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pl 2.4s infinite}
+.pdot.off{background:var(--red);animation:none}
+@keyframes pl{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* pair strip */
+.pairs{display:flex;gap:6px;padding:8px 16px;background:var(--surface);
+  border-bottom:.5px solid var(--border);overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.pbtn{padding:5px 11px;border-radius:6px;border:.5px solid var(--border2);background:transparent;
+  color:var(--muted2);font-size:11.5px;font-weight:500;cursor:pointer;white-space:nowrap;font-family:inherit}
+.pbtn.on{background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600}
+.seg{display:inline-flex;border:.5px solid var(--border2);border-radius:6px;overflow:hidden;margin-left:auto;flex-shrink:0}
+.sbtn{padding:5px 12px;background:transparent;border:none;color:var(--muted2);font-size:11.5px;
+  cursor:pointer;font-family:inherit;font-weight:500}
+.sbtn.on{background:var(--text);color:var(--bg);font-weight:600}
+
+/* nav */
+.nav{display:flex;padding:0 16px;background:var(--surface);border-bottom:.5px solid var(--border);
+  flex-shrink:0;overflow-x:auto;scrollbar-width:none;position:relative}
+.tab{padding:10px 13px;font-size:12px;font-weight:500;color:var(--muted2);background:none;border:none;
+  cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap;font-family:inherit;transition:color .18s}
+.tab.on{color:var(--text);font-weight:600}
+.ico{width:16px;height:16px;flex-shrink:0;color:var(--muted)}
+.ico svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;display:block;transform-origin:50% 50%}
+.tab.on .ico{color:var(--blue)}
+.ico.go svg{animation:pop .45s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.26) rotate(7deg)}100%{transform:scale(1)}}
+.ink{position:absolute;bottom:0;height:2px;background:var(--blue);
+  transition:left .28s cubic-bezier(.4,0,.2,1),width .28s cubic-bezier(.4,0,.2,1)}
+.cnt{font-size:9.5px;font-weight:600;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+
+/* layout */
+.main{flex:1;display:grid;grid-template-columns:1fr 300px;overflow:hidden}
+.col{overflow-y:auto;padding:14px 16px}
+.rail{border-left:.5px solid var(--border);background:var(--surface);overflow-y:auto;
+  overscroll-behavior:contain;padding:14px;contain:layout}
+.page{display:none}.page.on{display:block}
+.card{background:var(--card);border:.5px solid var(--border);border-radius:9px;padding:12px 13px;margin-bottom:11px}
+.ct{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;
+  margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.ct .r{margin-left:auto;font-weight:500;text-transform:none;letter-spacing:0;font-size:10.5px}
+
+/* pattern rows */
+.plist{display:flex;flex-direction:column}
+.lane{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;
+  padding:9px 0 5px;border-bottom:.5px solid var(--border);margin-bottom:2px}
+.prow{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:.5px solid var(--border)}
+.prow:last-child{border-bottom:none}
+.prow.stale{opacity:.45}
+.pdir{width:3px;align-self:stretch;border-radius:2px;flex-shrink:0;min-height:34px}
+.pdir.bull{background:var(--green)}.pdir.bear{background:var(--red)}.pdir.neut{background:var(--border2)}
+.pmain{flex:1;min-width:0}
+.pn{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pd{font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+.pright{text-align:right;flex-shrink:0}
+.pc{font-size:14px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1}
+.pb{font-size:9.5px;color:var(--muted);margin-top:3px}
+.tag{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.05em}
+.t-new{background:rgba(91,135,201,.16);color:var(--blue)}
+.t-conf{background:rgba(201,130,10,.16);color:var(--gold-lt)}
+.t-risk{background:rgba(224,80,79,.14);color:var(--red)}
+.t-stale{background:rgba(120,118,110,.16);color:var(--muted2)}
+.t-bull{background:var(--bull-bg);color:var(--green)}
+.t-bear{background:var(--bear-bg);color:var(--red)}
+.strength{display:inline-flex;gap:2px;margin-left:2px}
+.sd{width:4px;height:4px;border-radius:50%;background:var(--border2)}
+.sd.on-bull{background:var(--green)}.sd.on-bear{background:var(--red)}
+
+/* matrix */
+.mx{width:100%;border-collapse:collapse;font-size:11.5px}
+.mx th{text-align:left;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;
+  font-weight:700;padding:7px 8px;border-bottom:.5px solid var(--border)}
+.mx td{padding:9px 8px;border-bottom:.5px solid var(--border)}
+.cell{display:flex;align-items:center;gap:6px}
+.cellbtn{background:none;border:none;color:inherit;font-family:inherit;font-size:inherit;
+  cursor:pointer;text-align:left;padding:0;display:flex;align-items:center;gap:6px;width:100%}
+.chip{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.dash{color:var(--muted)}
+
+/* reliability */
+.rel{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--border)}
+.rel:last-child{border-bottom:none}
+.relbar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;min-width:60px}
+.relfill{height:100%;border-radius:3px}
+.relname{font-size:11.5px;font-weight:500;width:120px;flex-shrink:0}
+.relpct{font-size:11.5px;font-weight:700;font-family:'IBM Plex Mono',monospace;width:52px;text-align:right}
+.reln{font-size:9.5px;color:var(--muted);width:44px;text-align:right}
+
+/* rail bits */
+.kv{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:11.5px;
+  height:24px;contain:layout}
+.kv b{font-family:'IBM Plex Mono',monospace;font-weight:600}
+.mut{color:var(--muted)}
+.xrow{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:inherit;
+  font-family:inherit;text-align:left;padding:7px 0;border-bottom:.5px solid var(--border);cursor:pointer;font-size:11.5px}
+.xrow:last-child{border-bottom:none}
+.xrow span{flex:1;display:flex;flex-direction:column;gap:2px}
+.xrow small{font-size:9.5px;color:var(--muted)}
+.chev{width:5px;height:5px;border-right:1.4px solid var(--muted);border-top:1.4px solid var(--muted);
+  transform:rotate(45deg);flex-shrink:0}
+.banner{display:flex;gap:11px;padding:12px 14px;border-radius:8px;font-size:12px;margin-bottom:11px}
+.banner.warn{background:rgba(201,130,10,.08);border:.5px solid rgba(201,130,10,.3)}
+.banner.bull{background:var(--bull-bg);border:.5px solid rgba(23,169,122,.3)}
+.b-t{font-weight:700;font-size:12.5px;margin-bottom:3px}
+.b-s{font-size:11px;color:var(--muted2);line-height:1.5}
+.empty{color:var(--muted);font-size:11.5px;padding:16px 0;text-align:center}
+.note{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:8px}
+
+/* candles */
+.cwrap{display:flex;gap:5px;align-items:flex-end;height:74px;padding-top:4px}
+.cnd{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.cbody{width:60%;border-radius:1px;min-height:2px}
+.cwick{width:1px;flex:1}
+
+/* Thin scrollbars, matching the Brain and SMC panel (they both carry
+   exactly this rule). The prototype was left on the browser default,
+   which is what read as old next to the other modules. */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+::-webkit-scrollbar-track{background:transparent}
+*{scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+/* Horizontal strips hide theirs entirely — a scrollbar under the tab row
+   is noise, the overflow is discoverable by swiping. */
+.nav,.pairs{scrollbar-width:none}
+.nav::-webkit-scrollbar,.pairs::-webkit-scrollbar{display:none}
+
+
+/* chart patterns */
+.cp{border:.5px solid var(--border);border-radius:8px;padding:11px 12px;margin-bottom:9px;background:var(--card)}
+.cp-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.cp-n{font-size:13px;font-weight:700}
+.cp-why{font-size:11px;color:var(--muted2);line-height:1.5;margin-bottom:8px}
+.cp-lv{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+.cp-lv div{font-size:10px;color:var(--muted)}
+.cp-lv b{display:block;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text);margin-top:2px}
+.st{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.05em}
+.st-breaking{background:rgba(201,130,10,.18);color:var(--gold-lt)}
+.st-confirmed{background:var(--bull-bg);color:var(--green)}
+.st-failed{background:rgba(224,80,79,.16);color:var(--red)}
+.st-complete{background:rgba(91,135,201,.15);color:var(--blue)}
+.st-forming{background:rgba(120,118,110,.16);color:var(--muted2)}
+.cp-bar{height:4px;border-radius:2px;background:var(--border);overflow:hidden;margin-top:8px}
+.cp-bar i{display:block;height:100%;border-radius:2px}
+.kx{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:.5px solid var(--border);font-size:11.5px}
+.kx:last-child{border-bottom:none}
+.kx span{color:var(--muted2);line-height:1.5}
+
+@media (max-width:1150px){ .main{grid-template-columns:1fr 244px} }
+@media (max-width:900px){ .main{grid-template-columns:1fr 216px} }
+/* Rail STACKS below 780px — it is never display:none. Inside the shell
+   iframe the effective width is roughly screen minus 220px, which is why
+   two other modules lost their rail in production. */
+@media (max-width:780px){
+  body{height:auto;overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain}
+  .main{display:flex;flex-direction:column;overflow:visible}
+  .col,.rail{overflow:visible}
+  .rail{border-left:none;border-top:.5px solid var(--border)}
+  .nav{position:sticky;top:0;z-index:29;touch-action:pan-x;overscroll-behavior-x:contain}
+  .pairs{touch-action:pan-x;overscroll-behavior-x:contain}
+}
+@media (max-height:700px){ .head{padding:7px 16px} .card{padding:10px 11px;margin-bottom:9px} }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div class="hrow">
+    <div>
+      <div class="title">Pattern Detector</div>
+      <div class="sub">Candlestick structure · <span id="hSym">EUR/USD</span> <span id="hTf">H1</span></div>
+    </div>
+    <div class="live"><span class="pdot" id="dot"></span><span id="liveLbl">Live</span>
+      <span class="mut n" id="lastUp">updated just now</span></div>
+  </div>
+</div>
+
+<div class="pairs" id="pairStrip">
+  <button class="pbtn on" data-sym="EURUSD">EUR/USD</button>
+  <button class="pbtn" data-sym="GBPUSD">GBP/USD</button>
+  <button class="pbtn" data-sym="USDJPY">USD/JPY</button>
+  <button class="pbtn" data-sym="XAUUSD">XAU/USD</button>
+  <button class="pbtn" data-sym="GBPJPY">GBP/JPY</button>
+  <button class="pbtn" data-sym="USDCHF">USD/CHF</button>
+  <span class="seg"><button class="sbtn on" data-tf="H1">H1</button><button class="sbtn" data-tf="H4">H4</button></span>
+</div>
+
+<nav class="nav" id="nav">
+  <button class="tab on" data-p="live">
+    <span class="ico"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></span>
+    Live <span class="cnt" id="cLive">4</span></button>
+  <button class="tab" data-p="pairs">
+    <span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg></span>
+    All Pairs <span class="cnt" id="cPairs">3</span></button>
+  <button class="tab" data-p="chart">
+    <span class="ico"><svg viewBox="0 0 24 24"><path d="M3 17l4-6 3 3 4-7 3 4 4-5"/><circle cx="10" cy="14" r="1.3"/><circle cx="14" cy="7" r="1.3"/></svg></span>
+    Chart Patterns <span class="cnt" id="cChart">0</span></button>
+  <button class="tab" data-p="rel">
+    <span class="ico"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><path d="M8 15l4-5 3 3 4-6"/></svg></span>
+    Reliability</button>
+  <button class="tab" data-p="levels">
+    <span class="ico"><svg viewBox="0 0 24 24"><path d="M3 8h18M3 16h18"/><circle cx="8" cy="8" r="1.6"/><circle cx="16" cy="16" r="1.6"/></svg></span>
+    Levels <span class="cnt" id="cLv">5</span></button>
+  <span class="ink" id="ink"></span>
+</nav>
+
+<div class="main">
+  <div class="col">
+
+    <div id="topBanner"></div>
+
+    <!-- LIVE -->
+    <div class="page on" id="p-live">
+      <div class="card">
+        <div class="ct">Reading right now <span class="r mut" id="biasLine">Bullish · score +4</span></div>
+        <div id="verdictBox"></div>
+      </div>
+
+      <div class="card">
+        <div class="ct">Detected patterns <span class="r mut" id="patSummary">2 fresh · 1 mid · 1 stale</span></div>
+        <div class="plist" id="patList"></div>
+        <div class="note" id="patNote"></div>
+      </div>
+
+      <div class="card">
+        <div class="ct">Recent bars <span class="r mut" id="candNote"></span></div>
+        <div class="cwrap" id="candles"></div>
+      </div>
+    </div>
+
+    <!-- ALL PAIRS -->
+    <div class="page" id="p-pairs">
+      <div class="card">
+        <div class="ct">Freshest pattern per pair <span class="r mut">both timeframes</span></div>
+        <table class="mx"><thead><tr><th>Pair</th><th>H1</th><th>H4</th><th>Agree?</th></tr></thead>
+        <tbody id="mxBody"></tbody></table>
+        <div class="note">A pair is worth opening when both timeframes point the same way and the freshest
+          pattern is on the current or previous bar. Click any cell to jump to that pair and timeframe.</div>
+      </div>
+    </div>
+
+    <!-- CHART PATTERNS -->
+    <div class="page" id="p-chart">
+      <div id="chartBanner"></div>
+      <div class="card">
+        <div class="ct">Multi-bar formations <span class="r mut" id="chartScope">last 120 bars</span></div>
+        <div id="chartList"></div>
+        <div class="note">A candlestick pattern is one to three bars and says a bar rejected. These are
+          twenty to a hundred and twenty bars and say a <b>structure</b> is resolving. They are listed by
+          what they are doing right now, not by when they formed.</div>
+      </div>
+      <div class="card">
+        <div class="ct">What the states mean</div>
+        <div id="stateKey"></div>
+      </div>
+    </div>
+
+    <!-- RELIABILITY -->
+    <div class="page" id="p-rel">
+      <div class="card">
+        <div class="ct">Which patterns actually worked <span class="r mut" id="relScope">last 30 days · this account</span></div>
+        <div id="relList"></div>
+        <div class="note">Every pattern at 70%+ confidence is recorded when it fires, then priced again
+          one and four hours later. "Worked" means price moved in the pattern's direction by more than
+          the pair's own average bar range. Stored on this device only — it is your record, not a
+          published statistic.</div>
+      </div>
+      <div class="card">
+        <div class="ct">Recently resolved</div>
+        <div id="relLog"></div>
+      </div>
+    </div>
+
+    <!-- LEVELS -->
+    <div class="page" id="p-levels">
+      <div class="card">
+        <div class="ct">Support &amp; resistance <span class="r mut" id="lvNote"></span></div>
+        <div id="lvList"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="rail">
+    <div class="ct">Market reading</div>
+    <div class="kv"><span class="mut">Price</span><b id="rPrice">1.08423</b></div>
+    <div class="kv"><span class="mut">Bias</span><b id="rBias">Bullish</b></div>
+    <div class="kv"><span class="mut">Bias score</span><b id="rScore">+4</b></div>
+    <div class="kv"><span class="mut">RSI 14</span><b id="rRsi">58.2</b></div>
+    <div class="kv"><span class="mut">EMA 20/50</span><b id="rEma">Bullish</b></div>
+
+    <div class="ct" style="margin-top:16px">Elsewhere in Blackwood</div>
+    <div id="crossList"></div>
+
+    <div class="ct" style="margin-top:16px">Feed</div>
+    <div class="kv"><span class="mut">/api/patterns</span><b id="fPat">ok</b></div>
+    <div class="kv"><span class="mut">/api/state</span><b id="fState">ok</b></div>
+    <div class="note" id="feedNote"></div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   BLACKWOOD — CHART PATTERN ENGINE
+   Multi-bar formations: head & shoulders, double/triple tops and
+   bottoms, triangles, wedges, rectangles, flags.
+
+   WHY THIS IS SEPARATE FROM THE CANDLESTICK DETECTOR
+   A candlestick pattern is 1–3 bars and says "this bar rejected".
+   A chart pattern is 20–120 bars and says "this STRUCTURE is
+   resolving". They fail differently and they need different handling,
+   which is the whole point of the user's observation: a reversal that
+   is real does not usually reverse on one candle, and a break that
+   looks like a reversal is often a fake-out that resolves the other
+   way.
+
+   THE LIFECYCLE IS THE FEATURE
+     forming    — the shape is partly there, not tradable yet
+     complete   — the shape is finished, price has NOT broken the trigger
+     confirmed  — price broke the trigger and HELD past the grace period
+     failed     — price broke the trigger and closed back inside
+                  (this is the fake-out, and it usually resolves the
+                  OPPOSITE way, which is exactly what traps people)
+   Most tools only ever show "complete" and let the user assume the
+   break will hold. Naming the other three states is the useful part.
+   ══════════════════════════════════════════════════════════════════ */
+(function(root){
+'use strict';
+
+const H=c=>+(c.h!==undefined?c.h:c.high);
+const L=c=>+(c.l!==undefined?c.l:c.low);
+const C=c=>+(c.c!==undefined?c.c:c.close);
+const O=c=>+(c.o!==undefined?c.o:c.open);
+const T=c=>+(c.t!==undefined?c.t:c.time);
+
+/* ── SWINGS ───────────────────────────────────────────────────────
+   Fractal pivots: a high with `k` lower highs each side. k scales the
+   sensitivity — too small and every wiggle is a swing, too large and a
+   real head & shoulders is invisible. 3 suits H1/H4. */
+function swings(cd,k){
+  k=k||3;
+  const out=[];
+  for(let i=k;i<cd.length-k;i++){
+    let hi=true,lo=true;
+    for(let j=i-k;j<=i+k;j++){
+      if(j===i) continue;
+      if(H(cd[j])>=H(cd[i])) hi=false;
+      if(L(cd[j])<=L(cd[i])) lo=false;
+    }
+    if(hi) out.push({i,type:'H',p:H(cd[i]),t:T(cd[i])});
+    else if(lo) out.push({i,type:'L',p:L(cd[i]),t:T(cd[i])});
+  }
+  /* Collapse consecutive same-type pivots, keeping the extreme one —
+     otherwise a stair-step leaves three "highs" in a row and every
+     shape matcher below has to special-case it. */
+  const z=[];
+  out.forEach(s=>{
+    const last=z[z.length-1];
+    if(last&&last.type===s.type){
+      if((s.type==='H'&&s.p>last.p)||(s.type==='L'&&s.p<last.p)) z[z.length-1]=s;
+    } else z.push(s);
+  });
+  return z;
+}
+
+const near=(a,b,tol)=>Math.abs(a-b)<=tol;
+const avgRange=cd=>{
+  if(!cd.length) return 0;
+  const n=Math.min(cd.length,50);
+  let s=0; for(let i=cd.length-n;i<cd.length;i++) s+=H(cd[i])-L(cd[i]);
+  return s/n;
+};
+
+/* ── LIFECYCLE ────────────────────────────────────────────────────
+   Given a trigger level and the direction a confirmed break should
+   take, walk the bars AFTER the pattern completed and decide which of
+   the four states applies.
+
+   GRACE: a break needs to survive this many bars to count as
+   confirmed. Without it, one spike through the neckline reads as a
+   confirmation and then unwinds — which is the exact trap.
+   A break that closes back inside within the grace window is a FAILED
+   break, and failed breaks tend to run the other way, so we say so. */
+function lifecycle(cd,fromIdx,trigger,dir,grace){
+  grace=grace||3;
+  const bars=cd.slice(fromIdx+1);
+  if(!bars.length) return {state:'complete',barsSince:0,broke:false};
+  let breakIdx=-1;
+  for(let i=0;i<bars.length;i++){
+    const c=C(bars[i]);
+    if(dir>0 ? c>trigger : c<trigger){ breakIdx=i; break; }
+  }
+  if(breakIdx<0) return {state:'complete',barsSince:bars.length,broke:false};
+
+  const after=bars.slice(breakIdx+1);
+  const held=after.slice(0,grace);
+  const backInside=held.some(c=>dir>0 ? C(c)<trigger : C(c)>trigger);
+  if(backInside){
+    return {state:'failed',barsSince:bars.length-breakIdx,broke:true,
+      failedAt:breakIdx, note:'broke the level then closed back inside within '+grace+' bars'};
+  }
+  if(after.length<grace){
+    return {state:'breaking',barsSince:bars.length-breakIdx,broke:true,
+      note:'broken '+(bars.length-breakIdx)+' of '+grace+' bars ago — not yet confirmed'};
+  }
+  return {state:'confirmed',barsSince:bars.length-breakIdx,broke:true};
+}
+
+/* ── SHAPE MATCHERS ───────────────────────────────────────────────
+   Each returns a pattern object or null. They read the LAST few
+   pivots, because an older shape has already resolved and is history.
+   Every matcher states its own trigger (the level that decides it),
+   its target (the measured move) and its invalidation. */
+
+function headShoulders(cd,sw,tol){
+  // need L S L H L S (…or the inverse) — five pivots plus a shoulder low
+  if(sw.length<5) return null;
+  const p=sw.slice(-5);
+  const [a,b,c,d,e]=p;
+  // TOP: H L H L H with the middle high the tallest and shoulders similar
+  if(a.type==='H'&&b.type==='L'&&c.type==='H'&&d.type==='L'&&e.type==='H'){
+    if(c.p>a.p&&c.p>e.p&&near(a.p,e.p,tol*1.6)){
+      const neck=(b.p+d.p)/2;
+      const lc=lifecycle(cd,e.i,neck,-1);
+      return{key:'hs',name:'Head & Shoulders',kind:'reversal',dir:-1,
+        trigger:neck,target:neck-(c.p-neck),invalid:c.p,
+        pivots:p,startI:a.i,endI:e.i,life:lc,
+        why:'Left shoulder '+a.p.toFixed(5)+', head '+c.p.toFixed(5)+', right shoulder '+e.p.toFixed(5)+
+            ' with a neckline at '+neck.toFixed(5)+'.'};
+    }
+  }
+  // BOTTOM (inverse)
+  if(a.type==='L'&&b.type==='H'&&c.type==='L'&&d.type==='H'&&e.type==='L'){
+    if(c.p<a.p&&c.p<e.p&&near(a.p,e.p,tol*1.6)){
+      const neck=(b.p+d.p)/2;
+      const lc=lifecycle(cd,e.i,neck,1);
+      return{key:'ihs',name:'Inverse Head & Shoulders',kind:'reversal',dir:1,
+        trigger:neck,target:neck+(neck-c.p),invalid:c.p,
+        pivots:p,startI:a.i,endI:e.i,life:lc,
+        why:'Left shoulder '+a.p.toFixed(5)+', head '+c.p.toFixed(5)+', right shoulder '+e.p.toFixed(5)+
+            ' with a neckline at '+neck.toFixed(5)+'.'};
+    }
+  }
+  return null;
+}
+
+function doubleTriple(cd,sw,tol){
+  if(sw.length<3) return null;
+  const p=sw.slice(-5);
+  const highs=p.filter(x=>x.type==='H'), lows=p.filter(x=>x.type==='L');
+  // TRIPLE first — it is a double that kept going, so test the stronger claim first
+  if(highs.length>=3){
+    const h=highs.slice(-3);
+    if(near(h[0].p,h[1].p,tol)&&near(h[1].p,h[2].p,tol)){
+      const between=lows.filter(x=>x.i>h[0].i&&x.i<h[2].i);
+      if(between.length){
+        const neck=Math.min.apply(null,between.map(x=>x.p));
+        const lc=lifecycle(cd,h[2].i,neck,-1);
+        return{key:'ttop',name:'Triple Top',kind:'reversal',dir:-1,trigger:neck,
+          target:neck-(h[1].p-neck),invalid:Math.max(h[0].p,h[1].p,h[2].p),
+          pivots:h,startI:h[0].i,endI:h[2].i,life:lc,
+          why:'Three highs within '+tol.toFixed(5)+' of each other, support at '+neck.toFixed(5)+'.'};
+      }
+    }
+  }
+  if(lows.length>=3){
+    const l=lows.slice(-3);
+    if(near(l[0].p,l[1].p,tol)&&near(l[1].p,l[2].p,tol)){
+      const between=highs.filter(x=>x.i>l[0].i&&x.i<l[2].i);
+      if(between.length){
+        const neck=Math.max.apply(null,between.map(x=>x.p));
+        const lc=lifecycle(cd,l[2].i,neck,1);
+        return{key:'tbot',name:'Triple Bottom',kind:'reversal',dir:1,trigger:neck,
+          target:neck+(neck-l[1].p),invalid:Math.min(l[0].p,l[1].p,l[2].p),
+          pivots:l,startI:l[0].i,endI:l[2].i,life:lc,
+          why:'Three lows within '+tol.toFixed(5)+' of each other, resistance at '+neck.toFixed(5)+'.'};
+      }
+    }
+  }
+  if(highs.length>=2){
+    const h=highs.slice(-2);
+    if(near(h[0].p,h[1].p,tol)){
+      const between=lows.filter(x=>x.i>h[0].i&&x.i<h[1].i);
+      if(between.length){
+        const neck=Math.min.apply(null,between.map(x=>x.p));
+        const lc=lifecycle(cd,h[1].i,neck,-1);
+        return{key:'dtop',name:'Double Top',kind:'reversal',dir:-1,trigger:neck,
+          target:neck-(h[1].p-neck),invalid:Math.max(h[0].p,h[1].p),
+          pivots:h,startI:h[0].i,endI:h[1].i,life:lc,
+          why:'Two highs at '+h[0].p.toFixed(5)+' and '+h[1].p.toFixed(5)+
+              ' rejected the same area; the low between them sits at '+neck.toFixed(5)+'.'};
+      }
+    }
+  }
+  if(lows.length>=2){
+    const l=lows.slice(-2);
+    if(near(l[0].p,l[1].p,tol)){
+      const between=highs.filter(x=>x.i>l[0].i&&x.i<l[1].i);
+      if(between.length){
+        const neck=Math.max.apply(null,between.map(x=>x.p));
+        const lc=lifecycle(cd,l[1].i,neck,1);
+        return{key:'dbot',name:'Double Bottom',kind:'reversal',dir:1,trigger:neck,
+          target:neck+(neck-l[1].p),invalid:Math.min(l[0].p,l[1].p),
+          pivots:l,startI:l[0].i,endI:l[1].i,life:lc,
+          why:'Two lows at '+l[0].p.toFixed(5)+' and '+l[1].p.toFixed(5)+
+              ' held the same area; the high between them sits at '+neck.toFixed(5)+'.'};
+      }
+    }
+  }
+  return null;
+}
+
+/* Triangles and wedges are both "converging trendlines"; what separates
+   them is the SLOPE of each side, so one matcher handles all of them and
+   names the result from the slopes. */
+function converging(cd,sw,tol){
+  if(sw.length<4) return null;
+  const p=sw.slice(-5);
+  const hs=p.filter(x=>x.type==='H').slice(-2);
+  const ls=p.filter(x=>x.type==='L').slice(-2);
+  if(hs.length<2||ls.length<2) return null;
+  const hSlope=(hs[1].p-hs[0].p)/Math.max(1,hs[1].i-hs[0].i);
+  const lSlope=(ls[1].p-ls[0].p)/Math.max(1,ls[1].i-ls[0].i);
+  const flat=tol/25;                        // slope small enough to call level
+  const endI=Math.max(hs[1].i,ls[1].i);
+  const hFlat=Math.abs(hSlope)<flat, lFlat=Math.abs(lSlope)<flat;
+  let name=null,dir=0,kind='continuation',trigger=null,why='';
+
+  if(hFlat&&lSlope>flat){
+    name='Ascending Triangle'; dir=1; trigger=hs[1].p;
+    why='Flat resistance near '+hs[1].p.toFixed(5)+' with higher lows pressing into it.';
+  } else if(lFlat&&hSlope<-flat){
+    name='Descending Triangle'; dir=-1; trigger=ls[1].p;
+    why='Flat support near '+ls[1].p.toFixed(5)+' with lower highs pressing into it.';
+  } else if(hSlope<-flat&&lSlope>flat){
+    name='Symmetrical Triangle'; dir=0; trigger=hs[1].p;
+    why='Lower highs and higher lows converging — direction undecided until one side breaks.';
+  } else if(hSlope>flat&&lSlope>flat&&hSlope<lSlope){
+    name='Rising Wedge'; dir=-1; kind='reversal'; trigger=ls[1].p;
+    why='Both sides rising but the lows rising faster — momentum compressing against the highs.';
+  } else if(hSlope<-flat&&lSlope<-flat&&lSlope<hSlope){
+    name='Falling Wedge'; dir=1; kind='reversal'; trigger=hs[1].p;
+    why='Both sides falling but the highs falling faster — selling losing room.';
+  } else if(hFlat&&lFlat){
+    name='Rectangle / Range'; dir=0; trigger=hs[1].p;
+    why='Both sides flat — a range between '+ls[1].p.toFixed(5)+' and '+hs[1].p.toFixed(5)+'.';
+  }
+  if(!name) return null;
+
+  const lc = dir===0
+    ? {state:'complete',barsSince:cd.length-1-endI,broke:false,
+       note:'a symmetrical shape has no built-in direction — wait for the break'}
+    : lifecycle(cd,endI,trigger,dir);
+  const height=Math.abs(hs[0].p-ls[0].p);
+  return{key:name.toLowerCase().replace(/[^a-z]+/g,'-'),name,kind,dir,
+    trigger,target:dir?(dir>0?trigger+height:trigger-height):null,
+    invalid:dir>0?ls[1].p:hs[1].p,
+    pivots:[hs[0],ls[0],hs[1],ls[1]].sort((a,b)=>a.i-b.i),
+    startI:Math.min(hs[0].i,ls[0].i),endI,life:lc,why};
+}
+
+/* Flags: a strong impulse (the pole) followed by a shallow drift the
+   other way. Continuation, and the one most often mistaken for a
+   reversal — which is the user's point exactly. */
+function flag(cd,sw,tol){
+  if(cd.length<25) return null;
+  const look=Math.min(60,cd.length-1);
+  const seg=cd.slice(cd.length-look);
+  let poleEnd=-1,poleDir=0,poleSize=0;
+  for(let i=6;i<seg.length-5;i++){
+    const move=C(seg[i])-C(seg[i-6]);
+    if(Math.abs(move)>tol*4&&Math.abs(move)>poleSize){
+      poleSize=Math.abs(move); poleEnd=i; poleDir=move>0?1:-1;
+    }
+  }
+  if(poleEnd<0) return null;
+  const after=seg.slice(poleEnd);
+  if(after.length<4) return null;
+  const hi=Math.max.apply(null,after.map(H)), lo=Math.min.apply(null,after.map(L));
+  if((hi-lo)>poleSize*0.62) return null;            // drift too deep to be a flag
+  const drift=C(after[after.length-1])-C(after[0]);
+  if(poleDir>0&&drift>0) return null;               // must lean against the pole
+  if(poleDir<0&&drift<0) return null;
+  const trigger=poleDir>0?hi:lo;
+  const baseI=cd.length-look+poleEnd;
+  const lc=lifecycle(cd,cd.length-2,trigger,poleDir);
+  return{key:poleDir>0?'bullflag':'bearflag',
+    name:poleDir>0?'Bull Flag':'Bear Flag',kind:'continuation',dir:poleDir,
+    trigger,target:poleDir>0?trigger+poleSize:trigger-poleSize,
+    invalid:poleDir>0?lo:hi,
+    pivots:[],startI:baseI,endI:cd.length-1,life:lc,
+    why:'A '+(poleDir>0?'rally':'sell-off')+' of '+poleSize.toFixed(5)+
+        ' then a shallow drift the other way — this shape looks like a reversal but usually continues.'};
+}
+
+/* ── PUBLIC ───────────────────────────────────────────────────────── */
+function detect(candles,opts){
+  opts=opts||{};
+  const cd=(candles||[]).filter(c=>isFinite(H(c))&&isFinite(L(c))&&isFinite(C(c)));
+  if(cd.length<30) return {patterns:[],swings:[],reason:'need at least 30 bars'};
+  const tol=(opts.tol||avgRange(cd)*0.85);
+  const sw=swings(cd,opts.k||3);
+
+  /* SLIDING PIVOT WINDOW — this matters more than it looks.
+     Each matcher reads the LAST few pivots. But the moment a pattern's
+     break FAILS, price runs the other way and prints NEW pivots, which
+     push the shape out of that window — so the exact case the user cares
+     about (a reversal that got faked) became invisible the moment it
+     happened. Retry each matcher with the window ending a few pivots
+     back, so a shape stays visible while its aftermath plays out. */
+  const found=[];
+  const byKey={};
+  for(let back=0;back<=4;back++){
+    const win = back===0 ? sw : sw.slice(0, sw.length-back);
+    if(win.length<3) break;
+    [headShoulders,doubleTriple,converging,flag].forEach(fn=>{
+      let r=null;
+      try{ r=fn(cd,win,tol); }catch(e){ r=null; }
+      if(!r) return;
+      /* Keep the most INFORMATIVE version of each shape. A pattern seen
+         from an older window has more aftermath to judge, so it can be
+         'failed' or 'confirmed' where the newest window still says
+         'complete'. Prefer whichever has actually resolved. */
+      const rank={breaking:0,failed:1,confirmed:2,complete:3,forming:4};
+      const prev=byKey[r.key];
+      if(!prev||rank[r.life.state]<rank[prev.life.state]) byKey[r.key]=r;
+    });
+  }
+  Object.keys(byKey).forEach(k=>found.push(byKey[k]));
+
+  /* SIGNIFICANCE GATE — without this, noise names everything.
+     A flat, directionless series produced six "patterns" because the
+     matchers only check SHAPE, never SCALE: two highs three pips apart
+     on a five-pip range technically satisfy a double top and mean
+     nothing. Two requirements, both relative to the pair's own recent
+     range so they work on gold and JPY as well as EURUSD:
+       height — the distance from trigger to invalidation must be a real
+                move, not a wiggle
+       span   — the shape must take enough bars to represent actual
+                accumulation rather than three adjacent candles */
+  const bodyRange=avgRange(cd);
+  const MIN_HEIGHT=bodyRange*2.2;
+  const MIN_SPAN=12;
+  const sized=found.filter(p=>{
+    /* Height = the pattern's FULL price span, not trigger-to-invalidation.
+       For a triangle the invalidation is the most recent opposite pivot,
+       which sits close to the trigger by construction, so the narrower
+       measure filtered out perfectly good triangles. The span across all
+       of a shape's pivots is the honest size of the structure. */
+    const ps=(p.pivots||[]).map(x=>x.p).filter(isFinite);
+    const span = ps.length>=2 ? Math.max.apply(null,ps)-Math.min.apply(null,ps) : 0;
+    /* Take the LARGER of the two measures. A double bottom's pivots are
+       equal by definition, so its pivot span is ~0 and only the
+       trigger-to-invalidation distance describes it; a triangle is the
+       opposite. Neither measure alone covers both shapes. */
+    const h = Math.max(span, Math.abs((p.invalid==null?p.trigger:p.invalid)-p.trigger));
+    p.height=h;
+    p.span=(p.endI-p.startI);
+    return h>=MIN_HEIGHT && p.span>=MIN_SPAN;
+  });
+  const keep = sized.length ? sized : [];
+
+  /* A failed break flips the expected direction. This is the single most
+     useful thing here: the shape said one way, the market rejected it,
+     and the rejection is itself the signal. */
+  keep.forEach(p=>{
+    p.effectiveDir = (p.life.state==='failed') ? -p.dir : p.dir;
+    p.faked = p.life.state==='failed';
+    p.completion = p.life.state==='confirmed'?100
+                 : p.life.state==='breaking'?85
+                 : p.life.state==='failed'?100
+                 : p.life.state==='complete'?70:40;
+  });
+  /* Rank: something breaking right now matters more than an old shape. */
+  const order={breaking:0,failed:1,confirmed:2,complete:3,forming:4};
+  keep.sort((a,b)=>(order[a.life.state]-order[b.life.state])
+                 ||(b.height-a.height)||(b.endI-a.endI));
+  /* Cap the list. Beyond about four, overlapping reads of the same
+     structure stop informing and start competing. */
+  return {patterns:keep.slice(0,4),swings:sw,tol,
+          suppressed:Math.max(0,found.length-Math.min(keep.length,4))};
+}
+
+root.BWChartPatterns={detect,swings,lifecycle};
+})(typeof window!=='undefined'?window:globalThis);
+
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   PROTOTYPE — sample data only. Every number below is illustrative;
+   the production build reads /api/patterns and /api/state exactly as
+   the current page does. Nothing here is invented at runtime.
+   ══════════════════════════════════════════════════════════════════ */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ══ REAL DATA LAYER ═══════════════════════════════════════════════
+   Ported VERBATIM from the shipped patterns.html: BASE, bwDate and
+   prettyPair are the same functions, not rewrites — bwDate in
+   particular is the Safari fix (MT5 sends "2026.08.09 14:22:08", which
+   Safari's strict ISO parser rejects, turning every derived value into
+   a dash). The endpoints and cadence are unchanged too:
+     /api/state              -> the real watchlist
+     /api/patterns?symbol&tf -> candlestick patterns for one pair+TF
+     /api/candles?symbol     -> candle history, used by the chart engine
+   ══════════════════════════════════════════════════════════════════ */
+const BASE = location.origin;
+
+function bwDate(v){
+  if(v instanceof Date) return v;
+  if(v === null || v === undefined || v === '') return new Date(NaN);
+  if(typeof v === 'number') return new Date(v < 1e12 ? v * 1000 : v); // secs or ms
+  var s = String(v).trim();
+  if(/^\d+$/.test(s)){ var n = parseInt(s,10); return new Date(n < 1e12 ? n*1000 : n); }
+  // 2026.08.09 -> 2026-08-09
+  s = s.replace(/^(\d{4})\.(\d{2})\.(\d{2})/, '$1-$2-$3');
+  // "YYYY-MM-DD HH:MM(:SS)" -> "YYYY-MM-DDTHH:MM(:SS)"  (Safari needs the T)
+  s = s.replace(/^(\d{4}-\d{2}-\d{2})[ ]+(\d{2}:\d{2})/, '$1T$2');
+  var d = new Date(s);
+  if(!isNaN(+d)) return d;
+  // Last resort: pull the numbers out and build it explicitly.
+  var m = s.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3], +(m[4]||0), +(m[5]||0), +(m[6]||0));
+  return new Date(NaN);
+}
+
+/* Currency tables prettyPair() depends on — lifted with it. Dropping
+   these is what made every pair lookup throw P_BASE is not defined. */
+const P_CCY  = ['USD','EUR','GBP','JPY','CHF','AUD','NZD','CAD','SEK','NOK','DKK',
+                'SGD','HKD','ZAR','MXN','TRY','PLN','CZK','HUF','CNH','THB','INR'];
+const P_BASE = P_CCY.concat(['XAU','XAG','XPT','XPD','BTC','ETH','LTC','XRP','SOL','BNB']);
+function prettyPair(sym){
+  if (!sym) return '';
+  const up = String(sym).toUpperCase().replace(/[._-]/g,'');
+  for (let cut=0; cut<=3 && up.length-cut>=6; cut++){
+    const cand = up.slice(0, up.length-cut);
+    if (cand.length!==6) continue;
+    if (P_BASE.includes(cand.slice(0,3)) && P_CCY.includes(cand.slice(3,6))) return cand;
+  }
+  return up;
+}
+
+
+/* Live stores, filled by the fetches below. Shape matches what
+   findByPairTf() returns, so nothing downstream had to change. */
+const DATA={};        // DATA[bare][tf] = pattern payload
+const SERIES={};      // SERIES[bare][tf] = candle array
+const RISK={};        // from bw-risk-now, written by the MT5 Assistant
+const BRAIN={};       // from bw-brain-history, written by the Trading Brain
+let PAIRS=[];         // bare pairs, in watchlist order
+const brokerSym={};   // bare -> broker symbol (EURUSD -> EURUSDc)
+
+/* RISK RADAR — CURRENT STATE ONLY.
+   bw-risk-log is an ESCALATION HISTORY that never expires; reading it as
+   "the risk now" is what made the SMC panel warn about an 11-hour-old
+   flag. bw-risk-now is the live snapshot the Assistant publishes each
+   cycle. Anything older than three minutes is not current, and a stale
+   reading must never be presented as an all-clear. */
+const RISK_FRESH_MS=180000;
+function loadRisk(){
+  Object.keys(RISK).forEach(k=>delete RISK[k]);
+  try{
+    const n=JSON.parse(localStorage.getItem('bw-risk-now')||'null');
+    if(n&&n.pairs&&(Date.now()-(+n.t||0))<RISK_FRESH_MS){
+      Object.keys(n.pairs).forEach(k=>{
+        const p=n.pairs[k];
+        RISK[prettyPair(k)]={name:p.name||p.level,score:p.score,fresh:true};
+      });
+    }
+  }catch(e){}
+}
+function loadBrain(){
+  Object.keys(BRAIN).forEach(k=>delete BRAIN[k]);
+  try{
+    (JSON.parse(localStorage.getItem('bw-brain-history')||'[]')||[]).forEach(h=>{
+      const k=prettyPair(h.sym||'');
+      if(!k||BRAIN[k]) return;                     // newest per pair wins
+      BRAIN[k]={call:h.call||'—',conf:+h.conf||0,tf:h.tf||'',
+                mins:Math.max(0,Math.round((Date.now()-(+h.t||0))/60000))};
+    });
+  }catch(e){}
+}
+
+async function jget(url){
+  const r=await fetch(BASE+url,{credentials:'same-origin'});
+  if(!r.ok) throw new Error(r.status);
+  return r.json();
+}
+async function loadPairs(){
+  const st=await jget('/api/state');
+  const syms=(st.watchlist||[]).map(w=>typeof w==='string'?w:(w&&w.symbol)).filter(Boolean);
+  if(!syms.length) return false;
+  PAIRS=[];
+  syms.forEach(sym=>{ const b=prettyPair(sym); brokerSym[b]=sym; if(PAIRS.indexOf(b)<0) PAIRS.push(b); });
+  if(!pair||PAIRS.indexOf(pair)<0) pair=PAIRS[0];
+  const strip=$('pairStrip');
+  [...strip.querySelectorAll('.pbtn')].forEach(b=>b.remove());
+  const seg=strip.querySelector('.seg');
+  PAIRS.forEach(b=>{
+    const el=document.createElement('button');
+    el.className='pbtn'+(b===pair?' on':''); el.dataset.sym=b; el.textContent=pretty(b);
+    el.onclick=()=>{ strip.querySelectorAll('.pbtn').forEach(x=>x.classList.remove('on'));
+      el.classList.add('on'); pair=b; refresh(); };
+    strip.insertBefore(el,seg);
+  });
+  return true;
+}
+async function loadPair(b,t){
+  const sym=brokerSym[b]||b;
+  DATA[b]=DATA[b]||{}; SERIES[b]=SERIES[b]||{};
+  try{ DATA[b][t]=await jget('/api/patterns?symbol='+encodeURIComponent(sym)+'&tf='+t); }
+  catch(e){ DATA[b][t]=DATA[b][t]||{}; }
+  try{
+    const c=await jget('/api/candles?symbol='+encodeURIComponent(sym));
+    const byTf=c.candlesByTF||{};
+    SERIES[b].H1=byTf.H1||c.candles||[];
+    SERIES[b].H4=byTf.H4||[];
+  }catch(e){}
+}
+function feedOk(id,ok){ const e=$(id); if(e){ e.textContent=ok?'ok':'unreachable'; e.style.color=ok?'':'var(--red)'; } }
+
+async function refresh(){
+  loadRisk(); loadBrain();
+  try{ await loadPair(pair,tf); feedOk('fPat',true); }catch(e){ feedOk('fPat',false); }
+  renderLive(); renderMatrix(); renderRel();
+  $('dot').className='pdot'; secs=0;
+}
+async function boot(){
+  try{ await loadPairs(); feedOk('fState',true); }
+  catch(e){ console.warn('[patterns] loadPairs failed:',e&&e.message,e&&e.stack); feedOk('fState',false); $('dot').className='pdot off'; }
+  /* Matrix needs every pair on both timeframes; fetch them in the
+     background so the first paint is not blocked on six round trips. */
+  await refresh();
+  for(const b of PAIRS) for(const t of ['H1','H4']) if(!(DATA[b]&&DATA[b][t])) await loadPair(b,t);
+  renderMatrix();
+  $('feedNote').textContent='Patterns and candles refresh every 5s for the selected pair; '+
+    'the All Pairs matrix refreshes as each pair is polled.';
+}
+
+let pair='EURUSD', tf='H1', view='live';
+const D=()=>((DATA[pair]||{})[tf])||{};
+const pretty=s=>s.length===6?s.slice(0,3)+'/'+s.slice(3):s;
+const dirOf=p=>p.type==='bull'?'bull':p.type==='bear'?'bear':'neut';
+/* confidence_pct ?? 55, NOT || 55 — a genuine 0 is a real reading and
+   must not silently become 55. Same class of bug as bar_index || 99,
+   which is already commented in the current file. */
+const confOf=p=>p.confidence_pct ?? 55;
+const biOf=p=>p.bar_index ?? 99;
+const ageOf=b=>b<=2?'recent':b<=8?'mid':'stale';
+const barLbl=b=>b===0?'current bar':b===1?'1 bar ago':b+' bars ago';
+const cCol=c=>c>=75?'var(--green)':c>=60?'var(--gold-lt)':'var(--muted2)';
+
+/* CONFLUENCE — does the other timeframe agree? The current page shows one
+   timeframe at a time and never tells you this, so a user has to click
+   back and forth and remember. */
+function confluence(sym,t,p){
+  const other=t==='H1'?'H4':'H1';
+  const list=((DATA[sym]||{})[other]||{}).patterns||[];
+  return list.some(q=>dirOf(q)===dirOf(p)&&dirOf(q)!=='neut'&&biOf(q)<=3&&confOf(q)>=60);
+}
+
+function renderLive(){
+  const d=D();
+  if(!d||!d.price){
+    $('verdictBox').innerHTML='<div class="b-t mut">Waiting for '+pretty(pair)+' '+tf+
+      '</div><div class="b-s">No pattern payload from the EA for this pair and timeframe yet.</div>';
+    $('patList').innerHTML='<div class="empty">No data yet.</div>';
+    $('topBanner').innerHTML='';
+    try{ renderChart(); }catch(e){}
+    return;
+  }
+  $('hSym').textContent=pretty(pair); $('hTf').textContent=tf;
+  $('rPrice').textContent=d.price; $('rRsi').textContent=(+d.rsi).toFixed(1);
+  const bc=d.bias==='bullish'?'var(--green)':d.bias==='bearish'?'var(--red)':'var(--muted2)';
+  $('rBias').textContent=d.bias[0].toUpperCase()+d.bias.slice(1); $('rBias').style.color=bc;
+  $('rScore').textContent=(d.bias_score>0?'+':'')+d.bias_score; $('rScore').style.color=bc;
+  $('rEma').textContent=d.ema_bias[0].toUpperCase()+d.ema_bias.slice(1);
+  $('rEma').style.color=d.ema_bias==='bullish'?'var(--green)':'var(--red)';
+  $('biasLine').textContent=d.bias[0].toUpperCase()+d.bias.slice(1)+' · score '+(d.bias_score>0?'+':'')+d.bias_score;
+
+  const pats=[...(d.patterns||[])].sort((a,b)=>biOf(a)-biOf(b));
+  const fresh=pats.filter(p=>ageOf(biOf(p))==='recent');
+  const mid=pats.filter(p=>ageOf(biOf(p))==='mid');
+  const stale=pats.filter(p=>ageOf(biOf(p))==='stale');
+  $('cLive').textContent=fresh.length;
+  $('patSummary').textContent=fresh.length+' fresh · '+mid.length+' mid · '+stale.length+' stale';
+
+  /* A plain-language call, which the current page never gives — it shows
+     a bias score and leaves you to interpret it. */
+  const strong=fresh.filter(p=>confOf(p)>=70&&dirOf(p)!=='neut');
+  const agree=strong.filter(p=>dirOf(p)===(d.bias==='bullish'?'bull':'bear'));
+  const r=RISK[pair]||{};
+  let vb;
+  if(!fresh.length){
+    vb='<div class="b-t mut">Nothing forming yet</div><div class="b-s">No pattern on the last three bars. '+
+       'The freshest reading is '+(pats.length?barLbl(biOf(pats[0])):'none at all')+'.</div>';
+  }else if(agree.length){
+    vb='<div class="b-t" style="color:'+bc+'">'+agree.length+' fresh pattern'+(agree.length>1?'s':'')+
+       ' backing the '+d.bias+' reading</div><div class="b-s">'+
+       agree.map(p=>esc(p.name)+' at '+confOf(p)+'%').join(', ')+' on the '+
+       (biOf(agree[0])===0?'current bar':barLbl(biOf(agree[0])))+', with EMA and RSI on the same side.'+
+       (r.score>=50?' Risk Radar has '+pretty(pair)+' at '+r.name+' ('+r.score+') — size down or wait.':'')+
+       '</div>';
+  }else{
+    vb='<div class="b-t" style="color:var(--gold-lt)">Fresh pattern against the bias</div>'+
+       '<div class="b-s">'+esc(fresh[0].name)+' points '+dirOf(fresh[0])+' while the reading is '+d.bias+
+       '. A contradiction this fresh usually means the move is turning or the bias is late.</div>';
+  }
+  $('verdictBox').innerHTML=vb;
+
+  const row=(p,dim)=>{
+    const dir=dirOf(p), c=confOf(p), b=biOf(p), conf=confluence(pair,tf,p);
+    const tags=[];
+    if(b===0) tags.push('<span class="tag t-new">Current bar</span>');
+    if(conf) tags.push('<span class="tag t-conf">H1 + H4 agree</span>');
+    if(ageOf(b)==='stale') tags.push('<span class="tag t-stale">Stale</span>');
+    if(c>=70&&r.score>=50) tags.push('<span class="tag t-risk">Fired at '+esc(r.name)+'</span>');
+    const dots=[1,2,3,4,5].map(i=>'<span class="sd'+(i<=(p.strength||0)?' on-'+(dir==='neut'?'bull':dir):'')+'"></span>').join('');
+    return '<div class="prow'+(dim?' stale':'')+'"><div class="pdir '+dir+'"></div><div class="pmain">'+
+      '<div class="pn">'+esc(p.name)+' '+tags.join(' ')+'</div>'+
+      '<div class="pd">'+barLbl(b)+' · strength <span class="strength">'+dots+'</span>'+
+      (conf?' · also on '+(tf==='H1'?'H4':'H1'):'')+
+      (c>=70&&r.score>=50?' · verify before acting':'')+'</div></div>'+
+      '<div class="pright"><div class="pc" style="color:'+cCol(c)+'">'+c+'%</div><div class="pb">confidence</div></div></div>';
+  };
+  let h='';
+  if(fresh.length){ h+='<div class="lane">Fresh — last 3 bars</div>'+fresh.map(p=>row(p,false)).join(''); }
+  if(mid.length){ h+='<div class="lane">Earlier — 3 to 8 bars back</div>'+mid.map(p=>row(p,false)).join(''); }
+  if(stale.length){ h+='<div class="lane">Stale — 9+ bars back</div>'+stale.map(p=>row(p,true)).join(''); }
+  $('patList').innerHTML=h||'<div class="empty">No patterns in the last 10 bars on '+tf+'.</div>';
+  $('patNote').textContent='Patterns below 70% are shown but never alerted on. Confidence comes from the '+
+    'detector\u2019s own table, not from how the trade turned out — see Reliability for that.';
+
+  /* ── RECENT BARS — ALL of them, with agreement MARKED ────────────
+     The shipped page filtered this strip to candles matching the bias
+     (bullish bias -> only green bars) and drew eight of those. A panel
+     that removes the disagreeing evidence before you see it can only
+     ever confirm — if the bias is wrong it still looks supportive.
+     Now every one of the last twelve bars is drawn, sized by its real
+     range, and the ones AGAINST the bias are outlined instead of
+     hidden, with the tally stated. The card can now contradict the
+     bias, which is the only thing that makes it worth the space. */
+  const cds=(((SERIES[pair]||{})[tf])||[]).slice(-12);
+  const want=d.bias==='bullish'?1:d.bias==='bearish'?-1:0;
+  if(cds.length){
+    const hs=cds.map(c=>Math.abs(+c.h-+c.l)).filter(isFinite);
+    const mx=Math.max.apply(null,hs)||1;
+    let agree=0;
+    $('candles').innerHTML=cds.map(c=>{
+      const o=+c.o,cl=+c.c,hi=+c.h,lo=+c.l;
+      const bull=cl>=o, sign=bull?1:-1;
+      const on=want===0?true:sign===want;
+      if(on&&want!==0) agree++;
+      const hgt=Math.max(6,Math.round(Math.abs(hi-lo)/mx*54));
+      const body=Math.max(2,Math.round(Math.abs(cl-o)/mx*54));
+      const col=bull?'var(--green)':'var(--red)';
+      return '<div class="cnd" title="'+(bull?'up':'down')+' bar">'+
+        '<div class="cwick" style="background:'+col+';opacity:.4;height:'+(hgt-body)+'px"></div>'+
+        '<div class="cbody" style="height:'+body+'px;'+
+          (on?'background:'+col:'background:transparent;border:1px solid '+col+';opacity:.55')+'"></div></div>';
+    }).join('');
+    $('candNote').textContent = want===0
+      ? cds.length+' recent bars · no directional bias to compare against'
+      : agree+' of '+cds.length+' recent bars agree with the '+d.bias+' reading'+
+        (agree*2<cds.length?' — most bars disagree':'');
+  }else{
+    $('candles').innerHTML='';
+    $('candNote').textContent='no candle history yet';
+  }
+
+  /* levels */
+  const lv=d.sr_levels||[];
+  $('cLv').textContent=lv.length;
+  $('lvNote').textContent=lv.length?lv.length+' active':'none sent';
+  $('lvList').innerHTML=lv.length?lv.map(l=>{
+    const res=l.type==='resistance';
+    const dist=Math.abs(parseFloat(l.price)-parseFloat(d.price));
+    const pip=pair.indexOf('JPY')>0?0.01:pair.indexOf('XAU')===0?0.1:0.0001;
+    return '<div class="kv"><span>'+(res?'Resistance':'Support')+' <span class="mut">· '+(l.touches||1)+' touches</span></span>'+
+      '<b style="color:'+(res?'var(--red)':'var(--green)')+'">'+l.price+' <span class="mut n">'+(dist/pip).toFixed(0)+'p</span></b></div>';
+  }).join(''):'<div class="empty">The EA is not sending S/R levels for this pair.</div>';
+
+  renderCross();
+}
+
+function renderCross(){
+  const r=RISK[pair], b=BRAIN[pair];
+  const rows=[];
+  if(r){
+    const col=r.score>=75?'var(--red)':r.score>=50?'var(--gold-lt)':r.score>=25?'var(--blue)':'var(--green)';
+    rows.push(['Risk Radar','live · updated 3s ago','<b style="color:'+col+'">'+r.name+' · '+r.score+'</b>']);
+  }else rows.push(['Risk Radar','no live reading','<b class="mut">—</b>']);
+  rows.push(b?['Trading Brain',b.call+' · '+b.tf+' · '+b.mins+'m ago','<b>'+b.conf+'%</b>']
+             :['Trading Brain','not analysed yet','<b class="mut">—</b>']);
+  $('crossList').innerHTML=rows.map(x=>'<button class="xrow"><span>'+x[0]+'<small>'+x[1]+'</small></span>'+x[2]+'<i class="chev"></i></button>').join('');
+
+  /* ── TOP BANNER — three logical flaws fixed ──────────────────────
+     1. IT CLAIMED "NOTHING FLAGGED AGAINST IT" WHEN NOTHING HAD BEEN
+        CHECKED. The all-clear fired whenever risk was under 50 — which
+        includes the case where there is no risk reading at all, or the
+        reading is stale. "Checked and clear" and "not checked" are
+        completely different things to act on, and the same bug I had
+        just fixed in the SMC panel.
+     2. IT HEADLINED hot[0] — the first pattern in feed order, not the
+        strongest or the freshest. A 71% pattern from two bars ago could
+        front a banner while an 88% one on the current bar sat below it.
+     3. IT IGNORED CONTRADICTIONS. With one fresh bullish and one fresh
+        bearish pattern it still announced one of them confidently. Two
+        strong fresh patterns disagreeing is the more important message,
+        and it is the case where a trader most needs to be told to wait. */
+  const bn=$('topBanner');
+  const d=D();                       /* restored: my banner rewrite dropped this */
+  const hot=(d.patterns||[])
+    .filter(p=>biOf(p)<=2 && confOf(p)>=70 && dirOf(p)!=='neut')
+    .sort((x,y)=> biOf(x)-biOf(y) || confOf(y)-confOf(x));   // freshest, then strongest
+
+  if(!hot.length){ bn.innerHTML=''; return; }
+
+  const bulls=hot.filter(p=>dirOf(p)==='bull'), bears=hot.filter(p=>dirOf(p)==='bear');
+  const top=hot[0];
+  /* riskFresh mirrors the SMC panel: a reading is only usable while it is
+     actually current. The production build reads bw-risk-now and checks
+     its timestamp; the prototype simulates both states. */
+  const riskFresh = !!r && r.fresh !== false;
+
+  if(bulls.length && bears.length){
+    bn.innerHTML='<div class="banner warn"><div style="flex:1"><div class="b-t" style="color:var(--gold-lt)">'+
+      'Two strong patterns disagree</div><div class="b-s">'+
+      esc(bulls[0].name)+' ('+confOf(bulls[0])+'%, '+barLbl(biOf(bulls[0]))+') points up while '+
+      esc(bears[0].name)+' ('+confOf(bears[0])+'%, '+barLbl(biOf(bears[0]))+') points down, both fresh. '+
+      'Nothing to act on until one of them is invalidated.</div></div></div>';
+    return;
+  }
+  if(riskFresh && r.score>=50){
+    bn.innerHTML='<div class="banner warn"><div style="flex:1"><div class="b-t" style="color:var(--gold-lt)">'+
+      'Strong pattern, wrong moment</div><div class="b-s">'+esc(top.name)+' fired at '+confOf(top)+
+      '% '+(biOf(top)===0?'on the current bar':barLbl(biOf(top)))+', but Risk Radar has '+pretty(pair)+
+      ' at <b>'+esc(r.name)+' ('+r.score+')</b> as of a few seconds ago. The pattern is real; the '+
+      'conditions around it are not clean.</div></div></div>';
+    return;
+  }
+  if(riskFresh){
+    bn.innerHTML='<div class="banner bull"><div style="flex:1"><div class="b-t" style="color:var(--green)">'+
+      esc(top.name)+' at '+confOf(top)+'%, nothing flagged against it</div>'+
+      '<div class="b-s">Risk Radar has '+pretty(pair)+' at '+esc(r.name)+' ('+r.score+
+      '), checked seconds ago.</div></div></div>';
+    return;
+  }
+  /* Pattern is strong but risk is unknown — say UNCHECKED, not clear. */
+  bn.innerHTML='<div class="banner warn"><div style="flex:1"><div class="b-t" style="color:var(--muted2)">'+
+    esc(top.name)+' at '+confOf(top)+'% — risk not checked</div>'+
+    '<div class="b-s">The Assistant is not reporting a live Risk Radar reading for '+pretty(pair)+
+    ' right now, so nothing has confirmed the conditions around this pattern. Open the Assistant '+
+    'before acting on it.</div></div></div>';
+}
+
+function renderMatrix(){
+  let agreeing=0;
+  $('mxBody').innerHTML=(PAIRS.length?PAIRS:Object.keys(DATA)).map(sym=>{
+    const cell=t=>{
+      const ps=[...(((DATA[sym]||{})[t]||{}).patterns||[])].sort((a,b)=>biOf(a)-biOf(b));
+      const p=ps[0];
+      if(!p) return '<span class="dash">—</span>';
+      const dir=dirOf(p), c=confOf(p);
+      const cls=dir==='bull'?'t-bull':dir==='bear'?'t-bear':'t-stale';
+      return '<button class="cellbtn" data-go="'+sym+'|'+t+'"><span class="chip '+cls+'">'+
+        (dir==='bull'?'BULL':dir==='bear'?'BEAR':'NEUT')+'</span><span>'+esc(p.name)+
+        '</span><span class="mut n">'+c+'% · '+biOf(p)+'b</span></button>';
+    };
+    const f=t=>{const ps=[...(((DATA[sym]||{})[t]||{}).patterns||[])].sort((a,b)=>biOf(a)-biOf(b));return ps[0];};
+    const a=f('H1'), b=f('H4');
+    const both=a&&b&&dirOf(a)===dirOf(b)&&dirOf(a)!=='neut';
+    const fresh=both&&biOf(a)<=2;
+    if(fresh) agreeing++;
+    const ag=!a||!b?'<span class="dash">—</span>'
+      :both?'<span class="chip '+(dirOf(a)==='bull'?'t-bull':'t-bear')+'">'+(fresh?'YES · fresh':'yes')+'</span>'
+      :'<span class="mut">no</span>';
+    return '<tr><td><b>'+pretty(sym)+'</b><br><span class="mut n" style="font-size:10px">'+
+      ((RISK[sym]||{}).name||'—')+'</span></td><td>'+cell('H1')+'</td><td>'+cell('H4')+'</td><td>'+ag+'</td></tr>';
+  }).join('');
+  $('cPairs').textContent=agreeing;
+  document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{
+    const [s,t]=b.dataset.go.split('|');
+    pair=s; tf=t;
+    document.querySelectorAll('.pbtn').forEach(x=>x.classList.toggle('on',x.dataset.sym===s));
+    document.querySelectorAll('.sbtn').forEach(x=>x.classList.toggle('on',x.dataset.tf===t));
+    renderLive();
+    document.querySelector('.tab[data-p="live"]').click();
+  });
+}
+
+/* RELIABILITY — built from a log this page writes itself. Nothing is
+   seeded: an account with no history shows an empty state rather than
+   invented win rates. An entry is added when a >=70% pattern is first
+   seen on bar 0, then re-priced at +1h and +4h. */
+const RLS='bw-pat-outcomes';
+let RELLOGRAW=[];
+try{ RELLOGRAW=JSON.parse(localStorage.getItem(RLS)||'[]')||[]; }catch(e){ RELLOGRAW=[]; }
+function relSave(){ try{ localStorage.setItem(RLS,JSON.stringify(RELLOGRAW.slice(-400))); }catch(e){} }
+function pipOf(p){ return /JPY/.test(p)?0.01:/^XAU/.test(p)?0.1:/^XAG/.test(p)?0.01:0.0001; }
+function relRecord(){
+  const d=D(); if(!d||!d.price) return;
+  const px=parseFloat(d.price); if(!isFinite(px)) return;
+  ((d.patterns)||[]).forEach(p=>{
+    if(biOf(p)!==0||confOf(p)<70||dirOf(p)==='neut') return;
+    const key=pair+'|'+tf+'|'+p.name+'|'+Math.floor(Date.now()/3600000);
+    if(RELLOGRAW.some(x=>x.k===key)) return;
+    RELLOGRAW.push({k:key,n:p.name,p:pair,tf:tf,dir:dirOf(p),t:Date.now(),px:px,h1:null,h4:null});
+    relSave();
+  });
+  let dirty=false;
+  RELLOGRAW.forEach(x=>{
+    if(x.p!==pair) return;
+    const age=(Date.now()-x.t)/3600000;
+    const mv=(px-x.px)/pipOf(x.p)*(x.dir==='bull'?1:-1);
+    if(x.h1===null&&age>=1){ x.h1=mv; dirty=true; }
+    if(x.h4===null&&age>=4){ x.h4=mv; dirty=true; }
+  });
+  if(dirty) relSave();
+}
+function renderRel(){
+  relRecord();
+  /* "Worked" = moved at least 8 pips in the pattern's own direction by
+     the +1h check. Resolved entries only — an unresolved one is not a
+     loss and must not be counted as one. */
+  const tally={};
+  RELLOGRAW.forEach(x=>{
+    if(x.h1===null) return;
+    const t=tally[x.n]||(tally[x.n]={n:x.n,w:0,l:0});
+    if(x.h1>=8) t.w++; else t.l++;
+  });
+  const rows=Object.keys(tally).map(k=>tally[k])
+    .map(x=>({...x,n2:x.w+x.l,pct:Math.round(x.w/(x.w+x.l)*100)}))
+    .sort((a,b)=>b.pct-a.pct);
+  if(!rows.length){
+    $('relList').innerHTML='<div class="empty">Nothing resolved yet. A pattern is recorded when it '+
+      'fires at 70% or more on the current bar, then priced again an hour later.</div>';
+    $('relLog').innerHTML='<div class="empty">No outcomes yet.</div>';
+    return;
+  }
+  $('relList').innerHTML=rows.map(x=>{
+    const col=x.pct>=60?'var(--green)':x.pct>=45?'var(--gold-lt)':'var(--red)';
+    const thin=x.n2<10;
+    return '<div class="rel"><span class="relname">'+esc(x.n)+'</span>'+
+      '<span class="relbar"><span class="relfill" style="width:'+x.pct+'%;background:'+col+'"></span></span>'+
+      '<span class="relpct" style="color:'+(thin?'var(--muted)':col)+'">'+x.pct+'%</span>'+
+      '<span class="reln">'+x.n2+(thin?' ·thin':'')+'</span></div>';
+  }).join('');
+  $('relLog').innerHTML=RELLOGRAW.filter(x=>x.h1!==null).slice(-8).reverse().map(x=>{
+    const mins=Math.round((Date.now()-x.t)/60000);
+    const when=mins<60?mins+'m ago':Math.round(mins/60)+'h ago';
+    return '<div class="kv"><span>'+esc(x.n)+' <span class="mut">· '+pretty(x.p)+' '+x.tf+' · '+when+
+      '</span></span><b style="color:'+(x.h1>=8?'var(--green)':'var(--red)')+'">'+
+      (x.h1>0?'+':'')+x.h1.toFixed(1)+' pips</b></div>';
+  }).join('');
+}
+
+/* ── nav (the FIXED ink logic — no scrollLeft subtraction) ───────── */
+function moveInk(t,animate){
+  const n=$('nav'), ink=$('ink');
+  if(!n||!ink||!t) return;
+  if(!t.offsetWidth){ requestAnimationFrame(()=>moveInk(t,animate)); return; }
+  if(animate===false) ink.style.transition='none';
+  ink.style.left=(t.offsetLeft+13)+'px';
+  ink.style.width=(t.offsetWidth-26)+'px';
+  if(animate===false) requestAnimationFrame(()=>{ink.style.transition='';});
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');
+  const ic=t.querySelector('.ico'); if(ic){ic.classList.remove('go');void ic.offsetWidth;ic.classList.add('go');}
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  const pg=$('p-'+t.dataset.p); if(pg) pg.classList.add('on');
+  view=t.dataset.p; moveInk(t);
+  if(t.scrollIntoView) try{t.scrollIntoView({inline:'nearest',block:'nearest',behavior:'smooth'});}catch(e){}
+});
+window.addEventListener('resize',()=>moveInk(document.querySelector('.tab.on'),false));
+[60,400,1200].forEach(ms=>setTimeout(()=>moveInk(document.querySelector('.tab.on'),false),ms));
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>moveInk(document.querySelector('.tab.on'),false));
+
+document.querySelectorAll('.pbtn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.pbtn').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); pair=b.dataset.sym; renderLive(); renderMatrix();
+});
+document.querySelectorAll('.sbtn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.sbtn').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); tf=b.dataset.tf; renderLive();
+});
+
+
+/* ══ CHART PATTERNS ═══════════════════════════════════════════════
+   Sample candle series per pair, shaped so each lifecycle state is
+   visible. In production this reads the same candles the chart uses
+   (/api/candles) — the engine above takes any {t,o,h,l,c} array. */
+const STATE_TEXT={
+  breaking:['Breaking now','Price has crossed the trigger but has not yet survived the grace period. This is the moment a fake-out is indistinguishable from a real break — size accordingly.'],
+  confirmed:['Confirmed','Price broke the trigger and held past the grace period. The measured target applies from here.'],
+  failed:['Failed / fake-out','Price broke the trigger and then closed back inside. The shape did not deliver, and a failed break tends to run the OTHER way — the expected direction below is flipped for this reason.'],
+  complete:['Complete, not triggered','The shape is finished but price has not crossed the trigger. Nothing to act on until it does.'],
+  forming:['Forming','Partly built. Not tradable yet.']
+};
+function digitsOf(p){ return /JPY/.test(p)?3:/^XAU|^XAG/.test(p)?2:5; }
+function renderChart(){
+  const cd=((SERIES[pair]||{})[tf])||[];
+  const res=window.BWChartPatterns.detect(cd);
+  const dg=digitsOf(pair);
+  const f=v=>v==null?'—':(+v).toFixed(dg);
+  const r=RISK[pair];
+  const riskFresh=!!r&&r.fresh!==false;
+  const live=res.patterns.filter(p=>p.life.state==='breaking'||p.life.state==='failed');
+  $('cChart').textContent=res.patterns.length;
+  $('chartScope').textContent=cd.length+' bars · '+res.swings.length+' swings';
+
+  /* RISK RADAR TIE-IN — this is where the two features earn each other.
+     A break that happens inside an elevated risk window is exactly the
+     kind of move Risk Radar exists to flag as possibly engineered. */
+  const brk=res.patterns.find(p=>p.life.state==='breaking');
+  let bh='';
+  if(brk&&riskFresh&&r.score>=50){
+    bh='<div class="banner warn"><div style="flex:1"><div class="b-t" style="color:var(--gold-lt)">'+
+      esc(brk.name)+' is breaking inside a flagged window</div><div class="b-s">The trigger at '+f(brk.trigger)+
+      ' has just been crossed, and Risk Radar has '+pretty(pair)+' at <b>'+esc(r.name)+' ('+r.score+
+      ')</b>. Breaks that happen while conditions are flagged fail more often than breaks that do not — '+
+      'this is the combination that produces the classic fake-out.</div></div></div>';
+  }else if(res.patterns.some(p=>p.faked)){
+    const k=res.patterns.find(p=>p.faked);
+    bh='<div class="banner warn"><div style="flex:1"><div class="b-t" style="color:var(--red)">'+
+      esc(k.name)+' failed — expect the opposite</div><div class="b-s">It broke '+f(k.trigger)+
+      ' and closed back inside. Traders who entered on that break are now offside, and unwinding those '+
+      'positions is what usually drives the move the other way.</div></div></div>';
+  }
+  $('chartBanner').innerHTML=bh;
+
+  $('chartList').innerHTML = res.patterns.length ? res.patterns.map(p=>{
+    const st=p.life.state, txt=STATE_TEXT[st]||['',''];
+    const d=p.effectiveDir;
+    const dirTxt=d>0?'Bullish':d<0?'Bearish':'Undecided';
+    const dirCol=d>0?'var(--green)':d<0?'var(--red)':'var(--muted2)';
+    const barCol=st==='confirmed'?'var(--green)':st==='failed'?'var(--red)':
+                 st==='breaking'?'var(--gold-lt)':'var(--blue)';
+    return '<div class="cp"><div class="cp-h"><span class="cp-n">'+esc(p.name)+'</span>'+
+      '<span class="st st-'+st+'">'+esc(txt[0])+'</span>'+
+      '<span class="tag '+(d>0?'t-bull':d<0?'t-bear':'t-stale')+'">'+dirTxt+'</span>'+
+      '<span class="mut" style="font-size:10px;margin-left:auto">'+esc(p.kind)+
+      ' · '+p.life.barsSince+' bars since</span></div>'+
+      '<div class="cp-why">'+esc(p.why)+'</div>'+
+      (p.faked?'<div class="cp-why" style="color:var(--red)"><b>Direction flipped.</b> '+
+        'The shape pointed '+(p.dir>0?'up':'down')+', the break failed, so the working expectation is now '+
+        (d>0?'up':'down')+'.</div>':'')+
+      (p.life.note?'<div class="cp-why" style="color:var(--gold-lt)">'+esc(p.life.note)+'</div>':'')+
+      '<div class="cp-lv"><div>Trigger<b>'+f(p.trigger)+'</b></div>'+
+      '<div>Target<b>'+(p.target==null?'—':f(p.target))+'</b></div>'+
+      '<div>Invalid above/below<b>'+f(p.invalid)+'</b></div>'+
+      '<div>Completion<b>'+p.completion+'%</b></div></div>'+
+      '<div class="cp-bar"><i style="width:'+p.completion+'%;background:'+barCol+'"></i></div></div>';
+  }).join('') : '<div class="empty">No multi-bar formation on the last '+cd.length+
+      ' bars of '+pretty(pair)+' '+tf+'. Structure has to build before it can be named.</div>';
+
+  $('stateKey').innerHTML=Object.keys(STATE_TEXT).map(k=>
+    '<div class="kx"><span class="st st-'+k+'" style="flex-shrink:0">'+esc(STATE_TEXT[k][0])+'</span>'+
+    '<span>'+esc(STATE_TEXT[k][1])+'</span></div>').join('');
+}
+const _live=renderLive;
+renderLive=function(){ _live(); try{ renderChart(); }catch(e){ console.warn('[chart]',e); } };
+
+let secs=0;
+boot();
+setInterval(refresh,5000);
+setInterval(()=>{ secs+=5; $('lastUp').textContent='updated '+(secs<60?secs+'s ago':Math.floor(secs/60)+'m ago'); },5000);
+</script>
+</body>
+</html>
