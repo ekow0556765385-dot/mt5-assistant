@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trading Math</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#09090e;--surface:#0f0f16;--card:#14141c;--border:#22222e;--border2:#2e2e3e;
+  --gold:#c9820a;--gold-lt:#e09b2a;--green:#17a97a;--red:#e0504f;--blue:#5b87c9;
+  --text:#eceae0;--muted:#72706a;--muted2:#9a9890;
+  --bull-bg:rgba(23,169,122,.10);--bear-bg:rgba(224,80,79,.10);--gold-bg:rgba(201,130,10,.10)}
+[data-theme="light"]{--bg:#f6f6f4;--surface:#fff;--card:#fff;--border:#e3e2dd;--border2:#d2d1ca;
+  --gold:#b0720a;--gold-lt:#c9820a;--green:#0f8a62;--red:#c93f3e;--blue:#3f6bb0;
+  --text:#1b1b1f;--muted:#8a8880;--muted2:#5f5e59;
+  --bull-bg:rgba(15,138,98,.09);--bear-bg:rgba(201,63,62,.09);--gold-bg:rgba(176,114,10,.09)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Archivo,-apple-system,sans-serif;background:var(--bg);color:var(--text);
+  font-size:13px;line-height:1.55;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.n{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+::-webkit-scrollbar-track{background:transparent}
+*{scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.nav,.strip{scrollbar-width:none}
+.nav::-webkit-scrollbar,.strip::-webkit-scrollbar{display:none}
+
+/* header */
+.head{background:var(--surface);border-bottom:.5px solid var(--border);padding:13px 22px;flex-shrink:0}
+.hrow{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.title{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.sub{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.hact{margin-left:auto;display:flex;align-items:center;gap:14px}
+.conn{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted2)}
+.pdot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pl 2.4s infinite}
+.pdot.off{background:var(--red);animation:none}
+@keyframes pl{0%,100%{opacity:1}50%{opacity:.35}}
+.gear{background:none;border:.5px solid var(--border2);border-radius:6px;padding:6px 12px;color:var(--muted2);
+  font-family:inherit;font-size:11.5px;cursor:pointer;display:flex;align-items:center;gap:7px}
+.gear:hover{color:var(--text);border-color:var(--muted)}
+.gear svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.7}
+
+/* account strip */
+.strip{display:flex;gap:30px;padding:14px 22px;background:var(--surface);
+  border-bottom:.5px solid var(--border);overflow-x:auto;flex-shrink:0}
+.st{display:flex;flex-direction:column;gap:3px;white-space:nowrap}
+.st b{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;line-height:1.2}
+.st span{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.pos{color:var(--green)}.neg{color:var(--red)}.warn{color:var(--gold-lt)}
+
+/* nav */
+.nav{display:flex;padding:0 22px;background:var(--surface);border-bottom:.5px solid var(--border);
+  flex-shrink:0;overflow-x:auto;position:relative}
+.tab{padding:12px 15px;font-size:12px;font-weight:500;color:var(--muted2);background:none;border:none;
+  cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;font-family:inherit}
+.tab.on{color:var(--text);font-weight:600}
+.ico{width:16px;height:16px;color:var(--muted)}
+.ico svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;display:block;transform-origin:50% 50%}
+.tab.on .ico{color:var(--blue)}
+.ico.go svg{animation:pop .45s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.24) rotate(6deg)}100%{transform:scale(1)}}
+.ink{position:absolute;bottom:0;height:2px;background:var(--blue);
+  transition:left .28s cubic-bezier(.4,0,.2,1),width .28s cubic-bezier(.4,0,.2,1)}
+.cnt{font-size:9.5px;font-weight:600;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+
+/* layout */
+.main{flex:1;overflow-y:auto;padding:24px 22px 40px}
+.page{display:none}.page.on{display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:22px}
+
+/* cards */
+.card{background:var(--card);border:.5px solid var(--border);border-radius:10px;
+  padding:0;margin-bottom:22px;overflow:hidden}
+.chead{display:flex;align-items:center;gap:12px;padding:15px 20px;border-bottom:.5px solid var(--border)}
+.cnum{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:.06em}
+.ctitle{font-size:13.5px;font-weight:600;letter-spacing:-.005em}
+.cbadge{margin-left:auto;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 9px;border-radius:4px;white-space:nowrap}
+.bg{background:var(--bull-bg);color:var(--green)}
+.bb{background:rgba(91,135,201,.14);color:var(--blue)}
+.br{background:var(--bear-bg);color:var(--red)}
+.ba{background:var(--gold-bg);color:var(--gold-lt)}
+.cbody{padding:20px}
+
+/* metrics */
+.hero{font-family:'IBM Plex Mono',monospace;font-size:34px;font-weight:600;line-height:1.1;letter-spacing:-.02em}
+.herosub{font-size:11.5px;color:var(--muted);margin-top:6px}
+.mrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:18px;margin:20px 0 4px}
+.mc b{display:block;font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;line-height:1.3}
+.mc span{display:block;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+.bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:18px 0 0}
+.bar i{display:block;height:100%;border-radius:3px;transition:width .35s ease}
+
+/* inputs */
+.inp{display:flex;gap:16px;flex-wrap:wrap;margin-top:22px;padding-top:18px;border-top:.5px solid var(--border)}
+.ig{display:flex;flex-direction:column;gap:5px}
+.ig label{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.ig input,.ig select{background:var(--bg);border:.5px solid var(--border2);border-radius:6px;padding:7px 10px;
+  color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12.5px;width:104px}
+.ig input:focus,.ig select:focus{outline:none;border-color:var(--blue)}
+
+/* alerts */
+.al{margin-top:20px;padding:12px 15px;border-radius:7px;font-size:11.5px;line-height:1.6}
+.al-g{background:var(--bull-bg);border:.5px solid rgba(23,169,122,.28)}
+.al-a{background:var(--gold-bg);border:.5px solid rgba(201,130,10,.28)}
+.al-r{background:var(--bear-bg);border:.5px solid rgba(224,80,79,.28)}
+.note{font-size:10.5px;color:var(--muted);line-height:1.65;margin-top:16px}
+
+/* tables */
+.twrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.tbl th{text-align:left;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;
+  font-weight:700;padding:10px 12px;border-bottom:.5px solid var(--border);white-space:nowrap}
+.tbl td{padding:11px 12px;border-bottom:.5px solid var(--border);font-family:'IBM Plex Mono',monospace;white-space:nowrap}
+.tbl td.t{font-family:Archivo,sans-serif}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr.hi td{background:var(--gold-bg)}
+
+/* streak dots */
+.srow{display:flex;gap:5px;flex-wrap:wrap;padding:4px 0 2px}
+.sdot{width:23px;height:23px;border-radius:5px;display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+.sdot.win{background:var(--bull-bg);color:var(--green);border:.5px solid rgba(23,169,122,.3)}
+.sdot.loss{background:var(--bear-bg);color:var(--red);border:.5px solid rgba(224,80,79,.3)}
+.sdot.cur{outline:1.5px solid var(--text);outline-offset:1px}
+
+/* stop radar */
+.sl{border:.5px solid var(--border);border-radius:9px;padding:16px 18px;margin-bottom:14px;background:var(--card)}
+.sl.hot{border-color:rgba(224,80,79,.45)}
+.sl-h{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.sl-p{font-size:14px;font-weight:700}
+.sl-track{position:relative;height:8px;border-radius:4px;background:var(--border);overflow:hidden}
+.sl-fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;transition:width .35s}
+.sl-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:9px}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--red);
+  box-shadow:0 0 0 0 rgba(224,80,79,.6);animation:pz 1.15s infinite}
+@keyframes pz{0%{box-shadow:0 0 0 0 rgba(224,80,79,.6)}70%{box-shadow:0 0 0 8px rgba(224,80,79,0)}100%{box-shadow:0 0 0 0 rgba(224,80,79,0)}}
+@media (prefers-reduced-motion:reduce){.pulse,.pdot{animation:none}}
+.tag{font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:.06em}
+.empty{color:var(--muted);font-size:11.5px;padding:26px 0;text-align:center}
+
+/* calendar */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-top:22px}
+.cal .dow{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;
+  text-align:center;padding-bottom:4px;font-weight:700}
+.cd{border:.5px solid var(--border);border-radius:7px;min-height:74px;padding:8px 9px;
+  display:flex;flex-direction:column;gap:3px;position:relative}
+.cd.pad{border:none;background:none}
+.cd .dn{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+.cd .amt{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;margin-top:auto}
+.cd .tc{font-size:9px;color:var(--muted)}
+.cd.win{background:var(--bull-bg);border-color:rgba(23,169,122,.3)}
+.cd.win .amt{color:var(--green)}
+.cd.loss{background:var(--bear-bg);border-color:rgba(224,80,79,.3)}
+.cd.loss .amt{color:var(--red)}
+.cd.today{outline:1.5px solid var(--blue);outline-offset:1px}
+.callegend{display:flex;gap:18px;align-items:center;margin-top:18px;font-size:10.5px;color:var(--muted2);flex-wrap:wrap}
+.callegend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+@media (max-width:780px){.cal{gap:4px}.cd{min-height:58px;padding:6px}.cd .amt{font-size:11px}.cd .tc{display:none}}
+
+/* settings modal */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:flex-start;
+  justify-content:center;padding:40px 20px;z-index:80;overflow-y:auto}
+.ov.on{display:flex}
+.mod{background:var(--surface);border:.5px solid var(--border2);border-radius:12px;
+  width:100%;max-width:760px;overflow:hidden}
+.mhead{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:.5px solid var(--border)}
+.mhead h2{font-size:15px;font-weight:700}
+.mx{margin-left:auto;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
+.mbody{padding:8px 22px 22px}
+.sgrp{padding:18px 0;border-bottom:.5px solid var(--border)}
+.sgrp:last-child{border-bottom:none}
+.sgrp h3{font-size:12px;font-weight:600;margin-bottom:4px}
+.sgrp p{font-size:10.5px;color:var(--muted);line-height:1.6;margin-bottom:14px}
+
+@media (max-width:780px){
+  body{height:auto;overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain}
+  .main{overflow:visible;padding:18px 14px 40px}
+  .nav{position:sticky;top:0;z-index:29;touch-action:pan-x;overscroll-behavior-x:contain;padding:0 14px}
+  .strip{touch-action:pan-x;overscroll-behavior-x:contain;gap:22px;padding:12px 14px}
+  .head{padding:11px 14px}
+  .grid{grid-template-columns:1fr;gap:16px}
+  .hero{font-size:29px}
+}
+</style>
+</head>
+<body>
+
+<div class="head"><div class="hrow">
+  <div>
+    <div class="title">Trading Math</div>
+    <div class="sub">Expectancy · Survival · Position sizing</div>
+  </div>
+  <div class="hact">
+    <div class="conn"><span class="pdot" id="dot"></span><span id="connLbl">Live</span>
+      <span class="mut n" id="upd" style="color:var(--muted)">updated just now</span></div>
+    <button class="gear" onclick="openSettings()">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1A1.7 1.7 0 008.9 19a1.7 1.7 0 00-1.9.4l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1A1.7 1.7 0 004.6 8.9a1.7 1.7 0 00-.4-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+      Settings</button>
+  </div>
+</div></div>
+
+<div class="strip">
+  <div class="st"><b id="sBal">—</b><span>Balance</span></div>
+  <div class="st"><b id="sEq">—</b><span>Equity</span></div>
+  <div class="st"><b id="sMar">—</b><span>Free margin</span></div>
+  <div class="st"><b id="sTr">—</b><span>Closed trades</span></div>
+  <div class="st"><b id="sWR">—</b><span>Win rate</span></div>
+  <div class="st"><b id="sExp">—</b><span>Expectancy</span></div>
+  <div class="st"><b id="sStreak">—</b><span>Streak</span></div>
+  <div class="st"><b id="sRoR">—</b><span>Risk of ruin</span></div>
+</div>
+
+<nav class="nav" id="nav">
+  <button class="tab on" data-p="tools">
+    <span class="ico"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><path d="M8 15l4-6 3 3 4-7"/></svg></span>
+    Tools</button>
+  <button class="tab" data-p="stops">
+    <span class="ico"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M12 9v4M12 16h.01"/></svg></span>
+    Stop Radar <span class="cnt" id="cSL">0</span></button>
+  <button class="tab" data-p="open">
+    <span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg></span>
+    Open Positions <span class="cnt" id="cOpen">0</span></button>
+  <button class="tab" data-p="cal">
+    <span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
+    Calendar</button>
+  <button class="tab" data-p="hist">
+    <span class="ico"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg></span>
+    History <span class="cnt" id="cHist">0</span></button>
+  <span class="ink" id="ink"></span>
+</nav>
+
+<div class="main">
+
+<!-- ═══ TOOLS ═══ -->
+<div class="page on" id="p-tools">
+  <div class="grid">
+
+    <div class="card">
+      <div class="chead"><span class="cnum">01</span><span class="ctitle">Expectancy</span>
+        <span class="cbadge bg">Core metric</span></div>
+      <div class="cbody">
+        <div class="hero" id="expBig">—</div>
+        <div class="herosub" id="expSub">average result per trade, in units of your risk</div>
+        <div class="mrow">
+          <div class="mc"><b id="expPaper">—</b><span>Before costs</span></div>
+          <div class="mc"><b id="expReal">—</b><span>After costs</span></div>
+          <div class="mc"><b id="expDol">—</b><span>Per trade</span></div>
+        </div>
+        <div class="inp">
+          <div class="ig"><label>Avg win R</label><input type="number" id="avgWin" value="2.5" step="0.1"></div>
+          <div class="ig"><label>Avg loss R</label><input type="number" id="avgLoss" value="1.0" step="0.1"></div>
+          <div class="ig"><label>Cost R</label><input type="number" id="spread" value="0.08" step="0.01"></div>
+        </div>
+        <div id="expAl"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><span class="cnum">02</span><span class="ctitle">Breakeven Win Rate</span>
+        <span class="cbadge bb">System design</span></div>
+      <div class="cbody">
+        <div class="hero" id="beBig">—</div>
+        <div class="herosub">the win rate this reward:risk needs before it makes anything</div>
+        <div class="mrow">
+          <div class="mc"><b id="beNeed">—</b><span>Needed</span></div>
+          <div class="mc"><b id="beCur">—</b><span>Yours</span></div>
+          <div class="mc"><b id="beMar">—</b><span>Margin</span></div>
+        </div>
+        <div class="bar"><i id="beBar"></i></div>
+        <div class="inp">
+          <div class="ig"><label>Reward:risk</label><input type="number" id="bRR" value="2.5" step="0.1" min="0.5"></div>
+          <div class="ig"><label>Target WR %</label><input type="number" id="bTarget" value="45" step="1" min="1" max="99"></div>
+        </div>
+        <div id="beAl"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><span class="cnum">03</span><span class="ctitle">Risk of Ruin</span>
+        <span class="cbadge br">Danger zone</span></div>
+      <div class="cbody">
+        <div class="hero" id="rorBig">—</div>
+        <div class="herosub" id="rorSub">chance of reaching your drawdown limit at this size</div>
+        <div class="mrow">
+          <div class="mc"><b id="rorUnits">—</b><span>Losses to ruin</span></div>
+          <div class="mc"><b id="rorEdge">—</b><span>Edge per trade</span></div>
+          <div class="mc"><b id="rorSafe">—</b><span>Max size under 5%</span></div>
+        </div>
+        <div class="bar"><i id="rorBar"></i></div>
+        <div class="inp">
+          <div class="ig"><label>Risk / trade %</label><input type="number" id="rorRisk" value="1" step="0.1" min="0.1" max="20"></div>
+          <div class="ig"><label>Ruin = DD %</label><input type="number" id="rorDD" value="20" step="5" min="5" max="100"></div>
+        </div>
+        <div id="rorAl"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><span class="cnum">04</span><span class="ctitle">Gambler's Fallacy</span>
+        <span class="cbadge ba">Discipline</span></div>
+      <div class="cbody">
+        <div class="srow" id="streakRow"></div>
+        <div class="mrow">
+          <div class="mc"><b id="gfStreak">—</b><span>Current streak</span></div>
+          <div class="mc"><b id="gfNext">—</b><span>Next win prob</span></div>
+          <div class="mc"><b id="gfSProb">—</b><span>Odds of this run</span></div>
+        </div>
+        <div id="gfAl"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><span class="cnum">05</span><span class="ctitle">Loss Asymmetry</span>
+        <span class="cbadge br">Recovery math</span></div>
+      <div class="cbody">
+        <div class="twrap"><table class="tbl">
+          <thead><tr><th>Drawdown</th><th>Gain to recover</th><th>Trades at your edge</th></tr></thead>
+          <tbody id="asymBody"></tbody></table></div>
+        <div class="note">Losses and gains are not symmetric. A 50% drawdown needs a 100% gain to undo,
+          which is why the right-hand column grows so much faster than the left.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><span class="cnum">06</span><span class="ctitle">Position Sizing</span>
+        <span class="cbadge bg">Execution</span></div>
+      <div class="cbody">
+        <div class="hero" id="psLot">—</div>
+        <div class="herosub" id="psModeNote">lots, recalculated from your balance and stop distance</div>
+        <div class="mrow">
+          <div class="mc"><b id="psDR">—</b><span>Risking</span></div>
+          <div class="mc"><b id="psPV">—</b><span>Per pip</span></div>
+          <div class="mc"><b id="psPct">—</b><span>Of balance</span></div>
+          <div class="mc"><b id="psMode">—</b><span>Sizing mode</span></div>
+        </div>
+        <div class="inp">
+          <div class="ig"><label>Balance</label><input type="number" id="psBalance" value="10000" step="100"></div>
+          <div class="ig" id="wrapRisk"><label>Risk %</label><input type="number" id="psRisk" value="1" step="0.1"></div>
+          <div class="ig" id="wrapLots" style="display:none"><label>Fixed lots</label><input type="number" id="psFixedLots" value="0.10" step="0.01" min="0.01"></div>
+          <div class="ig"><label>Stop (pips)</label><input type="number" id="psSL" value="30" step="1"></div>
+          <div class="ig"><label>Instrument</label>
+            <select id="psType" style="width:190px">
+              <option value="10"    data-pip="0.0001">Majors — EURUSD, GBPUSD</option>
+              <option value="6.70"  data-pip="0.01">JPY pairs — USDJPY, GBPJPY</option>
+              <option value="10"    data-pip="0.1">Gold — XAUUSD standard</option>
+              <option value="1"     data-pip="0.1">Gold — XAUUSD mini</option>
+              <option value="50"    data-pip="0.01">Silver — XAGUSD</option>
+              <option value="10"    data-pip="0.0001">Commodity pairs — AUDUSD, USDCAD</option>
+              <option value="1"     data-pip="1">Bitcoin — BTCUSD</option>
+              <option value="0"     data-pip="0">Custom pip value</option>
+            </select></div>
+          <div class="ig"><label>Pip value $</label><input type="number" id="psPair" value="10" step="0.1"></div>
+          <div class="ig"><label>Account currency</label>
+            <input type="text" id="psCCYLbl" value="USD" readonly
+              title="Taken from the trading account" style="width:110px;opacity:.75"></div>
+        </div>
+        <div id="psAl"></div>
+        <div class="twrap" style="margin-top:20px"><table class="tbl">
+          <thead><tr><th>Stop (pips)</th><th>Lots</th><th>Risk $</th></tr></thead>
+          <tbody id="psBody"></tbody></table></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><span class="cnum">08</span><span class="ctitle">R-Multiple Spread</span>
+        <span class="cbadge bb">Distribution</span></div>
+      <div class="cbody">
+        <div id="rdist"></div>
+        <div class="mrow">
+          <div class="mc"><b id="rdBest">—</b><span>Best trade</span></div>
+          <div class="mc"><b id="rdWorst">—</b><span>Worst trade</span></div>
+          <div class="mc"><b id="rdMed">—</b><span>Median</span></div>
+        </div>
+        <div id="rdAl"></div>
+        <div class="note">Expectancy is an average, and an average hides its tail. If a single outsized
+          win is carrying the number, the rest of the system is not doing what it appears to.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><span class="cnum">09</span><span class="ctitle">Losing Streaks To Expect</span>
+        <span class="cbadge ba">Discipline</span></div>
+      <div class="cbody">
+        <div class="twrap"><table class="tbl">
+          <thead><tr><th>Run</th><th>Chance in 100 trades</th><th>Drawdown if it lands</th><th>Seen so far</th></tr></thead>
+          <tbody id="stkBody"></tbody></table></div>
+        <div id="stkAl"></div>
+        <div class="note">These runs are arithmetic, not misfortune. Size so that the streak you will
+          meet sooner or later is one the account can absorb without changing how you trade.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ STOP RADAR ═══ -->
+<div class="page" id="p-stops">
+  <div id="slBanner"></div>
+  <div class="card">
+    <div class="chead"><span class="cnum">07</span><span class="ctitle">Stop Loss Proximity</span>
+      <span class="cbadge ba" id="slBadge">—</span></div>
+    <div class="cbody">
+      <div id="slList"></div>
+      <div class="note">Progress is measured against each trade's own stop distance, so a wide stop and a
+        tight stop can be compared directly. Time remaining divides the distance left by that pair's
+        recent hourly range — a reading of pace, not a forecast.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="chead"><span class="ctitle" id="wcTitle">If every stop is hit</span>
+      <span class="cbadge br">Worst case</span></div>
+    <div class="cbody">
+      <div class="mrow" style="margin-top:0">
+        <div class="mc"><b id="wcLoss">—</b><span>Combined loss</span></div>
+        <div class="mc"><b id="wcBal">—</b><span>Balance after</span></div>
+        <div class="mc"><b id="wcRec">—</b><span>Gain needed back</span></div>
+        <div class="mc"><b id="wcTr">—</b><span>Trades to recover</span></div>
+      </div>
+      <div id="wcAl"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ OPEN ═══ -->
+<div class="page" id="p-open">
+  <div class="card">
+    <div class="chead"><span class="ctitle">Open Positions</span><span class="cbadge bg" id="openBadge">—</span></div>
+    <div class="cbody" style="padding:0">
+      <div class="twrap"><table class="tbl">
+        <thead><tr><th>Symbol</th><th>Type</th><th>Lots</th><th>Entry</th><th>Current</th>
+          <th>Stop</th><th>Target</th><th>P&amp;L</th><th>Open R</th></tr></thead>
+        <tbody id="openBody"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CALENDAR ═══ -->
+<div class="page" id="p-cal">
+  <div class="card">
+    <div class="chead"><span class="ctitle">Daily Results</span>
+      <button class="gear" id="calPrev" style="margin-left:auto">&larr;</button>
+      <span class="ctitle" id="calLbl" style="min-width:150px;text-align:center"></span>
+      <button class="gear" id="calNext">&rarr;</button></div>
+    <div class="cbody">
+      <div class="mrow" style="margin-top:0">
+        <div class="mc"><b id="calNet">—</b><span>Month net</span></div>
+        <div class="mc"><b id="calBest">—</b><span>Best day</span></div>
+        <div class="mc"><b id="calWorst">—</b><span>Worst day</span></div>
+        <div class="mc"><b id="calGreen">—</b><span>Green days</span></div>
+        <div class="mc"><b id="calTrades">—</b><span>Trades</span></div>
+      </div>
+      <div class="cal" id="calGrid"></div>
+      <div class="callegend">
+        <span><i style="background:var(--green)"></i>Winning day</span>
+        <span><i style="background:var(--red)"></i>Losing day</span>
+        <span><i style="background:var(--border2)"></i>No trades</span>
+        <span style="margin-left:auto" class="mut" id="calDD"></span>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="chead"><span class="ctitle">Weekly Breakdown</span><span class="cbadge bb" id="calWkBadge">—</span></div>
+    <div class="cbody" style="padding:0">
+      <div class="twrap"><table class="tbl">
+        <thead><tr><th>Week</th><th>Trades</th><th>Win rate</th><th>Net</th><th>Best day</th><th>Worst day</th></tr></thead>
+        <tbody id="calWk"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HISTORY ═══ -->
+<div class="page" id="p-hist">
+  <div class="card">
+    <div class="chead"><span class="ctitle">Closed Trade History</span>
+      <span class="cbadge bg" id="histCount">—</span><span class="cbadge bb" id="histProfit">—</span></div>
+    <div class="cbody" style="padding:0">
+      <div class="note" id="histNote" style="padding:0 20px 4px"></div>
+      <div class="twrap" style="max-height:520px;overflow-y:auto"><table class="tbl">
+        <thead><tr><th>#</th><th>Symbol</th><th>Type</th><th>Open</th><th>Close</th><th>Stop</th>
+          <th>Pips</th><th>Profit</th><th>R</th><th>R source</th><th>Result</th><th>Closed</th></tr></thead>
+        <tbody id="histBody"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ═══ SETTINGS ═══ -->
+<div class="ov" id="ov" onclick="if(event.target===this)closeSettings()">
+  <div class="mod">
+    <div class="mhead"><h2>Settings</h2>
+      <button class="mx" onclick="closeSettings()">&times;</button></div>
+    <div class="mbody">
+      <div class="sgrp">
+        <h3>01 — Expectancy</h3>
+        <p>Your average win and loss in R, and what a round trip costs you in spread and commission.
+          Leave costs at zero only if you genuinely trade for free.</p>
+        <div class="inp" style="margin:0;padding:0;border:none">
+          <div class="ig"><label>Avg win R</label><input type="number" id="m_avgWin" step="0.1"></div>
+          <div class="ig"><label>Avg loss R</label><input type="number" id="m_avgLoss" step="0.1"></div>
+          <div class="ig"><label>Cost R</label><input type="number" id="m_spread" step="0.01"></div>
+        </div>
+      </div>
+      <div class="sgrp">
+        <h3>02 — Breakeven Win Rate</h3>
+        <p>The reward:risk you actually trade, and the win rate you are aiming to hold.</p>
+        <div class="inp" style="margin:0;padding:0;border:none">
+          <div class="ig"><label>Reward:risk</label><input type="number" id="m_bRR" step="0.1"></div>
+          <div class="ig"><label>Target WR %</label><input type="number" id="m_bTarget" step="1"></div>
+        </div>
+      </div>
+      <div class="sgrp">
+        <h3>03 — Risk of Ruin</h3>
+        <p>How much you risk per trade, and the drawdown you would consider unrecoverable.</p>
+        <div class="inp" style="margin:0;padding:0;border:none">
+          <div class="ig"><label>Risk / trade %</label><input type="number" id="m_rorRisk" step="0.1"></div>
+          <div class="ig"><label>Ruin = DD %</label><input type="number" id="m_rorDD" step="5"></div>
+        </div>
+      </div>
+      <div class="sgrp">
+        <h3>06 — Position Sizing</h3>
+        <p>Defaults for the sizer. Pip value is per standard lot in your account currency; the
+          currency of your trading account, so nothing here needs converting by hand.</p>
+        <p><b>Dynamic</b> keeps your risk at the same percentage of the balance, so the lot size rises
+          as the account grows and falls as it draws down. <b>Fixed</b> keeps the lot size and stop
+          exactly where you set them, so the money at risk never changes and the percentage moves
+          instead. Choose one deliberately — they behave very differently through a losing run.</p>
+        <div class="inp" style="margin:0;padding:0;border:none">
+          <div class="ig" style="width:100%"><label>Sizing mode</label>
+            <select id="m_psMode" style="width:100%">
+              <option value="dynamic">Dynamic — risk a set % of the balance</option>
+              <option value="fixed">Fixed — same lots and stop every trade</option>
+            </select></div>
+          <div class="ig"><label>Risk %</label><input type="number" id="m_psRisk" step="0.1"></div>
+          <div class="ig"><label>Fixed lots</label><input type="number" id="m_psFixedLots" step="0.01" min="0.01"></div>
+          <div class="ig"><label>Stop (pips)</label><input type="number" id="m_psSL" step="1"></div>
+          <div class="ig"><label>Pip value $</label><input type="number" id="m_psPair" step="0.1"></div>
+        </div>
+      </div>
+      <div class="sgrp">
+        <h3>R Multiple</h3>
+        <p>R is a trade's result measured in units of what it risked, so it needs the stop that was
+          actually set. Where the broker recorded a stop, that stop is used. Where it did not — a trade
+          closed manually with no stop attached, for instance — the fallback below is used instead, and
+          those trades are marked in the history so you can see which figures rest on it. Set it to
+          zero to exclude them from every calculation rather than estimate them.</p>
+        <div class="inp" style="margin:0;padding:0;border:none">
+          <div class="ig"><label>Fallback stop (pips)</label><input type="number" id="m_defStop" step="1" min="0"></div>
+        </div>
+      </div>
+      <div class="sgrp">
+        <h3>07 — Stop Radar</h3>
+        <p>How close a trade must get to its stop before it is called out, and how far ahead the
+          warning banner looks.</p>
+        <div class="inp" style="margin:0;padding:0;border:none">
+          <div class="ig"><label>Warn at %</label><input type="number" id="m_slWarn" step="5"></div>
+          <div class="ig"><label>Urgent at %</label><input type="number" id="m_slHot" step="5"></div>
+        </div>
+      </div>
+      <div class="sgrp">
+        <h3>Data</h3>
+        <p>Settings are stored on your Blackwood account and follow you between devices, with a local
+          copy so the dashboard works before the network answers.</p>
+        <div class="inp" style="margin:0;padding:0;border:none">
+          <div class="ig" style="width:100%"><label>Refresh interval</label>
+            <select id="m_interval" style="width:180px">
+              <option value="5">Every 5 seconds</option>
+              <option value="15" selected>Every 15 seconds</option>
+              <option value="60">Every minute</option>
+              <option value="0">Manual only</option>
+            </select></div>
+        </div>
+      </div>
+      <div class="sgrp" style="display:flex;align-items:center;gap:14px">
+        <div style="flex:1">
+          <h3 style="margin:0">Saved to your account</h3>
+          <p style="margin:2px 0 0" id="syncLbl">Checking…</p>
+        </div>
+        <button class="gear" id="btnSave" style="padding:9px 20px;border-color:var(--blue);color:var(--text)">Save settings</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const V=id=>{const e=$(id);return e?parseFloat(e.value)||0:0;};
+
+/* ── LIVE DATA ─────────────────────────────────────────────────────
+   Ported verbatim from the shipped dashboard: the same endpoints, the
+   same fallbacks and the same trade normalisation, so nothing about how
+   data arrives has changed. /api/math-data first, enriched from
+   /api/state when it is thin, and /api/state + /api/agent-session as a
+   fallback if it fails outright.
+   ══════════════════════════════════════════════════════════════════ */
+let trades=[], liveAccount={}, autoTimer=null, fetchRetries=0;
+let ACC={balance:0,equity:0,margin:0};
+let OPEN=[], TRADES=[], RISKNOW={};
+
+/* Symbol normalisation, lifted with normaliseTrade because it depends
+   on it — cutting the helper and keeping the caller is what makes a
+   lifted block throw on its first real payload. */
+// ── Broker symbol normalisation ───────────────────────────────────
+// MathReporter strips the broker suffix before sending, but the FALLBACK
+// paths (/api/state and /api/agent-session, i.e. the main EA's own feed)
+// carry the RAW broker symbol. So on a suffixed account the same
+// instrument arrived as both "EURUSD" and "EURUSDc" depending on which
+// source filled the row — and per-symbol grouping counted them as two
+// different instruments, splitting the stats. Normalise on the way in so
+// every source agrees.
+const M_CCY  = ['USD','EUR','GBP','JPY','CHF','AUD','NZD','CAD','SEK','NOK','DKK',
+                'SGD','HKD','ZAR','MXN','TRY','PLN','CZK','HUF','CNH','THB','INR'];
+const M_BASE = M_CCY.concat(['XAU','XAG','XPT','XPD','BTC','ETH','LTC','XRP','SOL','BNB']);
+function prettyPair(sym){
+  if (!sym || sym === '—') return sym || '—';
+  const up = String(sym).toUpperCase().replace(/[._-]/g,'');
+  for (let cut=0; cut<=3 && up.length-cut>=6; cut++){
+    const cand = up.slice(0, up.length-cut);
+    if (cand.length!==6) continue;
+    if (M_BASE.includes(cand.slice(0,3)) && M_CCY.includes(cand.slice(3,6))) return cand;
+  }
+  return up; // indices / metals baskets — leave intact
+}
+
+
+/* MT5 sends "2026.08.09 14:22:08" and the API sometimes an ISO string.
+   Safari's date parser rejects the dotted form, which turns every derived
+   value into a dash on iPhone, so all parsing goes through here. */
+function bwDate(v){
+  if(v instanceof Date) return v;
+  if(v==null||v==='') return new Date(NaN);
+  if(typeof v==='number') return new Date(v<1e12?v*1000:v);
+  const s=String(v).trim();
+  if(/^\d+$/.test(s)){ const n=+s; return new Date(n<1e12?n*1000:n); }
+  let d=new Date(s.replace(/\./g,'-').replace(' ','T'));
+  if(!isNaN(d)) return d;
+  d=new Date(s);
+  return d;
+}
+/* ── FETCH WITH A TIMEOUT, PORTABLE ───────────────────────────────
+   An AbortSignal cannot always be handed to fetch. In sandboxed frames
+   (preview panes, srcdoc documents) fetch is proxied to the parent via
+   postMessage, and postMessage cannot structured-clone an AbortSignal —
+   the call dies with DataCloneError before the request is ever made, and
+   the dashboard then reports "no MT5 data" when the real problem was the
+   options object.
+   So: try the abortable path, and if the environment rejects the signal,
+   retry the same request without it and enforce the deadline with a race
+   instead. The request itself is identical either way. */
+function timedFetch(u, ms){
+  const opts = { cache:'no-store', headers:{ 'Accept':'application/json' } };
+  const deadline = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout after '+ms+'ms')), ms));
+  let ctrl = null;
+  try { ctrl = (typeof AbortController!=='undefined') ? new AbortController() : null; } catch(e) { ctrl = null; }
+  const attempt = () => {
+    if (!ctrl) return Promise.race([ fetch(u, opts), deadline ]);
+    const t = setTimeout(()=>{ try{ ctrl.abort(); }catch(e){} }, ms);
+    let p;
+    try { p = fetch(u, Object.assign({ signal: ctrl.signal }, opts)); }
+    catch(e){ clearTimeout(t); ctrl = null; return Promise.race([ fetch(u, opts), deadline ]); }
+    return p.then(r=>{ clearTimeout(t); return r; })
+            .catch(err=>{
+              clearTimeout(t);
+              /* Signal rejected by the host, not a network failure — retry clean. */
+              if (err && /clone|postMessage|signal/i.test(err.message||'')) {
+                ctrl = null;
+                return Promise.race([ fetch(u, opts), deadline ]);
+              }
+              throw err;
+            });
+  };
+  return attempt();
+}
+function setConn(t){ const l=document.getElementById('connLbl'); if(l) l.textContent=t; }
+function getBaseUrl() {
+  /* Served from Railway in production, so the relative path is correct
+     and there is no manual URL field to read. Kept for local testing. */
+  const f = document.getElementById('railUrl');
+  const manual = f ? f.value.trim().replace(/\/$/, '') : '';
+  // If page is served from Railway itself, use relative URLs (avoids CORS entirely)
+  const isOnRailway = window.location.hostname !== 'localhost' &&
+                      window.location.hostname !== '127.0.0.1' &&
+                      window.location.protocol !== 'file:';
+  return isOnRailway ? '' : manual;
+}
+
+// ── FETCH FROM RAILWAY — primary endpoint ──
+async function fetchLive() {
+  const url = getBaseUrl();
+  const dot = document.getElementById('dot');
+  
+  dot.className = 'pdot';
+  setConn('Syncing');
+
+  try {
+    // Step 1: fetch /api/math-data
+    const res = await timedFetch(`${url}/api/math-data`, 8000);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    let data = await res.json();
+    console.log('[MathDash] /api/math-data response:', JSON.stringify(data).substring(0, 300));
+
+    // Step 2: if math-data has no account/trades, enrich from /api/state
+    const hasAccount = data.account && parseFloat(data.account.balance || 0) > 0;
+    const hasTrades  = data.closed_trades && data.closed_trades.length > 0;
+    const hasOpen    = data.open_trades   && data.open_trades.length   > 0;
+
+    if (!hasAccount || (!hasTrades && !hasOpen)) {
+      console.log('[MathDash] Enriching from /api/state...');
+      data = await enrichFromState(url, data);
+    }
+
+    // Step 3: render
+    processLiveData(data);
+    dot.className = 'pdot'; since = 0;
+    const src = data.data_source || 'live';
+    /* `data_source` names the STORE the trades came out of, not the
+       transport. The server sets 'bridge' whenever it reads the general
+       EA feed (st.closedTrades) — which a WebRequest account fills just
+       as a file-bridge account does — so labelling it "Bridge" told
+       WebRequest users they were on a transport they are not using.
+       Name the origin of the data instead, which is what it actually
+       describes. */
+    setConn(src === 'math_reporter' ? 'Live · MathReporter' :
+            src === 'agent_session'  ? 'Live · Agent'    :
+            src === 'bridge' || src === 'state' ? 'Live · EA feed' : 'Live');
+    since = 0;
+    fetchRetries = 0;
+
+  } catch(e) {
+    fetchRetries++;
+    console.warn('[MathDash] /api/math-data failed:', e.message, e.stack, '— trying /api/state directly');
+    await fetchFallback(url);
+  }
+}
+
+// ── ENRICH: pull account from /api/state if math-data had no account ──
+async function enrichFromState(urlOverride, data) {
+  const url = urlOverride !== undefined ? urlOverride : getBaseUrl();
+  try {
+    const res = await fetch(`${url}/api/state`, { cache: 'no-store' });
+    if (!res.ok) return data;
+    const state = await res.json();
+    console.log('[MathDash] /api/state keys:', Object.keys(state));
+
+    // Account — bridge sends camelCase (balance, equity, freeMargin)
+    const a = state.accountInfo || {};
+    if (parseFloat(a.balance || 0) > 0) {
+      data.account = {
+        balance:     parseFloat(a.balance     || 0),
+        equity:      parseFloat(a.equity      || 0),
+        margin:      parseFloat(a.margin      || 0),
+        free_margin: parseFloat(a.freeMargin  || a.free_margin || 0),
+        currency:    a.currency || 'USD',
+        leverage:    a.leverage || 0,
+        profit:      parseFloat(a.profit || 0),
+        server:      a.server   || ''
+      };
+    }
+
+    // Open trades — bridge uses openPrice, volume (camelCase)
+    if (state.openTrades && state.openTrades.length > 0 &&
+        (!data.open_trades || data.open_trades.length === 0)) {
+      data.open_trades = state.openTrades.map(t => ({
+        symbol:     t.symbol,
+        type:       (t.type || '').toUpperCase(),
+        lots:       parseFloat(t.volume || t.lots || 0),
+        open_price: parseFloat(t.openPrice || t.open_price || 0),
+        sl:         parseFloat(t.sl || 0),
+        tp:         parseFloat(t.tp || 0),
+        profit:     parseFloat(t.profit || 0),
+        float_r:    t.float_r || null
+      }));
+    }
+
+    // Closed trades — bridge uses openPrice, closePrice (camelCase)
+    if (state.closedTrades && state.closedTrades.length > 0 &&
+        (!data.closed_trades || data.closed_trades.length === 0)) {
+      data.closed_trades = state.closedTrades.map((t, i) => ({
+        ticket:      t.ticket || i + 1,
+        symbol:      t.symbol,
+        type:        (t.type || '').toUpperCase(),
+        lots:        parseFloat(t.volume || t.lots || 0),
+        open_price:  parseFloat(t.openPrice  || t.open_price  || 0) || null,
+        close_price: parseFloat(t.closePrice || t.close_price || 0) || null,
+        sl:          parseFloat(t.sl || 0),
+        tp:          parseFloat(t.tp || 0),
+        profit:      parseFloat(t.profit || 0),
+        pips:        parseFloat(t.pips   || 0) || null,
+        close_time:  t.closeTime || t.close_time || '',
+        _source:     'bridge'
+      }));
+      data.data_source = 'state';
+    }
+
+    // Agent session fallback for closed trades
+    if (!data.closed_trades || data.closed_trades.length === 0) {
+      try {
+        const sRes = await fetch(`${url}/api/agent-session`, { cache: 'no-store' });
+        if (sRes.ok) {
+          const sess = await sRes.json();
+          const orders = (sess.executed_orders || []).filter(o => o.profit !== undefined);
+          if (orders.length > 0) {
+            data.closed_trades = orders.map((o, i) => ({
+              ticket:      o.ticket || i + 1,
+              symbol:      o.symbol || '—',
+              type:        (o.action || o.type || '').toUpperCase(),
+              lots:        parseFloat(o.lots || o.volume || 0),
+              open_price:  parseFloat(o.open_price || o.price || 0) || null,
+              close_price: parseFloat(o.close_price || 0) || null,
+              sl:          parseFloat(o.sl || 0),
+              tp:          parseFloat(o.tp || 0),
+              profit:      parseFloat(o.profit || 0),
+              pips:        null,
+              close_time:  o.close_time || o.closed_at || '',
+              _source:     'agent_session'
+            }));
+            data.data_source = 'agent_session';
+          }
+        }
+      } catch(e2) {}
+    }
+  } catch(e) { console.warn('[MathDash] enrichFromState failed:', e.message); }
+  return data;
+}
+
+// ── FALLBACK: /api/state + /api/agent-session ──
+async function fetchFallback(urlOverride) {
+  const url = urlOverride !== undefined ? urlOverride : getBaseUrl();
+  const dot = document.getElementById('dot');
+  
+  try {
+    // Use GET endpoints — /api/state and /api/agent-session
+    const [stateRes, sessionRes] = await Promise.allSettled([
+      fetch(`${url}/api/state`,          { cache: 'no-store' }),
+      fetch(`${url}/api/agent-session`,  { cache: 'no-store' })
+    ]);
+
+    let account = {};
+    let closed  = [];
+    let open    = [];
+
+    // ── /api/state gives full server state including accountInfo ──
+    if (stateRes.status === 'fulfilled' && stateRes.value.ok) {
+      const state = await stateRes.value.json();
+      const a = state.accountInfo || {};
+      if (a.balance) {
+        account = {
+          balance:     a.balance,
+          equity:      a.equity     || a.balance,
+          margin:      a.margin     || 0,
+          free_margin: a.freeMargin || a.free_margin || 0,
+          currency:    a.currency   || 'USD',
+          leverage:    a.leverage   || 0,
+          profit:      a.profit     || 0,
+          server:      a.server     || ''
+        };
+      }
+      // Map open trades — bridge sends openPrice / volume (camelCase)
+      if (state.openTrades && state.openTrades.length > 0) {
+        open = state.openTrades.map(t => ({
+          symbol:     t.symbol,
+          type:       (t.type || '').toUpperCase(),
+          lots:       t.volume || t.lots || 0,
+          open_price: t.openPrice || t.open_price || 0,
+          sl:         t.sl || 0,
+          tp:         t.tp || 0,
+          profit:     parseFloat(t.profit || 0)
+        }));
+      }
+      // Map closed trades
+      if (state.closedTrades && state.closedTrades.length > 0) {
+        closed = state.closedTrades.map((t, i) => ({
+          ticket:      t.ticket || i + 1,
+          symbol:      t.symbol,
+          type:        (t.type || '').toUpperCase(),
+          lots:        t.volume || t.lots || 0,
+          open_price:  t.openPrice  || t.open_price  || 0,
+          close_price: t.closePrice || t.close_price || 0,
+          sl:          t.sl || 0,
+          profit:      parseFloat(t.profit || 0),
+          pips:        t.pips || 0,
+          close_time:  t.closeTime || t.close_time || new Date().toISOString()
+        }));
+      }
+    }
+
+    // ── /api/agent-session adds executed orders as closed trades ──
+    if (sessionRes.status === 'fulfilled' && sessionRes.value.ok) {
+      const sess = await sessionRes.value.json();
+      if (closed.length === 0 && sess.executed_orders && sess.executed_orders.length > 0) {
+        closed = sess.executed_orders.filter(o => o.profit !== undefined).map((o, i) => ({
+          ticket:      i + 1,
+          symbol:      o.symbol || '—',
+          type:        (o.action || '').toUpperCase(),
+          lots:        o.lots   || 0,
+          open_price:  o.open_price  || 0,
+          close_price: o.close_price || 0,
+          sl:          o.sl    || 0,
+          profit:      parseFloat(o.profit || 0),
+          pips:        o.pips  || 0,
+          close_time:  o.close_time || new Date().toISOString()
+        }));
+      }
+    }
+
+    if (parseFloat(account.balance||0) > 0 || closed.length > 0 || open.length > 0) {
+      processLiveData({ account, open_trades: open, closed_trades: closed, stats: {}, data_source: 'fallback', last_update: new Date().toISOString() });
+      dot.className = 'pdot'; since = 0;
+      lbl.textContent = parseFloat(account.balance||0) > 0 ? 'LIVE — State' : 'PARTIAL DATA';
+      since = 0;
+    } else {
+      throw new Error('All endpoints empty — is MT5 bridge running and sending data?');
+    }
+  } catch(e) {
+    (function(){const d=document.getElementById('dot');if(d)d.className='pdot off';})();
+    setConn(fetchRetries <= 2 ? 'Reconnecting' : 'No MT5 data');
+    
+    console.error('[MathDash] Fallback failed:', e.message);
+  }
+}
+
+// ── NORMALISE trade — handles camelCase (bridge) and snake_case (MathReporter) ──
+function normaliseTrade(t, i) {
+  /* The three feeds that can reach here (MathReporter, the state store
+     and the agent session) each name these differently, and a key this
+     list misses silently becomes 0 — which is why Open, Close, Stop and
+     Pips could all read zero at once while profit was correct. Accept
+     every spelling seen across the three, and parse rather than trust
+     `||` (a legitimate 0 and a missing key are not the same thing). */
+  const pick = (...keys) => {
+    for (const k of keys) {
+      const v = t[k];
+      if (v !== undefined && v !== null && v !== '') {
+        const n = parseFloat(v);
+        if (!isNaN(n) && n !== 0) return n;
+      }
+    }
+    return null;                 // absent, which is NOT the same as zero
+  };
+  let open_price  = pick('open_price','openPrice','entry_price','entryPrice',
+                           'price_open','priceOpen','open','entry','openprice');
+  let close_price = pick('close_price','closePrice','exit_price','exitPrice',
+                           'price_close','priceClose','close','exit','closeprice');
+  const sl          = pick('sl','stopLoss','stop_loss','sl_price','slPrice',
+                           'price_sl','stoploss');
+  const tp          = t.tp          || t.takeProfit || t.take_profit  || 0;
+  const lots        = t.lots        || t.volume     || t.lot_size     || 0;
+  const symbol      = prettyPair(t.symbol) || '—';
+  // Type already normalised + corrected by server — just uppercase here
+  var rawType = String(t.type || t.action || t.direction || t.trade_type || '').toUpperCase().trim();
+  if (rawType === '0' || rawType === 'BUY_STOP'  || rawType === 'BUY_LIMIT')  rawType = 'BUY';
+  if (rawType === '1' || rawType === 'SELL_STOP' || rawType === 'SELL_LIMIT') rawType = 'SELL';
+  const type = rawType || '—';
+  const profit      = parseFloat(t.profit || t.net_profit || 0);
+  let pips = pick('pips','pip_gain','pipGain','pip','points_gain');
+
+  const close_time  = t.close_time  || t.closeTime  || t.exit_time   || t.time || '';
+  const open_time   = t.open_time   || t.openTime   || t.entry_time  || '';
+  const ticket      = t.ticket      || t.position_id || t.id         || (i + 1);
+  /* computeR returns { r, src } so the dashboard can show WHERE each R
+     came from and exclude the ones it could not compute honestly. */
+  /* ── RECOVERING THE PRICES THE EA DOES NOT SEND ──────────────────
+     The closed-trade payload is only ticket / symbol / profit / volume /
+     type / time. But the server SNAPSHOTS every open position it sees
+     (app.js ~1581: open_price, sl, tp, lots, type keyed by ticket) and
+     re-attaches that snapshot when the trade later appears as closed —
+     which is exactly how the open-positions view knows these values.
+     So entry and stop DO arrive for any trade the server watched open.
+     The one piece still missing is the CLOSE price, because app.js
+     derives it from `pips` and the EA sends no pips. Profit is sent,
+     and profit is just the distance closed priced up, so invert it the
+     same way the open view derives current price:
+         close = open + dir x (profit / (lots x pipValue/pipSize))
+     Everything downstream — pips, R, the R-spread, streaks — then works
+     from real numbers rather than blanks. */
+  const pipSz  = /JPY/i.test(symbol) ? 0.01
+               : /XAU|GOLD/i.test(symbol) ? 0.1
+               : /XAG|SILVER/i.test(symbol) ? 0.01
+               : /BTC|ETH/i.test(symbol) ? 1 : 0.0001;
+  const pipVal = /XAG|SILVER/i.test(symbol) ? 50
+               : /JPY/i.test(symbol) ? 6.7
+               : /BTC|ETH/i.test(symbol) ? 1 : 10;
+  const dirN   = type === 'SELL' ? -1 : 1;
+  let derivedClose = false;
+  if (close_price == null && open_price != null && lots > 0 && profit !== 0) {
+    const perUnit = lots * (pipVal / pipSz);
+    const rate = (typeof ccyRate === 'function') ? ccyRate() : 1;
+    if (perUnit > 0) { close_price = open_price + dirN * ((profit * (rate || 1)) / perUnit); derivedClose = true; }
+  }
+  if (pips == null && open_price != null && close_price != null) {
+    pips = +(((close_price - open_price) * dirN) / pipSz).toFixed(1);
+  }
+  const rr          = computeR({ r_multiple: t.r_multiple, open_price, close_price, sl, type, pips });
+  const r_multiple  = rr.r;
+  const r_method    = rr.src;
+  const float_r     = t.float_r  || null;
+  return {
+    ticket, symbol, type, lots,
+    open_price, close_price, sl, tp,
+    profit, pips, close_time, open_time,
+    r_multiple, r_method, float_r, derivedClose,
+    /* A trade with no computable R is not a win or a loss for the
+       statistics — it is unscored, and every downstream tool skips it. */
+    /* Profit is always present, so win/loss is always knowable even when
+       R is not. Only the R-DEPENDENT tools skip an unscored trade. */
+    win: profit > 0,
+    scored: r_multiple != null,
+    r:   r_multiple,
+    rSource: r_method,
+    i:   i + 1,
+    closed: close_time ? bwDate(close_time) : null
+  };
+}
+
+// ── Track last known account login to detect switches ──
+var lastAccountLogin  = '';
+var lastAccountBalance = 0;
+
+// ── Clear everything when account switches ──
+/* Open positions arrive in either the bridge's camelCase or the
+   MathReporter's snake_case, exactly as closed trades do. Pip size and
+   pip value are derived from the symbol so the stop radar can measure
+   distance in that instrument's own terms. */
+function normaliseOpen(t){
+  const sym=String(t.symbol||t.sym||'').toUpperCase();
+  const base=sym.replace(/[^A-Z]/g,'').slice(0,6);
+  if(!base) return null;
+  const pip=/JPY$/.test(base)?0.01:/^XAU/.test(base)?0.1:/^XAG/.test(base)?0.01:
+            /^BTC|^ETH/.test(base)?1:0.0001;
+  const pipVal=/^XAG/.test(base)?50:/JPY$/.test(base)?6.7:/^BTC|^ETH/.test(base)?1:10;
+  const entry=parseFloat(t.open_price??t.openPrice??t.entry??0);
+  const lotsIn=Math.abs(parseFloat(t.lots??t.volume??0));
+  const profitIn=parseFloat(t.profit??t.pl??0);
+  let price=parseFloat(t.current_price??t.currentPrice??t.price??NaN);
+  /* THE EA DOES NOT SEND A CURRENT PRICE for open positions - its payload
+     is ticket / symbol / type / volume / openPrice / sl / tp / profit /
+     riskPct / openTime. Falling back to the entry price made every trade
+     look motionless: open R was always 0 and the stop radar always read
+     0%, however close price actually was.
+     Floating profit IS sent, and profit is only the distance travelled
+     priced up, so invert it:
+         distance = profit / (lots x value of one whole price unit)
+     applied in the trade's own direction. Value per price unit is the
+     pip value divided by the pip size. */
+  const sl=parseFloat(t.sl??t.stop_loss??t.stopLoss??0);
+  const tp=parseFloat(t.tp??t.take_profit??t.takeProfit??0);
+  const lots=Math.abs(parseFloat(t.lots??t.volume??0));
+  if(!entry||!lots) return null;
+  const dirN=String(t.type||t.action||'buy').toLowerCase().indexOf('sell')>=0?-1:1;
+  if(!isFinite(price)||!price){
+    /* perUnit is the USD value of a one-unit price move, but `profit`
+       arrives in the ACCOUNT currency. Dividing them directly made the
+       implied distance wrong by the exchange rate on any non-USD account,
+       and every open R inherited that error. Convert first. */
+    const perUnit=lotsIn*(pipVal/pip);
+    const rate=(typeof ccyRate==='function')?ccyRate():1;
+    price = perUnit>0 ? entry + dirN*((profitIn*(rate||1))/perUnit) : entry;
+  }
+  return {sym:base, type:dirN>0?'buy':'sell',
+    lots, entry, price, sl, tp, pip, pipVal,
+    derivedPrice: !(t.current_price||t.currentPrice||t.price),
+    pl:profitIn,
+    /* Recent hourly range is not in this payload, so the stop radar's
+       pace estimate falls back to a fraction of the stop distance rather
+       than inventing a volatility figure. */
+    /* No volatility figure is sent either, so pace is estimated from how
+       far this trade has actually moved since it opened rather than from
+       an invented ATR. Trades open less than an hour give no estimate. */
+    hourRange:(function(){
+      const hrs=(Date.now()/1000-(parseFloat(t.openTime??t.open_time??0)||0))/3600;
+      if(!(hrs>=1)) return 0;
+      return Math.abs(price-entry)/hrs;
+    })()};
+}
+
+function clearAllData() {
+  /* An account switch must not leave the previous account's numbers on
+     screen for even one cycle. Reset the stores and repaint through the
+     normal render path rather than blanking elements one by one. */
+  trades = []; liveAccount = {}; TRADES = []; OPEN = [];
+  ACC = { balance:0, equity:0, margin:0 };
+  setConn('Account switched');
+  try { recalcAll(); } catch(e) {}
+}
+
+
+// ── PROCESS LIVE DATA ──
+function processLiveData(data) {
+  var newAccount = data.account || {};
+  var newLogin   = String(newAccount.login   || '');
+  var newBalance = parseFloat(newAccount.balance || 0);
+
+  // Detect account switch — login changed OR currency changed
+  var loginChanged   = lastAccountLogin && newLogin && newLogin !== lastAccountLogin;
+  var balanceJumped  = lastAccountBalance > 0 && newBalance > 0 &&
+                       Math.abs(newBalance - lastAccountBalance) / lastAccountBalance > 0.20 &&
+                       trades.length > 0;
+
+  if (loginChanged || balanceJumped) {
+    console.log('[MathDash] Account switched — clearing display');
+    clearAllData();
+  }
+
+  if (newLogin)   lastAccountLogin   = newLogin;
+  if (newBalance) lastAccountBalance = newBalance;
+
+  liveAccount = newAccount;
+
+  // Server already normalises — but we run normaliseTrade again client-side
+  // in case any fallback path sends raw camelCase data
+  trades = (data.closed_trades || []).map((t, i) => normaliseTrade(t, i));
+
+  /* Feed the dashboard's own state. The old strip ids (sBalance /
+     sEquity / sMargin / gBalance / balLive) are gone; renderAcc() paints
+     the strip from ACC, so account values are set here and rendered in
+     one place rather than written directly into the DOM from the fetch
+     path. */
+  const bal = parseFloat(liveAccount.balance || 0);
+  const eq  = parseFloat(liveAccount.equity  || bal);
+  const fm  = parseFloat(liveAccount.free_margin || liveAccount.freeMargin || 0);
+  ACC = { balance: bal, equity: eq, margin: fm };
+
+  /* ACCOUNT CURRENCY — detected, never chosen. Everything downstream
+     formats through money(), so one call re-denominates the whole
+     dashboard. */
+  setAccountCurrency(liveAccount.currency || 'USD');
+
+  /* DYNAMIC SIZING follows the live balance; FIXED deliberately does not,
+     because the whole point of fixed is that the lot size does not move
+     when the account does. */
+  if (bal > 0 && sizingMode() !== 'fixed') {
+    const pb = document.getElementById('psBalance');
+    if (pb) pb.value = bal.toFixed(2);
+  }
+
+  TRADES = trades;
+  OPEN   = (data.open_trades || []).map(normaliseOpen).filter(Boolean);
+  loadRisk();
+  recalcAll();
+  console.log('[MathDash] Rendered:', trades.length, 'trades, balance:', liveAccount.balance);
+}
+
+
+
+/* Risk Radar state, published by the MT5 Assistant each cycle. Only used
+   while genuinely current — a stale reading must never be presented as a
+   live warning next to an open position. */
+function loadRisk(){
+  RISKNOW={};
+  try{
+    const n=JSON.parse(localStorage.getItem('bw-risk-now')||'null');
+    if(n&&n.pairs&&(Date.now()-(+n.t||0))<180000){
+      Object.keys(n.pairs).forEach(k=>{
+        const p=n.pairs[k];
+        RISKNOW[String(k).replace(/[^A-Za-z]/g,'').slice(0,6).toUpperCase()]=
+          {name:p.name||p.level,score:p.score};
+      });
+    }
+  }catch(e){}
+}
+
+/* ── R MULTIPLE ───────────────────────────────────────────────────
+   R is only meaningful against the risk that was actually taken, so the
+   stop the trade was placed with is the only correct denominator.
+   Order of preference:
+     1. the R the EA computed at entry, which used the live stop
+     2. the recorded stop price, giving |entry - stop|
+     3. the fallback stop set in Settings, if the trader has set one
+   There is no built-in guess. With the fallback left at zero, a trade
+   with no stop on record returns null, is labelled "no stop" in the
+   history, and is left out of win rate, expectancy and everything
+   downstream — an unknown result is not the same as an average one. */
+function computeR(t){
+  if(t.r_multiple!=null && t.r_multiple!==0) return {r:+(+t.r_multiple).toFixed(3),src:'EA'};
+  const open=+t.open_price||0, close=+t.close_price||0, sl=+t.sl||0;
+  const buy=String(t.type||'').toUpperCase()==='BUY';
+  if(sl&&open&&close){
+    const risk=Math.abs(open-sl);
+    if(risk>0) return {r:+(((buy?close-open:open-close)/risk).toFixed(3)),src:'stop'};
+  }
+  const fb=parseFloat(($('m_defStop')||{}).value)||0;
+  if(fb>0 && t.pips!=null && +t.pips!==0) return {r:+((+t.pips/fb).toFixed(3)),src:'fallback'};
+  return {r:null,src:'no stop'};
+}
+/* Trades arrive already scored by normaliseTrade, which owns computeR.
+   This only derives the win rate, and only from trades that HAVE an R —
+   an unscored trade is unknown, not average. */
+function rebuildR(){
+  const scored=TRADES.filter(t=>t.r!=null);
+  winRate=scored.length?scored.filter(t=>t.r>0).length/scored.length:0;
+  return scored.length;
+}
+let winRate=0;
+
+/* ── Risk of ruin ─────────────────────────────────────────────────
+   Ruin over N risk-units is z^N, where z solves
+       p·z^a + (1-p)·z^(-b) = 1
+   with a = average win in R and b = average loss in R. This respects
+   the fact that a 2.5:1 system survives a losing run that would end an
+   even-money one. No closed form exists, so bisect: the function is
+   monotonic in z and settles well inside eighty steps. */
+function ruinZ(p,a,b){
+  if(p<=0||a<=0||b<=0) return 1;
+  const f=z=>p*Math.pow(z,a)+(1-p)*Math.pow(z,-b)-1;
+  let lo=1e-6,hi=1-1e-9;
+  if(f(hi-1e-7)>0) return 1;
+  for(let i=0;i<80;i++){const m=(lo+hi)/2; if(f(m)>0) lo=m; else hi=m;}
+  return (lo+hi)/2;
+}
+const ruin=(p,a,b,u)=>{const z=ruinZ(p,a,b); return z>=1?1:Math.min(1,Math.max(0,Math.pow(z,u)));};
+
+/* ── 01 Expectancy ─────────────────────────────────────────────── */
+function calcExpectancy(){
+  const p=winRate,a=V('avgWin'),b=V('avgLoss'),c=V('spread');
+  const paper=p*a-(1-p)*b, real=paper-c;
+  const dol=ACC.balance*(V('rorRisk')/100)*real;
+  $('expBig').textContent=(real>=0?'+':'')+real.toFixed(3)+'R';
+  $('expBig').className='hero '+(real>=0?'pos':'neg');
+  $('expPaper').textContent=(paper>=0?'+':'')+paper.toFixed(3)+'R';
+  $('expReal').textContent=(real>=0?'+':'')+real.toFixed(3)+'R';
+  $('expReal').className=real>=0?'pos':'neg';
+  $('expDol').textContent=money(dol);
+  $('expDol').className=dol>=0?'pos':'neg';
+  $('sExp').textContent=(real>=0?'+':'')+real.toFixed(2)+'R';
+  $('sExp').className=real>=0?'pos':'neg';
+  const thin=TRADES.length<30;
+  $('expSub').textContent='average result per trade, in units of your risk'+
+    (thin?' — only '+TRADES.length+' trades, treat as provisional':'');
+  $('expAl').innerHTML=real>0.3
+    ?'<div class="al al-g">A strong edge. At '+V('rorRisk')+'% risk this is '+money(dol)+' per trade on average.</div>'
+    :real>0
+    ?'<div class="al al-a">A marginal edge. Costs take '+(paper>0?((c/paper)*100).toFixed(0):'—')+
+      '% of what the system makes before fees. Widen the target or trade a cheaper instrument.</div>'
+    :'<div class="al al-r">Negative expectancy. Position size and streak management cannot rescue this — the rules themselves need changing.</div>';
+  return real;
+}
+
+/* ── 02 Breakeven ──────────────────────────────────────────────── */
+function calcBreakeven(){
+  const rr=V('bRR'), c=V('spread'), b=V('avgLoss')||1;
+  /* Costs are paid on every trade, winners included, so they raise the
+     bar: the requirement is (loss + cost) / (win + loss). */
+  const need=(b+c)/(rr*b+b);
+  const cur=winRate, mar=cur-need;
+  $('beBig').textContent=(need*100).toFixed(1)+'%';
+  $('beBig').className='hero '+(mar>=0?'pos':'neg');
+  $('beNeed').textContent=(need*100).toFixed(1)+'%';
+  $('beCur').textContent=(cur*100).toFixed(1)+'%';
+  $('beMar').textContent=(mar>=0?'+':'')+(mar*100).toFixed(1)+' pts';
+  $('beMar').className=mar>=0?'pos':'neg';
+  $('beBar').style.width=Math.min(100,cur/need*100)+'%';
+  $('beBar').style.background=mar>=0?'var(--green)':'var(--red)';
+  const tgt=V('bTarget')/100;
+  $('beAl').innerHTML=mar>=0
+    ?'<div class="al al-g">Clear of breakeven by '+(mar*100).toFixed(1)+' points. At '+rr.toFixed(1)+
+      ':1 you need '+(need*100).toFixed(1)+'% and you are holding '+(cur*100).toFixed(1)+'%.'+
+      (tgt>need?' Your '+(tgt*100).toFixed(0)+'% target leaves room to spare.':'')+'</div>'
+    :'<div class="al al-r">Below breakeven. At '+rr.toFixed(1)+':1 you need '+(need*100).toFixed(1)+
+      '% once costs are counted, and you are at '+(cur*100).toFixed(1)+'%. Either the target has to widen or the entry has to sharpen.</div>';
+}
+
+/* ── 03 Risk of ruin ───────────────────────────────────────────── */
+function calcRoR(){
+  const p=winRate,a=V('avgWin'),b=V('avgLoss');
+  const risk=V('rorRisk')||1, dd=V('rorDD')||20;
+  const units=Math.max(1,Math.floor(dd/risk));
+  const r=ruin(p,a,b,units);
+  const col=r<0.05?'var(--green)':r<0.15?'var(--gold-lt)':'var(--red)';
+  $('rorBig').textContent=(r*100).toFixed(1)+'%';
+  $('rorBig').style.color=col;
+  $('sRoR').textContent=(r*100).toFixed(1)+'%';
+  $('sRoR').className=r<0.05?'pos':r<0.15?'warn':'neg';
+  $('rorUnits').textContent=units;
+  $('rorEdge').textContent=(p*a-(1-p)*b).toFixed(3)+'R';
+  $('rorBar').style.width=Math.min(100,r*100)+'%';
+  $('rorBar').style.background=col;
+  /* Largest risk % that keeps ruin under 5%, found by walking down. */
+  /* Largest risk per trade that still keeps ruin under 5%. Searched from
+     the top down so the answer is the most aggressive size that is still
+     defensible, not merely the first one that passes. */
+  let safe=null;
+  for(let x=20;x>=0.1;x-=0.1){
+    if(ruin(p,a,b,Math.max(1,Math.floor(dd/x)))<0.05){safe=Math.round(x*10)/10;break;}
+  }
+  $('rorSafe').textContent=safe?safe.toFixed(1)+'%':'—';
+  $('rorSub').textContent='chance of a '+dd+'% drawdown while risking '+risk+'% a trade';
+  $('rorAl').innerHTML=r<0.05
+    ?'<div class="al al-g">It would take '+units+' net losing units to reach '+dd+'%, and your edge makes that unlikely. This size is sustainable.</div>'
+    :r<0.2
+    ?'<div class="al al-a">'+(r*100).toFixed(1)+'% of accounts with this edge and this size eventually see a '+dd+
+      '% drawdown.'+(safe&&safe<risk?' Risking '+safe.toFixed(1)+'% instead brings it under 5%.':'')+'</div>'
+    :'<div class="al al-r">'+(r*100).toFixed(1)+'% chance of a '+dd+'% drawdown. This is a sizing problem, not a strategy problem'+
+      (safe?' — '+safe.toFixed(1)+'% per trade would bring it under 5%.':'.')+'</div>';
+}
+
+/* ── 04 Gambler's fallacy ──────────────────────────────────────── */
+function getStreak(){
+  const T=TRADES.filter(t=>t.r!=null);
+  if(!T.length) return {type:'none',count:0};
+  const type=T[T.length-1].win?'win':'loss';
+  let c=0;
+  for(let i=T.length-1;i>=0;i--){ if((type==='win')===T[i].win) c++; else break; }
+  return {type,count:c};
+}
+function calcGF(){
+  const recent=TRADES.filter(t=>t.r!=null).slice(-20);
+  $('streakRow').innerHTML=recent.length
+    ? recent.map((t,i)=>'<div class="sdot '+(t.win?'win':'loss')+(i===recent.length-1?' cur':'')+
+        '" title="'+esc(t.symbol)+' '+(t.win?'WIN':'LOSS')+' '+t.r+'R">'+(t.win?'W':'L')+'</div>').join('')
+    : '<span class="mut" style="font-size:11px">No trades yet</span>';
+  const s=getStreak(), len=s.count, isLoss=s.type==='loss';
+  const prob=len>0?(isLoss?Math.pow(1-winRate,len):Math.pow(winRate,len)):1;
+  $('gfStreak').textContent=len===0?'—':(isLoss?'↓ ':'↑ ')+len+' '+(len===1?s.type:(s.type==='loss'?'losses':'wins'));
+  $('gfStreak').className=isLoss?'neg':'pos';
+  $('gfNext').textContent=(winRate*100).toFixed(1)+'%';
+  $('gfSProb').textContent=(prob*100).toFixed(2)+'%';
+  $('sStreak').textContent=len===0?'—':(isLoss?'↓':'↑')+len;
+  $('sStreak').className=isLoss?'neg':'pos';
+  $('gfAl').innerHTML=len===0
+    ?'<div class="al al-g">Each trade is independent. What happened before never changes the odds of the next one.</div>'
+    :isLoss&&len>=3
+    ?'<div class="al al-r">'+len+' losses in a row. The next trade is still '+(winRate*100).toFixed(1)+
+      '% — not higher. A run this long happens naturally about '+(prob*100).toFixed(1)+
+      '% of the time at your win rate. Hold your size.</div>'
+    :!isLoss&&len>=3
+    ?'<div class="al al-a">'+len+' wins in a row. The next trade is still '+(winRate*100).toFixed(1)+
+      '% — not higher. Runs like this are where over-sizing usually starts.</div>'
+    :'<div class="al al-g">Win probability on the next trade is '+(winRate*100).toFixed(1)+
+      '%, whatever the last few did.</div>';
+}
+
+/* ── 05 Loss asymmetry ─────────────────────────────────────────── */
+function calcAsym(){
+  const exp=winRate*V('avgWin')-(1-winRate)*V('avgLoss')-V('spread');
+  const risk=V('rorRisk')||1;
+  $('asymBody').innerHTML=[5,10,20,30,40,50,60,70,80].map(loss=>{
+    const rec=(loss/(100-loss))*100;
+    const tr=exp>0?Math.ceil(rec/(exp*risk)):null;
+    const col=loss<=10?'var(--green)':loss<=30?'var(--gold-lt)':'var(--red)';
+    return '<tr><td style="color:'+col+'">-'+loss+'%</td><td style="color:'+col+'">+'+rec.toFixed(1)+
+      '%</td><td class="mut">'+(tr==null?'never at this edge':tr+' trades')+'</td></tr>';
+  }).join('');
+}
+
+/* ── 06 Position sizing ────────────────────────────────────────── */
+function calcPS(){
+  const mode=sizingMode();
+  const bal=V('psBalance')||1, sl=V('psSL'), pv=V('psPair');
+  const ccy=ccyRate();
+  let risk=V('psRisk'), dr, fixedLots=null;
+  if(mode==='fixed'){
+    /* FIXED SIZING — the trader has committed to a lot size and a stop
+       distance, and wants them to stay put whatever the balance does.
+       The lot size is the input; the money at risk is the output, and it
+       is the PERCENTAGE that moves as the account grows or shrinks. */
+    fixedLots=V('psFixedLots');
+    const riskUSD=fixedLots*sl*pv;
+    dr=ccy?riskUSD/ccy:riskUSD;
+    risk=bal?dr/bal*100:0;
+  }else{
+    dr=bal*(risk/100);
+  }
+  /* CURRENCY CONVERSION.
+     The allowance `dr` is in the ACCOUNT currency; the pip value is quoted
+     in USD per standard lot. The selector holds what one unit of the
+     account currency is worth in USD, so the allowance converts to USD by
+     MULTIPLYING, and lots = (dr x rate) / (stop x pipValue).
+     Dividing by the rate instead inverts the conversion, which understates
+     a EUR account by about 25% and overstates a GHS account by a factor of
+     roughly two hundred. */
+  const drUSD=dr*ccy;
+  const raw=(sl>0&&pv>0)?drUSD/(sl*pv):0;
+  const lots=(mode==='fixed')?fixedLots:Math.floor(raw*100)/100;
+  $('psLot').textContent=(lots||0).toFixed(2);
+  $('psModeNote').textContent = mode==='fixed'
+    ? 'fixed lot size — the amount at risk moves with your stop, not your balance'
+    : 'lots, recalculated from your balance and stop distance';
+  $('psDR').textContent=money(dr)+(ccy!==1?' ($'+drUSD.toFixed(2)+')':'');
+  $('psPV').textContent=money(lots*pv);
+  $('psPct').textContent=risk.toFixed(2)+'%';
+  $('psPct').className=risk>3?'neg':risk>2?'warn':'';
+  $('psMode').textContent=mode==='fixed'?'Fixed':'Dynamic';
+  /* Below one micro lot the rounded answer is 0.00, which reads as a bug
+     rather than as "this stop is too wide for this balance". */
+  $('psAl').innerHTML = lots>=0.01
+    ? '<div class="al al-g">'+lots.toFixed(2)+' lots risks '+money(lots*sl*pv)+' USD over a '+sl+
+      '-pip stop, against your '+money(dr)+' allowance.</div>'
+    : raw>0
+    ? '<div class="al al-a">This works out below the 0.01 minimum lot. Either the stop is too wide for '+
+      money(bal)+' at '+risk+'% risk, or the pip value is set too high. A '+
+      Math.floor(drUSD/(0.01*pv))+'-pip stop would be the widest you could take.</div>'
+    : '<div class="al al-a">Enter a stop distance and pip value to size the trade.</div>';
+  const wr=$('wrapRisk'), wl=$('wrapLots');
+  if(wr&&wl){ wr.style.display=mode==='fixed'?'none':''; wl.style.display=mode==='fixed'?'':'none'; }
+  $('psBody').innerHTML=[10,20,30,40,50,60].map(s=>{
+    const l=(mode==='fixed')?fixedLots:Math.floor((drUSD/(s*pv))*100)/100;
+    return '<tr'+(s===sl?' class="hi"':'')+'><td>'+s+'</td><td style="color:var(--gold-lt)">'+
+      (l||0).toFixed(2)+'</td><td class="mut">'+
+      money(mode==='fixed'?(fixedLots*s*pv)/(ccy||1):dr)+'</td></tr>';
+  }).join('');
+}
+
+/* ── ACCOUNT CURRENCY ─────────────────────────────────────────────
+   The account tells us what currency it is denominated in, so nothing
+   here is chosen by hand. Every figure on the dashboard is shown in that
+   currency; pip values are quoted per standard lot in USD, so the only
+   conversion needed is between the two, and it happens in one place.
+   Rates are refreshed with the account and fall back to the last known
+   value, so a missing rate never silently prices an account as USD. */
+const CCY_USD={USD:1,EUR:1.12,GBP:1.28,AUD:0.66,CAD:0.73,CHF:1.13,NZD:0.61,
+  JPY:0.0067,ZAR:0.055,NGN:0.00065,GHS:0.064,KES:0.0077,INR:0.012,SGD:0.75};
+const CCY_SYM={USD:'$',EUR:'€',GBP:'£',JPY:'¥',AUD:'A$',CAD:'C$',CHF:'CHF ',
+  NZD:'NZ$',ZAR:'R',NGN:'₦',GHS:'GH₵',KES:'KSh',INR:'₹',SGD:'S$'};
+let ACCT_CCY='USD';
+function ccyRate(){ return CCY_USD[ACCT_CCY]!=null?CCY_USD[ACCT_CCY]:1; }
+function ccySym(){ return CCY_SYM[ACCT_CCY]||(ACCT_CCY+' '); }
+/* money() is used everywhere, so switching the account switches the whole
+   dashboard at once rather than card by card. */
+function money(v){
+  const sym=ccySym();
+  const dp=(ACCT_CCY==='JPY'||ACCT_CCY==='NGN')?0:2;
+  return (v<0?'-':'')+sym+Math.abs(v).toFixed(dp).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+}
+function setAccountCurrency(code){
+  const c=String(code||'USD').toUpperCase();
+  if(c===ACCT_CCY) return false;
+  ACCT_CCY=c;
+  const l=$('psCCYLbl');
+  if(l) l.value=c+(CCY_USD[c]==null?' (rate unknown)':'');
+  document.querySelectorAll('[data-ccy]').forEach(e=>e.textContent=c);
+  return true;
+}
+
+/* ── SIZING MODE ──────────────────────────────────────────────────
+   Dynamic: the trader sets a percentage once and the lot size follows
+   the balance up and down, so risk stays constant in relative terms.
+   Fixed: the trader sets a lot size and stop that do not move, so the
+   money at risk stays constant and the PERCENTAGE drifts as the balance
+   changes. Both are legitimate; what is not legitimate is showing one
+   and computing the other. */
+function sizingMode(){ return (($('m_psMode')||{}).value)||'dynamic'; }
+
+/* ── 07 Stop radar ─────────────────────────────────────────────── */
+function calcStops(){
+  const warn=parseFloat(($('m_slWarn')||{}).value)||70;
+  const hotAt=parseFloat(($('m_slHot')||{}).value)||85;
+  const rows=OPEN.map(t=>{
+    const dir=t.type==='buy'?1:-1;
+    const full=Math.abs(t.entry-t.sl);
+    /* NO STOP = NO RADAR. With sl at 0 the old maths produced a distance
+       measured against zero, so an unprotected trade — the one actually
+       most at risk — showed a comfortable reading. It is now flagged as
+       having no stop at all, which is the more urgent message. */
+    if(!t.sl||!(full>0)) return {...t,noStop:true,pct:0,left:0,pipsLeft:0,hours:Infinity,risk$:0};
+    const left=Math.max(0,dir>0?(t.price-t.sl):(t.sl-t.price));
+    const pct=Math.max(0,Math.min(100,(1-left/full)*100));
+    /* (distance / pip) x pip value x lots gives the risk in USD, because
+       pip values are quoted in USD. Everything on this page is displayed
+       through money(), which formats in the ACCOUNT currency — so the
+       figure has to be converted, or a GHS account sees dollar amounts
+       wearing a cedi symbol. */
+    const riskUSD=(full/t.pip)*t.pipVal*t.lots;
+    const rate=(typeof ccyRate==='function')?ccyRate():1;
+    const risk$=riskUSD/(rate||1);
+    const hours=t.hourRange>0?left/t.hourRange:Infinity;
+    return {...t,noStop:false,left,pipsLeft:left/t.pip,pct,hours,risk$,riskUSD};
+  }).sort((a,b)=>(a.noStop===b.noStop)?(b.pct-a.pct):(a.noStop?-1:1));
+
+  const hot=rows.filter(r=>!r.noStop&&r.pct>=warn);
+  const nostop=rows.filter(r=>r.noStop);
+  /* The badge read 0 while three positions were being tracked, because
+     it counted only the ones already past the warning threshold. A tab
+     badge should say how much it is watching; urgency is carried by the
+     cards, the banner and the colour, not by hiding the count. */
+  $('cSL').textContent=rows.length;
+  const cs=$('cSL');
+  if(cs) cs.style.color=(hot.length||nostop.length)?'var(--red)':'';
+  $('slBadge').textContent=OPEN.length+' open · '+hot.length+' in reach'+
+    (nostop.length?' · '+nostop.length+' unprotected':'');
+  $('cOpen').textContent=OPEN.length;
+  $('openBadge').textContent=OPEN.length+' open';
+
+  $('slList').innerHTML=rows.length?rows.map(r=>{
+    if(r.noStop){
+      return '<div class="sl hot"><div class="sl-h"><span class="pulse"></span>'+
+        '<span class="sl-p">'+esc(r.sym)+'</span>'+
+        '<span class="tag '+(r.type==='buy'?'bg':'br')+'">'+r.type.toUpperCase()+'</span>'+
+        '<span class="tag br">No stop loss</span>'+
+        '<span class="n" style="margin-left:auto;font-size:11px;color:var(--muted)">'+
+        r.lots.toFixed(2)+' lots · '+money(r.pl)+'</span></div>'+
+        '<div class="al al-r" style="margin-top:0">This position has no stop attached, so there is no '+
+        'distance to measure and no defined loss. Set one before anything else on this page is useful '+
+        'for it.</div></div>';
+    }
+    const col=r.pct>=hotAt?'var(--red)':r.pct>=warn?'var(--gold-lt)':r.pct>=40?'var(--blue)':'var(--green)';
+    const rr=RISKNOW[r.sym];
+    const eta=!isFinite(r.hours)?'—':r.hours<1?Math.round(r.hours*60)+' min':r.hours.toFixed(1)+' h';
+    return '<div class="sl'+(r.pct>=hotAt?' hot':'')+'">'+
+      '<div class="sl-h">'+(r.pct>=hotAt?'<span class="pulse"></span>':'')+
+      '<span class="sl-p">'+esc(r.sym)+'</span>'+
+      '<span class="tag '+(r.type==='buy'?'bg':'br')+'">'+r.type.toUpperCase()+'</span>'+
+      '<span class="mut n" style="font-size:11px;color:var(--muted)">'+r.lots.toFixed(2)+' lots</span>'+
+      (r.pct>=warn?'<span class="tag br">'+Math.round(r.pct)+'% to stop</span>':'')+
+      (rr&&rr.score>=50?'<span class="tag ba">'+esc(rr.name)+' '+rr.score+'</span>':'')+
+      '<span class="n" style="margin-left:auto;font-size:11px;color:var(--muted)">'+
+        r.pipsLeft.toFixed(1)+' pips left · about '+eta+'</span></div>'+
+      '<div class="sl-track"><div class="sl-fill" style="width:'+r.pct+'%;background:'+col+'"></div></div>'+
+      '<div class="sl-lbl"><span>entry '+r.entry+'</span><span>stop '+r.sl+' · '+money(r.risk$)+' at risk</span></div>'+
+      (rr&&rr.score>=50&&r.pct>=warn
+        ? '<div class="al al-r" style="margin-top:14px">Near its stop while '+esc(r.sym)+
+          ' is flagged '+esc(rr.name)+' ('+rr.score+'). In flagged conditions stops get reached for reasons that have nothing to do with the setup.</div>'
+        : '')+'</div>';
+  }).join(''):'<div class="empty">No open positions.</div>';
+
+  /* THE DASHES. This card totalled only the stops already past the
+     warning threshold, so with nothing in reach it summed zero and every
+     figure fell back to a dash — on an account carrying real, fully
+     stopped positions. The worst case a trader needs is "if all of these
+     are hit", not "if the close ones are hit"; the ones in reach are
+     already called out above. Total every position that HAS a stop, and
+     say how many of them are currently near it. */
+  const stopped=rows.filter(r=>!r.noStop&&r.risk$>0);
+  const worst=stopped.reduce((a,b)=>a+b.risk$,0);
+  const after=ACC.balance-worst;
+  const exp=winRate*V('avgWin')-(1-winRate)*V('avgLoss')-V('spread');
+  const need=(worst&&after>0)?worst/after*100:0;
+  const tr=(exp>0&&worst)?Math.ceil(need/(exp*(V('rorRisk')||1))):null;
+  const wt=$('wcTitle');
+  if(wt) wt.textContent = stopped.length
+    ? 'If all '+stopped.length+' stop'+(stopped.length===1?'':'s')+' are hit'
+    : 'If every stop is hit';
+  $('wcLoss').textContent=worst?'-'+money(worst):'—';
+  $('wcLoss').className=worst?'neg':'';
+  /* If the combined loss exceeds the balance there is no recovery
+     percentage to quote — the account is gone, and printing "+-1084%"
+     is worse than saying so. */
+  const wiped = worst>0 && after<=0;
+  $('wcBal').textContent = wiped ? 'account gone' : money(after);
+  $('wcBal').className   = wiped ? 'neg' : '';
+  $('wcRec').textContent = !worst ? '—' : wiped ? 'not recoverable' : '+'+need.toFixed(2)+'%';
+  $('wcTr').textContent  = (tr==null||wiped) ? '—' : tr+' trade'+(tr===1?'':'s');
+  $('wcAl').innerHTML = worst
+    ? '<div class="al '+(wiped||worst/ACC.balance>0.03?'al-r':'al-a')+'">'+
+      (wiped?'<b>These positions risk more than the account holds.</b> ':'')+
+      'All '+stopped.length+' stopped position'+
+      (stopped.length===1?'':'s')+' being hit costs '+money(worst)+', or '+
+      (worst/ACC.balance*100).toFixed(2)+'% of the account, and takes '+
+      (tr==null?'an indefinite number of':tr)+' winning trade'+(tr===1?'':'s')+
+      ' at your edge to undo.'+
+      (hot.length?' '+hot.length+' of them '+(hot.length===1?'is':'are')+' already within reach of the stop.':'')+
+      (nostop.length?' '+nostop.length+' further position'+(nostop.length===1?' has':'s have')+
+        ' no stop at all and cannot be counted here.':'')+'</div>'
+    : nostop.length
+      ? '<div class="al al-r">None of your open positions has a stop, so there is no defined worst case to total.</div>'
+      : '<div class="al al-g">No open positions with stops.</div>';
+  $('slBanner').innerHTML=nostop.length
+    ?'<div class="al al-r" style="margin:0 0 22px"><b>'+nostop.length+' position'+
+      (nostop.length>1?'s have':' has')+' no stop loss.</b> '+nostop.map(h=>h.sym).join(', ')+
+      '. Until a stop is set the loss on '+(nostop.length>1?'those trades is':'that trade is')+
+      ' unbounded and none of the risk figures here apply to '+(nostop.length>1?'them':'it')+'.</div>'
+    :hot.length
+    ?'<div class="al al-r" style="margin:0 0 22px"><b>'+hot.length+' position'+(hot.length>1?'s are':' is')+
+      ' approaching a stop.</b> '+hot.map(h=>h.sym+' at '+Math.round(h.pct)+'%').join(', ')+
+      '. Decide now whether to cut, hedge or leave them — not when the fill arrives.</div>':'';
+
+  $('openBody').innerHTML=rows.map(r=>{
+    /* OPEN R had two faults. It was not direction-aware, so a profitable
+       SELL read negative and a losing SELL read positive; and when no
+       stop was set the denominator collapsed towards zero, which is how
+       a losing trade produced "+445.27R" in green. R is undefined
+       without a stop — say so instead of dividing by almost nothing. */
+    /* OPEN R = money made so far divided by money at risk. Going through
+       the derived PRICE put the pip-value assumption into the calculation
+       twice — once deriving the price, once measuring the distance — so
+       any error in it was squared, and on a non-USD account an exchange
+       rate error rode along too. Profit and the stop distance are both
+       known directly, so use them:
+         risk in money = (stop distance / pip) x pip value x lots
+       Both sides land in the same units and nothing is inferred. */
+    const risk=Math.abs(r.entry-r.sl);
+    const rate=(typeof ccyRate==='function')?ccyRate():1;
+    const riskUSD=(risk/r.pip)*r.pipVal*r.lots;
+    const plUSD=r.pl*(rate||1);
+    const openR=(r.sl&&risk>0&&riskUSD>0)?(plUSD/riskUSD):null;
+    return '<tr><td class="t"><b>'+esc(r.sym)+'</b></td><td class="t">'+r.type.toUpperCase()+'</td>'+
+      '<td>'+r.lots.toFixed(2)+'</td><td>'+px(r.sym,r.entry)+'</td><td>'+px(r.sym,r.price)+'</td><td class="'+(r.sl?'neg':'mut')+'">'+(r.sl?px(r.sym,r.sl):'none')+
+      '</td><td class="'+(r.tp?'pos':'mut')+'">'+(r.tp?px(r.sym,r.tp):'none')+'</td><td class="'+(r.pl>=0?'pos':'neg')+'">'+money(r.pl)+
+      '</td><td class="'+(openR==null?'mut':openR>=0?'pos':'neg')+'">'+
+      (openR==null?'no stop':(openR>=0?'+':'')+openR.toFixed(2)+'R')+'</td></tr>';
+  }).join('')||'<tr><td colspan="9" class="empty">No open positions.</td></tr>';
+}
+
+/* ── 08 R-multiple spread ──────────────────────────────────────── */
+function calcRDist(){
+  const rs=TRADES.map(t=>t.r).filter(v=>typeof v==='number'&&v!==null);
+  if(!rs.length){ $('rdist').innerHTML='<div class="empty">No closed trades yet.</div>'; return; }
+  const B=[['Worse than -1R',v=>v<-1],['-1R',v=>v>=-1&&v<0],['0 to 1R',v=>v>=0&&v<1],
+           ['1 to 2R',v=>v>=1&&v<2],['2 to 3R',v=>v>=2&&v<3],['3R and above',v=>v>=3]];
+  const counts=B.map(b=>rs.filter(b[1]).length);
+  const mx=Math.max.apply(null,counts)||1;
+  $('rdist').innerHTML=B.map((b,i)=>{
+    const c=i<2?'var(--red)':i===2?'var(--gold-lt)':'var(--green)';
+    const pct=rs.length?(counts[i]/rs.length*100):0;
+    return '<div style="display:flex;align-items:center;gap:12px;padding:7px 0">'+
+      '<span style="width:112px;font-size:11.5px;color:var(--muted2)">'+b[0]+'</span>'+
+      '<span class="bar" style="flex:1;margin:0"><i style="width:'+(counts[i]/mx*100)+'%;background:'+c+'"></i></span>'+
+      '<span class="n" style="width:64px;text-align:right;font-size:11.5px">'+counts[i]+
+      ' <span style="color:var(--muted)">'+pct.toFixed(0)+'%</span></span></div>';
+  }).join('');
+  const sorted=rs.slice().sort((a,b)=>a-b);
+  const med=sorted.length%2?sorted[(sorted.length-1)/2]:(sorted[sorted.length/2-1]+sorted[sorted.length/2])/2;
+  const best=sorted[sorted.length-1], worst=sorted[0];
+  const mean=rs.reduce((a,b)=>a+b,0)/rs.length;
+  const exBest=rs.length>1?(rs.reduce((a,b)=>a+b,0)-best)/(rs.length-1):0;
+  $('rdBest').textContent=(best>0?'+':'')+best.toFixed(2)+'R'; $('rdBest').className='pos';
+  $('rdWorst').textContent=worst.toFixed(2)+'R'; $('rdWorst').className='neg';
+  $('rdMed').textContent=(med>0?'+':'')+med.toFixed(2)+'R';
+  $('rdMed').className=med>=0?'pos':'neg';
+  const carried=mean>0&&exBest<=0;
+  $('rdAl').innerHTML=carried
+    ?'<div class="al al-r">The average of '+mean.toFixed(3)+'R rests on one trade. Remove the '+
+      best.toFixed(2)+'R result and the remaining '+(rs.length-1)+' trades average '+exBest.toFixed(3)+
+      'R. Treat the edge as unproven until it repeats without that outlier.</div>'
+    :'<div class="al al-g">Take out the best trade and the other '+(rs.length-1)+' still average '+
+      exBest.toFixed(3)+'R, so the edge is spread across the sample rather than resting on one result.</div>';
+}
+
+/* ── 09 Losing streaks ─────────────────────────────────────────── */
+function longestRun(){
+  let best=0,cur=0;
+  TRADES.filter(t=>t.r!=null).forEach(t=>{ if(!t.win){cur++;best=Math.max(best,cur);} else cur=0; });
+  return best;
+}
+function calcStreaks(){
+  const q=1-winRate, risk=V('rorRisk')||1, seen=longestRun();
+  $('stkBody').innerHTML=[3,4,5,7,10].map(n=>{
+    const per=Math.pow(q,n);
+    /* Chance of at least one run of n in a hundred trades. The exact
+       figure needs a Markov chain; this is the standard approximation
+       and is close enough at these run lengths to size against. */
+    const odds=Math.min(1,1-Math.pow(1-per,Math.max(1,100-n+1)));
+    const drop=(1-Math.pow(1-risk/100,n))*100;
+    const col=odds>0.5?'var(--red)':odds>0.2?'var(--gold-lt)':'var(--muted2)';
+    return '<tr'+(n===seen?' class="hi"':'')+'><td class="t">'+n+' in a row</td>'+
+      '<td style="color:'+col+'">'+(odds*100).toFixed(0)+'%</td>'+
+      '<td class="neg">-'+drop.toFixed(1)+'%</td>'+
+      '<td class="mut">'+(n<=seen?'yes':'not yet')+'</td></tr>';
+  }).join('');
+  const five=Math.min(1,1-Math.pow(1-Math.pow(q,5),96));
+  $('stkAl').innerHTML='<div class="al '+(five>0.5?'al-a':'al-g')+'">At a '+(winRate*100).toFixed(1)+
+    '% win rate, five losses in a row happens at least once in roughly '+(five*100).toFixed(0)+
+    '% of hundred-trade stretches. Your longest run so far is '+seen+
+    '. At '+risk+'% per trade that run costs '+((1-Math.pow(1-risk/100,seen||1))*100).toFixed(1)+'%.</div>';
+}
+
+/* ── calendar ──────────────────────────────────────────────────── */
+let calMonth=new Date();
+function dayKey(d){ return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate(); }
+function calcCal(){
+  const y=calMonth.getFullYear(), m=calMonth.getMonth();
+  const byDay={};
+  TRADES.forEach(t=>{
+    const d=t.closed;
+    if(!d||isNaN(d)) return;      // undated trades cannot sit on a calendar
+    const k=dayKey(d);
+    (byDay[k]=byDay[k]||{net:0,n:0,w:0,d:d}).net+=t.profit;
+    byDay[k].n++; if(t.win) byDay[k].w++;
+  });
+  $('calLbl').textContent=calMonth.toLocaleString('en',{month:'long'})+' '+y;
+  const first=new Date(y,m,1), days=new Date(y,m+1,0).getDate();
+  const lead=(first.getDay()+6)%7;                       // Monday-first
+  let html=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>'<div class="dow">'+x+'</div>').join('');
+  for(let i=0;i<lead;i++) html+='<div class="cd pad"></div>';
+  let net=0,best=null,worst=null,green=0,trades=0;
+  const todayK=dayKey(new Date());
+  for(let d=1;d<=days;d++){
+    const k=y+'-'+m+'-'+d, e=byDay[k];
+    let cls='cd';
+    if(e){ cls+=e.net>=0?' win':' loss'; net+=e.net; trades+=e.n;
+      if(e.net>=0) green++;
+      if(best===null||e.net>best.net) best=e;
+      if(worst===null||e.net<worst.net) worst=e; }
+    if(k===todayK) cls+=' today';
+    html+='<div class="'+cls+'"><span class="dn">'+d+'</span>'+
+      (e?'<span class="amt">'+(e.net>0?'+':'')+money(e.net)+'</span>'+
+         '<span class="tc">'+e.n+' trade'+(e.n===1?'':'s')+' · '+Math.round(e.w/e.n*100)+'%</span>':'')+
+      '</div>';
+  }
+  $('calGrid').innerHTML=html;
+  const dayCount=Object.keys(byDay).filter(k=>k.startsWith(y+'-'+m+'-')).length;
+  $('calNet').textContent=(net>0?'+':'')+money(net);
+  $('calNet').className=net>0?'pos':net<0?'neg':'mut';
+  /* A BEST DAY IS A WINNING DAY. Ranking every day and taking the top
+     one means a losing month reports its smallest loss as the "best
+     day", which reads as an achievement and is not one. Nothing belongs
+     there until a day actually finishes positive. The worst day is the
+     mirror: it only exists once a day has finished negative. */
+  const sgn=v=>(v>0?'+':'')+money(v);
+  const bestWin  = best  && best.net  > 0 ? best  : null;
+  const worstLoss= worst && worst.net < 0 ? worst : null;
+  $('calBest').textContent = bestWin ? sgn(bestWin.net) : '—';
+  $('calBest').className   = bestWin ? 'pos' : 'mut';
+  $('calBest').title       = bestWin ? '' : 'No day has closed positive this month yet';
+  $('calWorst').textContent= worstLoss ? sgn(worstLoss.net) : '—';
+  $('calWorst').className  = worstLoss ? 'neg' : 'mut';
+  $('calGreen').textContent=dayCount?green+' of '+dayCount:'—';
+  $('calTrades').textContent=trades;
+
+  /* Worst peak-to-trough run of days inside the month. */
+  const keys=Object.keys(byDay).filter(k=>k.startsWith(y+'-'+m+'-'))
+    .sort((a,b)=>byDay[a].d-byDay[b].d);
+  let run=0,worstRun=0;
+  keys.forEach(k=>{ run=Math.min(0,run+byDay[k].net); worstRun=Math.min(worstRun,run); });
+  $('calDD').textContent=worstRun<0?'Deepest run of red days this month: '+money(worstRun):'';
+
+  /* weekly */
+  const wk={};
+  keys.forEach(k=>{
+    const d=byDay[k].d;
+    const on=new Date(d); on.setDate(d.getDate()-((d.getDay()+6)%7));
+    const wkKey=dayKey(on);
+    const e=wk[wkKey]=wk[wkKey]||{start:on,net:0,n:0,w:0,best:null,worst:null};
+    e.net+=byDay[k].net; e.n+=byDay[k].n; e.w+=byDay[k].w;
+    if(e.best===null||byDay[k].net>e.best) e.best=byDay[k].net;
+    if(e.worst===null||byDay[k].net<e.worst) e.worst=byDay[k].net;
+  });
+  const wks=Object.keys(wk).map(k=>wk[k]).sort((a,b)=>a.start-b.start);
+  $('calWkBadge').textContent=wks.length+' week'+(wks.length===1?'':'s');
+  $('calWk').innerHTML=wks.length?wks.map(e=>
+    '<tr><td class="t">w/c '+e.start.toLocaleDateString('en',{day:'numeric',month:'short'})+'</td>'+
+    '<td>'+e.n+'</td><td>'+(e.n?Math.round(e.w/e.n*100):0)+'%</td>'+
+    '<td class="'+(e.net>0?'pos':e.net<0?'neg':'mut')+'">'+(e.net>0?'+':'')+money(e.net)+'</td>'+
+    '<td class="'+(e.best>0?'pos':'mut')+'">'+(e.best>0?'+'+money(e.best):'—')+'</td>'+
+    '<td class="'+(e.worst<0?'neg':'mut')+'">'+(e.worst<0?money(e.worst):'—')+'</td></tr>').join('')
+    :'<tr><td colspan="6" class="empty">No trades this month.</td></tr>';
+}
+
+/* ── history ───────────────────────────────────────────────────── */
+/* Price formatting keyed off the NORMALISED symbol. `t.symbol` carries
+   the broker suffix (XAUUSDm, EURUSDc), so an equality test against
+   'XAUUSD' never matched and gold printed with five decimals. */
+function px(sym,v){
+  if(v==null||v===0||!isFinite(v)) return '—';
+  const b=String(sym||'').replace(/[^A-Za-z]/g,'').slice(0,6).toUpperCase();
+  const d=/JPY$/.test(b)?3:/^XAU/.test(b)?2:/^XAG/.test(b)?3:/^BTC|^ETH/.test(b)?1:5;
+  return (+v).toFixed(d);
+}
+function renderHist(){
+  const net=TRADES.reduce((a,b)=>a+b.profit,0);
+  $('cHist').textContent=TRADES.length;
+  $('histCount').textContent=TRADES.length+' trades';
+  $('histProfit').textContent=money(net);
+  $('histProfit').className='cbadge '+(net>=0?'bg':'br');
+  const noPx=TRADES.filter(t=>t.open_price==null).length;
+  const hn=$('histNote');
+  if(hn) hn.innerHTML = noPx
+    ? noPx+' of these '+TRADES.length+' trades arrived without entry, exit or stop prices — the '+
+      'terminal feed sends only ticket, symbol, type, volume, profit and time for closed deals. '+
+      'Profit and win/loss are exact; the price columns and R are blank because that data was never sent, '+
+      'not because it is zero. Running the MathReporter script alongside the EA fills them in.'
+    : '';
+  $('histBody').innerHTML=TRADES.slice().reverse().map(t=>
+    '<tr><td class="mut">'+t.i+'</td><td class="t"><b>'+esc(t.symbol)+'</b></td><td class="t">'+t.type+
+    '</td><td class="'+(t.open_price==null?'mut':'')+'">'+px(t.symbol,t.open_price)+
+    '</td><td class="'+(t.close_price==null?'mut':'')+'">'+px(t.symbol,t.close_price)+
+    '</td><td class="mut">'+(t.sl?px(t.symbol,t.sl):'—')+
+    '</td><td class="'+(t.pips==null?'mut':t.pips>=0?'pos':'neg')+'">'+
+      (t.pips==null?'—':(t.pips>0?'+':'')+t.pips)+
+    '</td><td class="'+(t.profit>=0?'pos':'neg')+'">'+money(t.profit)+
+    '</td><td class="'+(t.r==null?'mut':t.r>=0?'pos':'neg')+'">'+
+    (t.r==null?'—':(t.r>0?'+':'')+t.r.toFixed(2)+'R')+'</td>'+
+    '<td class="mut t">'+t.rSource+'</td>'+
+    '<td class="'+(t.win?'pos':'neg')+' t">'+(t.win?'Win':'Loss')+'</td>'+
+    '<td class="mut">'+t.closed.toISOString().slice(5,16).replace('T',' ')+'</td></tr>').join('');
+}
+
+/* ── account strip ─────────────────────────────────────────────── */
+function renderAcc(){
+  $('sBal').textContent=money(ACC.balance);
+  $('sEq').textContent=money(ACC.equity);
+  $('sEq').className=ACC.equity>=ACC.balance?'pos':'neg';
+  $('sMar').textContent=money(ACC.margin);
+  const scored=TRADES.filter(t=>t.r!=null).length;
+  $('sTr').textContent=scored+(scored<TRADES.length?' / '+TRADES.length:'');
+  $('sWR').textContent=(winRate*100).toFixed(1)+'%';
+  $('sWR').className=winRate>=0.5?'pos':'';
+}
+
+function recalcAll(){
+  rebuildR(); renderAcc(); calcExpectancy(); calcBreakeven(); calcRoR();
+  calcGF(); calcAsym(); calcPS(); calcStops();
+  calcRDist(); calcStreaks(); calcCal(); renderHist();
+}
+
+/* ── settings ──────────────────────────────────────────────────── */
+const FIELDS=['avgWin','avgLoss','spread','bRR','bTarget','rorRisk','rorDD','psRisk','psSL','psPair','psType','psFixedLots'];
+const EXTRA={slWarn:70,slHot:85,interval:15,defStop:0,psMode:'dynamic'};
+const KEY='blackwood_math_settings_v2';
+function loadSettings(){
+  let s={}; try{ s=JSON.parse(localStorage.getItem(KEY)||'{}')||{}; }catch(e){}
+  FIELDS.forEach(f=>{ if(s[f]!=null&&$(f)) $(f).value=s[f]; });
+  Object.keys(EXTRA).forEach(k=>{ const m=$('m_'+k); if(m) m.value=(s[k]!=null?s[k]:EXTRA[k]); });
+}
+function saveSettings(){
+  const s={};
+  FIELDS.forEach(f=>{ if($(f)) s[f]=$(f).value; });
+  Object.keys(EXTRA).forEach(k=>{ const m=$('m_'+k); if(m) s[k]=m.value; });
+  try{ localStorage.setItem(KEY,JSON.stringify(s)); }catch(e){}
+}
+function openSettings(){
+  FIELDS.forEach(f=>{ const m=$('m_'+f); if(m&&$(f)) m.value=$(f).value; });
+  $('ov').classList.add('on');
+}
+function closeSettings(){ $('ov').classList.remove('on'); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeSettings(); });
+
+FIELDS.forEach(f=>{ const e=$(f); if(e) e.oninput=()=>{ saveSettings(); recalcAll(); }; });
+Object.keys(EXTRA).forEach(k=>{
+  const m=$('m_'+k);
+  if(m) m.oninput=()=>{ const t=$(k); if(t) t.value=m.value; saveSettings(); recalcAll(); };
+});
+FIELDS.forEach(f=>{
+  const m=$('m_'+f);
+  if(m) m.oninput=()=>{ if($(f)) $(f).value=m.value; saveSettings(); recalcAll(); };
+});
+
+/* ── SETTINGS BOUND TO THE ACCOUNT ────────────────────────────────
+   localStorage keeps the dashboard usable offline and before the network
+   answers; /api/settings is the source of truth tied to the signed-in
+   Blackwood account, so the same values follow the trader to any device
+   and survive a reinstall. If the route is unreachable or nobody is
+   signed in, everything falls back to local storage with no breakage —
+   the label just says so rather than implying a save that did not
+   happen. */
+let serverSettings=false;
+function currentSettings(){
+  const o={};
+  FIELDS.forEach(f=>{ if($(f)) o[f]=$(f).value; });
+  Object.keys(EXTRA).forEach(k=>{ const m=$('m_'+k); if(m) o[k]=m.value; });
+  return o;
+}
+function syncLabel(txt,col){
+  const l=$('syncLbl'); if(!l) return;
+  l.textContent=txt; l.style.color=col||'';
+}
+async function fetchServerSettings(){
+  try{
+    const r=await fetch('/api/settings',{credentials:'include',cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    serverSettings=true;
+    if(d&&d.settings){
+      Object.keys(d.settings).forEach(k=>{
+        const v=d.settings[k];
+        if(v===undefined||v===null||v==='') return;
+        const el=$(k)||$('m_'+k); if(el) el.value=v;
+        const twin=$(k)&&$('m_'+k); if(twin) $('m_'+k).value=v;
+      });
+      try{ localStorage.setItem(KEY,JSON.stringify(d.settings)); }catch(e){}
+      recalcAll();
+    }
+    syncLabel('Synced to your account — these settings follow you to any device.');
+  }catch(e){
+    serverSettings=false;
+    syncLabel('Saved on this device only — sign in to carry them across devices.','var(--gold-lt)');
+  }
+}
+async function saveToAccount(){
+  saveSettings();
+  const b=$('btnSave'); if(b){ b.disabled=true; b.textContent='Saving…'; }
+  let ok=false;
+  try{
+    const r=await fetch('/api/settings',{method:'POST',credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({settings:currentSettings()})});
+    ok=r.ok;
+  }catch(e){ ok=false; }
+  if(b){ b.disabled=false; b.textContent='Save settings'; }
+  syncLabel(ok?'Saved to your account just now.'
+              :'Saved on this device. The account could not be reached, so try again once you are signed in.',
+            ok?'var(--green)':'var(--gold-lt)');
+  if(ok) serverSettings=true;
+  recalcAll();
+}
+if($('btnSave')) $('btnSave').onclick=saveToAccount;
+
+/* ── nav ───────────────────────────────────────────────────────── */
+function moveInk(t,animate){
+  const n=$('nav'),ink=$('ink');
+  if(!n||!ink||!t) return;
+  if(!t.offsetWidth){requestAnimationFrame(()=>moveInk(t,animate));return;}
+  if(animate===false) ink.style.transition='none';
+  ink.style.left=(t.offsetLeft+15)+'px';
+  ink.style.width=(t.offsetWidth-30)+'px';
+  if(animate===false) requestAnimationFrame(()=>{ink.style.transition='';});
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');
+  const ic=t.querySelector('.ico'); if(ic){ic.classList.remove('go');void ic.offsetWidth;ic.classList.add('go');}
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  const pg=$('p-'+t.dataset.p); if(pg) pg.classList.add('on');
+  moveInk(t);
+  if(t.scrollIntoView) try{t.scrollIntoView({inline:'nearest',block:'nearest',behavior:'smooth'});}catch(e){}
+});
+window.addEventListener('resize',()=>moveInk(document.querySelector('.tab.on'),false));
+[60,400,1200].forEach(ms=>setTimeout(()=>moveInk(document.querySelector('.tab.on'),false),ms));
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>moveInk(document.querySelector('.tab.on'),false));
+
+$('calPrev').onclick=()=>{calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()-1,1);calcCal();};
+$('calNext').onclick=()=>{calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()+1,1);calcCal();};
+$('psType').onchange=()=>{
+  const o=$('psType').selectedOptions[0];
+  const v=parseFloat(o.value);
+  if(v>0) $('psPair').value=v;      /* "Custom" leaves the field alone */
+  saveSettings(); recalcAll();
+};
+if($('m_psMode')) $('m_psMode').onchange=()=>{ saveSettings(); recalcAll(); };
+/* ── BOOT ──────────────────────────────────────────────────────── */
+loadSettings();
+fetchServerSettings();
+setAccountCurrency('USD');
+recalcAll();                       // paint empty shell immediately
+fetchLive();                       // then fill it
+function startAuto(){
+  if(autoTimer) clearInterval(autoTimer);
+  const secs=parseInt((($('m_interval')||{}).value)||'15',10);
+  if(secs>0) autoTimer=setInterval(fetchLive, secs*1000);
+}
+startAuto();
+if($('m_interval')) $('m_interval').onchange=()=>{ saveSettings(); startAuto(); };
+let since=0;
+setInterval(()=>{ since+=5;
+  const u=$('upd'); if(u) u.textContent='updated '+(since<60?since+'s ago':Math.round(since/60)+'m ago');
+},5000);
+</script>
+</body>
+</html>
