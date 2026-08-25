@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<!-- First script on purpose: an error thrown by anything loaded before
+     this one is an error nobody hears about. -->
+<script src="/bw-error-reporter.js" data-module="smc"></script>
+<script src="/bw-source.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blackwood SMC Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- No icon CDN. Every icon in this module is inline SVG, so there is no
+     font request that can fail silently inside the dashboard iframe. -->
+<style>
+/* Shell tokens — same as the dashboard, the Assistant and the Brain, so all
+   three modules read as one product. Both themes defined; the shell owns
+   the toggle. */
+:root,[data-theme="dark"]{
+  --bg:#09090e;--surface:#0f0f16;--card:#14141c;
+  --border:#22222e;--border2:#2e2e3e;
+  --gold:#c9820a;--gold-lt:#e09b2a;
+  --green:#17a97a;--red:#e0504f;--blue:#5b87c9;
+  --text:#eceae0;--muted:#72706a;--muted2:#9a9890;
+  --bull-bg:rgba(23,169,122,.10);--bear-bg:rgba(224,80,79,.10);
+}
+[data-theme="light"]{
+  --bg:#f8f7f2;--surface:#ffffff;--card:#f0ede6;
+  --border:#d8d4cc;--border2:#c8c4bc;
+  --gold:#c9820a;--gold-lt:#c9820a;
+  --green:#0f7a54;--red:#c03838;--blue:#3d6ba8;
+  --text:#1a1814;--muted:#8a8678;--muted2:#6a6660;
+  --bull-bg:rgba(15,122,84,.10);--bear-bg:rgba(192,56,56,.10);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'Archivo',system-ui,sans-serif;
+  font-size:13px;display:flex;flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased}
+.n{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+
+/* header */
+.head{background:var(--surface);border-bottom:.5px solid var(--border);padding:11px 16px;flex-shrink:0}
+.hrow{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.htitle{font-size:15px;font-weight:600;letter-spacing:-.3px}
+.hpx{font-size:15px;font-weight:500}
+.hdelta{font-size:11px;font-weight:600}
+.hright{margin-left:auto;display:flex;align-items:center;gap:10px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+.dot.live{animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.upd{font-size:10.5px;color:var(--muted)}
+
+/* pair strip */
+.pairs{display:flex;gap:5px;overflow-x:auto;padding:9px 16px;background:var(--surface);
+  border-bottom:.5px solid var(--border);scrollbar-width:none;flex-shrink:0;
+  touch-action:pan-x;overscroll-behavior-x:contain}
+.pairs::-webkit-scrollbar{display:none}
+.pair{padding:5px 12px;font-size:11.5px;font-weight:600;border-radius:6px;flex:0 0 auto;
+  border:.5px solid var(--border2);background:var(--card);color:var(--muted2);cursor:pointer;
+  font-family:inherit;display:flex;align-items:center;gap:7px}
+.pair:hover{color:var(--text)}
+.pair.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.pdot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+
+/* nav */
+.nav{display:flex;padding:0 16px;background:var(--surface);border-bottom:.5px solid var(--border);
+  flex-shrink:0;overflow-x:auto;scrollbar-width:none;position:relative}
+.nav::-webkit-scrollbar{display:none}
+.tab{padding:10px 13px;font-size:12px;font-weight:500;color:var(--muted2);background:none;border:none;
+  cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap;font-family:inherit;
+  position:relative;transition:color .18s}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--text);font-weight:600}
+.ico{width:16px;height:16px;flex-shrink:0;color:var(--muted);transition:color .2s}
+.ico svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;display:block;transform-origin:50% 50%}
+.tab.on .ico{color:var(--blue)}
+.ico.go svg{animation:pop .45s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.28) rotate(8deg)}100%{transform:scale(1)}}
+.ink{position:absolute;bottom:0;height:2px;background:var(--blue);
+  transition:left .28s cubic-bezier(.4,0,.2,1),width .28s cubic-bezier(.4,0,.2,1)}
+.cnt{font-size:9.5px;font-weight:600;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+
+/* body */
+.main{flex:1;display:grid;grid-template-columns:1fr 268px;min-height:0}
+.col{overflow-y:auto;min-height:0}
+.scroll{padding:14px;display:flex;flex-direction:column;gap:13px}
+.rail{background:var(--surface);border-left:.5px solid var(--border);overflow-y:auto;
+  overscroll-behavior:contain}
+.sec{padding:14px}
+.sec+.sec{border-top:.5px solid var(--border)}
+.sec-h{font-size:9px;font-weight:600;letter-spacing:1.3px;color:var(--muted);text-transform:uppercase;
+  margin-bottom:11px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+
+.card{background:var(--surface);border:.5px solid var(--border);border-radius:8px;padding:14px 15px}
+.card-h{font-size:9px;font-weight:600;letter-spacing:1.3px;color:var(--muted);text-transform:uppercase;
+  margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+.metric{font-size:22px;font-weight:600;letter-spacing:-.7px;line-height:1.1}
+.metric-s{font-size:10.5px;color:var(--muted);margin-top:4px}
+
+.seg{display:inline-flex;border:.5px solid var(--border);border-radius:5px;overflow:hidden;
+  background:var(--bg);flex-shrink:0}
+.seg button{padding:4px 12px;font-size:10.5px;font-weight:600;background:none;border:none;
+  cursor:pointer;color:var(--muted);font-family:'IBM Plex Mono',monospace;line-height:1.5}
+.seg button+button{border-left:.5px solid var(--border)}
+.seg button.on{background:var(--card);color:var(--text)}
+
+/* ── SIGNATURE: the price ladder ────────────────────────────────
+   Every zone drawn at its real distance from price, on one axis. */
+.ladder{position:relative;height:340px;border-radius:8px;background:var(--card);
+  border:.5px solid var(--border);overflow:hidden}
+.zone{position:absolute;left:74px;right:96px;border-radius:4px;display:flex;align-items:center;
+  padding-left:9px;font-size:9.5px;font-weight:600;letter-spacing:.3px;cursor:pointer;
+  border:.5px solid transparent;transition:filter .15s}
+.zone:hover{filter:brightness(1.35)}
+.zone.bull{background:var(--bull-bg);border-color:rgba(23,169,122,.35);color:var(--green)}
+.zone.bear{background:var(--bear-bg);border-color:rgba(224,80,79,.35);color:var(--red)}
+.zone.fvg{background:rgba(91,135,201,.10);border-color:rgba(91,135,201,.3);color:var(--blue);
+  border-style:dashed}
+.zone.spent{background:transparent;border-color:var(--border2);color:var(--muted);
+  border-style:dotted}
+.zone .zt{position:absolute;right:8px;font-size:8.5px;font-weight:600;letter-spacing:.4px}
+.price-line{position:absolute;left:0;right:0;height:1.5px;background:var(--gold-lt);z-index:5}
+.price-line::after{content:attr(data-p);position:absolute;right:4px;top:-16px;font-size:9.5px;
+  font-weight:700;color:var(--gold-lt);font-family:'IBM Plex Mono',monospace}
+.price-line::before{content:'';position:absolute;left:0;top:-2.5px;width:6px;height:6px;
+  border-radius:50%;background:var(--gold-lt)}
+.axis{position:absolute;left:0;top:0;bottom:0;width:70px;border-right:.5px solid var(--border)}
+.axis span{position:absolute;right:7px;font-size:9px;color:var(--muted);
+  font-family:'IBM Plex Mono',monospace;transform:translateY(-50%)}
+.lad-note{font-size:10px;color:var(--muted);line-height:1.6;margin-top:10px}
+
+/* rows */
+.row{display:flex;align-items:flex-start;gap:10px;padding:10px 0}
+.row+.row{border-top:.5px solid var(--border)}
+.row-t{font-size:12px;font-weight:600;line-height:1.4;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.row-s{font-size:10.5px;color:var(--muted2);margin-top:3px;line-height:1.5}
+.tag{display:inline-block;font-size:8px;font-weight:600;letter-spacing:.6px;padding:2px 6px;
+  border-radius:3px;text-transform:uppercase;border:.5px solid transparent}
+.t-bull{color:var(--green);border-color:rgba(23,169,122,.3)}
+.t-bear{color:var(--red);border-color:rgba(224,80,79,.3)}
+.t-tf{color:var(--blue);border-color:rgba(91,135,201,.3)}
+.t-gold{color:var(--gold-lt);border-color:rgba(201,130,10,.3)}
+.t-mute{color:var(--muted);border-color:var(--border2)}
+/* confluence: a zone backed by the other timeframe */
+.t-conf{color:var(--gold-lt);border-color:var(--gold);background:rgba(201,130,10,.10)}
+.conf-note{font-size:10px;color:var(--gold-lt);margin-top:5px;line-height:1.5}
+.zone.conf{box-shadow:inset 0 0 0 1px var(--gold)}
+.dist{margin-left:auto;font-size:11.5px;font-weight:600;flex-shrink:0;text-align:right}
+.dist small{display:block;font-size:9px;color:var(--muted);font-weight:400;margin-top:1px}
+
+.kv{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 0;font-size:11.5px}
+.kv+.kv{border-top:.5px solid var(--border)}
+.kv span{color:var(--muted2)}
+.kv b{font-weight:600}
+.meter{height:4px;border-radius:2px;background:var(--border);overflow:hidden;margin-top:6px}
+.meter i{display:block;height:100%;border-radius:2px}
+
+.banner{display:flex;gap:11px;align-items:flex-start;padding:12px 14px;border-radius:8px;font-size:12px}
+.banner.warn{background:rgba(201,130,10,.08);border:.5px solid rgba(201,130,10,.3)}
+.banner.bull{background:var(--bull-bg);border:.5px solid rgba(23,169,122,.3)}
+.banner.bear{background:var(--bear-bg);border:.5px solid rgba(224,80,79,.3)}
+.banner.info{background:rgba(91,135,201,.07);border:.5px solid rgba(91,135,201,.28)}
+.b-t{font-size:12.5px;font-weight:600;margin-bottom:3px}
+.b-s{font-size:11px;color:var(--muted2);line-height:1.55}
+
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+th{text-align:left;font-size:8.5px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;
+  padding:0 6px 7px;border-bottom:.5px solid var(--border);font-weight:600}
+td{padding:8px 6px;border-bottom:.5px solid var(--border)}
+tr:last-child td{border-bottom:none}
+.tw{overflow-x:auto;touch-action:pan-x;overscroll-behavior-x:contain}
+
+.page{display:none;flex-direction:column;gap:13px}
+.page.on{display:flex}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.mut{color:var(--muted)}.up{color:var(--green)}.dn{color:var(--red)}.gd{color:var(--gold-lt)}.bl{color:var(--blue)}
+.note{font-size:10px;color:var(--muted);line-height:1.6;margin-top:10px}
+/* clickable cross-module rows */
+.xrow{display:flex;align-items:center;gap:9px;width:100%;padding:9px 0;background:none;
+  border:none;border-top:.5px solid var(--border);cursor:pointer;font-family:inherit;
+  color:inherit;text-align:left;font-size:11.5px}
+.xrow:first-child{border-top:none}
+.xrow:hover{color:var(--text)}
+.xrow:hover .chev{transform:translateX(2px);border-color:var(--text)}
+.xrow>span{flex:1;color:var(--muted2);display:flex;flex-direction:column;gap:2px}
+.xrow>span small{font-size:9.5px;color:var(--muted)}
+.xrow>b{font-weight:600;white-space:nowrap}
+.chev{width:6px;height:6px;border-right:1.4px solid var(--muted);border-top:1.4px solid var(--muted);
+  transform:rotate(45deg);flex-shrink:0;transition:transform .15s,border-color .15s;margin-left:2px}
+.xbtn{padding:5px 11px;font-size:10.5px;font-weight:600;border-radius:5px;cursor:pointer;
+  border:.5px solid var(--border2);background:var(--card);color:var(--text);font-family:inherit}
+.xbtn:hover{border-color:var(--muted)}
+.empty{font-size:11.5px;color:var(--muted);padding:14px 0;line-height:1.6}
+
+/* grid view */
+.gcard{background:var(--surface);border:.5px solid var(--border);border-radius:8px;padding:12px 13px;
+  cursor:pointer;transition:border-color .15s}
+.gcard:hover{border-color:var(--border2)}
+.gname{font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px}
+.gpx{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:2px}
+.mini{display:flex;justify-content:space-between;font-size:10.5px;padding:4px 0}
+.mini span{color:var(--muted2)}
+
+/* iframe fit — nothing important is ever display:none */
+
+/* ── price map sizing ─────────────────────────────────────────────
+   One segmented control with a sliding selection rather than three
+   outlined buttons — the same object the rest of the platform uses for
+   an exclusive choice. Icons only: the labels were the widest thing in
+   the header and said less than the shapes do. */
+.lad-seg{margin-left:auto;display:inline-flex;padding:2px;gap:2px;border-radius:9px;
+  background:var(--bg);border:.5px solid var(--border)}
+.lad-s{width:30px;height:26px;display:grid;place-items:center;border:none;border-radius:7px;
+  background:transparent;color:var(--muted);cursor:pointer;padding:0;
+  transition:color .16s ease,background .16s ease}
+.lad-s svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round;display:block}
+.lad-s:hover{color:var(--text)}
+.lad-s.on{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.28)}
+[data-theme="light"] .lad-s.on{box-shadow:0 1px 3px rgba(0,0,0,.10)}
+.lad-s:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+
+.lad-hint{font-size:10.5px;color:var(--muted);line-height:1.55;margin-top:9px}
+.ladder.tall{height:620px}
+/* Full screen lifts the map out of the card so nothing constrains it.
+   The card keeps its place in the layout, so exiting does not jump the page. */
+body.lad-full{overflow:hidden}
+.ladder.full{position:fixed;inset:56px 22px 22px;height:auto;z-index:70;
+  box-shadow:0 24px 70px rgba(0,0,0,.55)}
+/* The exit is a floating pill, not a bordered button. */
+.lad-esc{position:fixed;top:18px;right:26px;z-index:71;display:none;align-items:center;gap:9px;
+  background:var(--card);border:.5px solid var(--border2);border-radius:999px;padding:8px 16px;
+  color:var(--text);font-family:inherit;font-size:11.5px;cursor:pointer;
+  box-shadow:0 8px 26px rgba(0,0,0,.4)}
+.lad-esc:hover{border-color:var(--muted)}
+.lad-esc kbd{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted);
+  border:.5px solid var(--border2);border-radius:4px;padding:1px 5px}
+body.lad-full .lad-esc{display:inline-flex}
+@media (max-width:780px){ .ladder.tall{height:520px} .ladder.full{inset:52px 10px 10px} }
+
+@media (max-height:820px){
+  .head{padding:8px 14px}.pairs{padding:7px 14px}.scroll{padding:11px;gap:10px}
+  .card{padding:11px 13px}.ladder{height:280px}
+}
+@media (max-height:660px){ .ladder{height:230px} }
+@media (max-width:1400px){ .main{grid-template-columns:1fr 244px} }
+@media (max-width:1120px){ .main{grid-template-columns:1fr 216px} }
+@media (max-width:820px){
+  body{overflow-x:hidden;overflow-y:auto;height:auto;overscroll-behavior-y:contain}
+  .nav{position:sticky;top:0;z-index:29;background:var(--surface);
+    box-shadow:0 1px 0 var(--border);touch-action:pan-x}
+  .main{display:flex;flex-direction:column}
+  .col{overflow:visible}
+  .rail{border-left:none;border-top:.5px solid var(--border);overflow:visible}
+  .g2,.g3{grid-template-columns:1fr}
+  .zone{left:64px;right:78px}
+  .hright{width:100%;margin-left:0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<header class="head">
+  <div class="hrow">
+    <span class="htitle">SMC Panel</span>
+    <span class="hpx n" id="hPx">—</span>
+    <span class="hdelta n" id="hDelta"></span>
+    <div class="hright">
+      <span class="mut" style="font-size:11px"><span class="dot live" id="liveDot"></span> <span id="liveLbl">Live</span></span>
+      <span class="seg" id="tfSeg">
+        <button class="on" onclick="setTF('H1',this)">H1</button>
+        <button onclick="setTF('H4',this)">H4</button>
+      </span>
+      <span class="upd" id="upd">Connecting…</span>
+    </div>
+  </div>
+</header>
+
+<div class="pairs" id="pairs"><span class="empty" style="padding:4px 2px">Loading pairs…</span></div>
+
+<nav class="nav" id="nav">
+  <button class="tab on" data-p="map">
+    <span class="ico"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/><circle cx="18" cy="12" r="2"/></svg></span>
+    Price Map</button>
+  <button class="tab" data-p="zones">
+    <span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="12" height="5" rx="1.5"/></svg></span>
+    Zones <span class="cnt" id="cZones">6</span></button>
+  <button class="tab" data-p="structure">
+    <span class="ico"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 3 4-6 5 4"/><circle cx="8" cy="12" r="1.4"/><circle cx="16" cy="9" r="1.4"/></svg></span>
+    Structure <span class="cnt" id="cStruct">4</span></button>
+  <button class="tab" data-p="alerts">
+    <span class="ico"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6c0 4-2 5-2 7h16c0-2-2-3-2-7a6 6 0 0 0-6-6z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></span>
+    Alerts <span class="cnt" id="cAlerts">2</span></button>
+  <button class="tab" data-p="book">
+    <span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span>
+    All Pairs</button>
+  <span class="ink" id="ink"></span>
+</nav>
+
+<div class="main">
+  <main class="col scroll">
+
+    <!-- PRICE MAP -->
+    <section class="page on" id="p-map">
+      <div id="topBanner"></div>
+
+      <div class="card">
+        <div class="card-h"><span>Price map</span>
+          <span class="mut" style="text-transform:none;letter-spacing:0" id="mapRange"></span>
+          <span class="lad-seg" role="group" aria-label="Price map size">
+            <button class="lad-s on" id="ladNorm" title="Standard height" aria-label="Standard height">
+              <svg viewBox="0 0 16 16"><rect x="2.5" y="4.5" width="11" height="7" rx="1.5"/></svg></button>
+            <button class="lad-s" id="ladTall" title="Taller — more room between zones" aria-label="Taller">
+              <svg viewBox="0 0 16 16"><rect x="3.5" y="2" width="9" height="12" rx="1.5"/>
+                <path d="M8 4.8v6.4M6.2 6.6 8 4.8l1.8 1.8M6.2 9.4 8 11.2l1.8-1.8"/></svg></button>
+            <button class="lad-s" id="ladFull" title="Full screen" aria-label="Full screen">
+              <svg viewBox="0 0 16 16"><path d="M2.5 6V3.4A.9.9 0 0 1 3.4 2.5H6M10 2.5h2.6a.9.9 0 0 1 .9.9V6M13.5 10v2.6a.9.9 0 0 1-.9.9H10M6 13.5H3.4a.9.9 0 0 1-.9-.9V10"/></svg></button>
+          </span></div>
+        <div class="ladder" id="ladder"></div>
+        <div class="lad-hint" id="ladHint">Zones close together stack on top of each other at this height.
+          <b>Expand</b> gives the map more vertical room so each price is readable, and
+          <b>Full screen</b> opens it at the full height of the window. Press Esc to come back.</div>
+        <div class="lad-note">Every zone at its true distance from price on one axis, so you can see what price has to pass through before it reaches anything. Solid = order block, dashed = fair value gap, dotted = already spent. A gold outline and <b>✦</b> mark a zone that overlaps one on the other timeframe — the H4 block says where the size sits, the H1 block inside it says where to enter.</div>
+      </div>
+
+      <div class="g3">
+        <div class="card"><div class="card-h">Nearest zone</div>
+          <div class="metric" id="nearName">—</div>
+          <div class="metric-s" id="nearDist">—</div>
+          <div class="meter"><i id="nearBar" style="width:0%;background:var(--gold)"></i></div></div>
+        <div class="card"><div class="card-h">Zone balance</div>
+          <div class="metric" id="balVal">—</div>
+          <div class="metric-s" id="balNote">Unmitigated demand vs supply</div>
+          <div class="meter"><i id="balBar" style="width:50%;background:var(--green)"></i></div></div>
+        <div class="card"><div class="card-h">Structure</div>
+          <div class="metric" id="structVal">—</div>
+          <div class="metric-s" id="structNote">—</div></div>
+      </div>
+    </section>
+
+    <!-- ZONES -->
+    <section class="page" id="p-zones">
+      <div class="card">
+        <div class="card-h"><span>Order blocks &amp; fair value gaps</span>
+          <span class="seg" id="zoneSeg">
+            <button class="on" onclick="setZoneFilter('live',this)">Live</button>
+            <button onclick="setZoneFilter('all',this)">All</button>
+            <button onclick="setZoneFilter('ob',this)">OB</button>
+            <button onclick="setZoneFilter('fvg',this)">FVG</button>
+          </span></div>
+        <div id="zoneList"></div>
+        <div class="note">Strength is measured against the pair's own recent range, not raw price — a 40-pip zone on gold and a 40-pip zone on EUR/USD are not the same thing. Spent zones are kept visible but greyed, because knowing a level already broke is as useful as knowing one is holding.</div>
+      </div>
+    </section>
+
+    <!-- STRUCTURE -->
+    <section class="page" id="p-structure">
+      <div class="card">
+        <div class="card-h"><span>Market structure</span>
+          <span class="mut" style="text-transform:none;letter-spacing:0">Newest first</span></div>
+        <div id="structList"></div>
+      </div>
+      <div class="card">
+        <div class="card-h">Bias derived from structure</div>
+        <div id="biasBox"></div>
+        <div class="note">Read straight from the break sequence: successive higher breaks are bullish, a change of character against the run is the first warning that it is over.</div>
+      </div>
+    </section>
+
+    <!-- ALERTS -->
+    <section class="page" id="p-alerts">
+      <div class="card">
+        <div class="card-h"><span>Confluence alerts</span>
+          <span class="mut" style="text-transform:none;letter-spacing:0">Pattern + zone + gap agreeing</span></div>
+        <div id="alertList"></div>
+      </div>
+      <div class="card">
+        <div class="card-h">Sweep watch</div>
+        <div id="sweepList"></div>
+        <div class="note">Same four states the Trading Brain uses — Wait, Watch, Enter now, or no live block — so the two modules never describe the same setup differently.</div>
+      </div>
+    </section>
+
+    <!-- ALL PAIRS -->
+    <section class="page" id="p-book">
+      <div class="card">
+        <div class="card-h"><span>Every watched pair</span>
+          <span class="mut" style="text-transform:none;letter-spacing:0">Sorted by how close price is to a zone</span></div>
+        <div class="g3" id="grid" style="gap:11px"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- RAIL -->
+  <aside class="col rail">
+    <div class="sec">
+      <div class="sec-h">This pair</div>
+      <div class="kv"><span>Price</span><b class="n" id="rPx">—</b></div>
+      <div class="kv"><span>Live zones</span><b class="n" id="rZones">—</b></div>
+      <div class="kv"><span>Nearest</span><b class="n" id="rNear">—</b></div>
+      <div class="kv"><span>H1 + H4 zones</span><b id="rConf">—</b></div>
+      <div class="kv"><span>Structure</span><b id="rStruct">—</b></div>
+      <div class="kv"><span>Feed age</span><b class="n" id="rAge">—</b></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h">Elsewhere in Blackwood</div>
+      <div id="crossList"></div>
+      <div class="note">Read-only. The SMC panel does not compute these — it shows what the other modules already decided, so a zone entry is never taken in a window the Assistant has flagged.</div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h">Zone legend</div>
+      <div class="kv"><span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--bull-bg);border:.5px solid rgba(23,169,122,.5);margin-right:7px"></i>Demand</span><b class="mut">Bullish OB</b></div>
+      <div class="kv"><span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--bear-bg);border:.5px solid rgba(224,80,79,.5);margin-right:7px"></i>Supply</span><b class="mut">Bearish OB</b></div>
+      <div class="kv"><span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;border:1px dashed var(--blue);margin-right:7px"></i>Gap</span><b class="mut">Unfilled FVG</b></div>
+      <div class="kv"><span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;border:1px dotted var(--muted);margin-right:7px"></i>Spent</span><b class="mut">Traded through</b></div>
+    </div>
+  </aside>
+</div>
+
+
+<script>/* ═══════════════════════════════════════════════════════════════════
+   BLACKWOOD — SMC PANEL : ENGINE
+   ───────────────────────────────────────────────────────────────────
+   Real data behind the redesigned panel.
+
+   Ported VERBATIM from smc-panel.html (proven, do not rewrite):
+     bwDate()      – tolerant MT5/ISO/epoch date parsing
+     BW_CCY / BW_BASE / prettyPair()  – broker-suffix stripping
+     the endpoints and the 5s poll:  /smc  ·  /smc/tf/H4  ·  /confluence
+
+   New here:
+     – both timeframes fetched every cycle, so confluence can be seen
+       without switching (the old panel only ever held one)
+     – zone strength normalised per pair instead of raw price height
+     – spent / mitigated inference
+     – sweep states matching the Trading Brain's exactly
+     – cross-module reads: news from /api/state, the Brain's last
+       verdict and the Assistant's last risk flag from localStorage
+   ═══════════════════════════════════════════════════════════════════ */
+(function(){
+'use strict';
+
+/* ── VERBATIM from smc-panel.html ───────────────────────────────── */
+function bwDate(v){
+  if(v instanceof Date) return v;
+  if(v === null || v === undefined || v === '') return new Date(NaN);
+  if(typeof v === 'number') return new Date(v < 1e12 ? v * 1000 : v); // sec
+  var s = String(v).trim();
+  if(/^\d+$/.test(s)){ var n = parseInt(s,10); return new Date(n < 1e12 ? n*1000 : n); }
+  s = s.replace(/^(\d{4})\.(\d{2})\.(\d{2})/, '$1-$2-$3')
+       .replace(/^(\d{4}-\d{2}-\d{2})[ ]+(\d{2}:\d{2})/, '$1T$2');
+  return new Date(s);
+}
+const BW_CCY  = ['USD','EUR','GBP','JPY','CHF','AUD','NZD','CAD','SEK','NOK','DKK',
+                 'SGD','HKD','ZAR','MXN','TRY','PLN','CZK','HUF','CNH','THB','INR'];
+const BW_BASE = BW_CCY.concat(['XAU','XAG','XPT','XPD','BTC','ETH','LTC','XRP','SOL','BNB']);
+function prettyPair(sym){
+  if (!sym) return '';
+  const up = String(sym).toUpperCase().replace(/[._-]/g, '');
+  for (let cut = 0; cut <= 3 && up.length - cut >= 6; cut++) {
+    const cand = up.slice(0, up.length - cut);
+    if (cand.length !== 6) continue;
+    if (BW_BASE.includes(cand.slice(0,3)) && BW_CCY.includes(cand.slice(3,6))) return cand;
+  }
+  return up; // not a recognisable pair (PLATINUM, indices) — leave it alone
+}
+
+/* ── display helpers ────────────────────────────────────────────── */
+function digitsFor(bare){
+  if(/JPY$/.test(bare)) return 3;
+  if(/^XA[UG]/.test(bare)) return 2;
+  if(/^(BTC|ETH|LTC|XRP|SOL|BNB)/.test(bare)) return 2;
+  return 5;
+}
+/* One "pip" in this pair's own terms — what a trader means by distance. */
+function pipSize(bare){
+  if(/JPY$/.test(bare)) return 0.01;
+  if(/^XAU/.test(bare)) return 0.1;
+  if(/^XAG/.test(bare)) return 0.01;
+  if(/^(BTC|ETH)/.test(bare)) return 1;
+  return 0.0001;
+}
+function fmt(v,d){ const n=parseFloat(v); return isFinite(n)?n.toFixed(d):'—'; }
+function label(pair){ return pair.length===6 ? pair.slice(0,3)+'/'+pair.slice(3) : pair; }
+
+const SMC = window.BWSMC = {
+  bwDate, prettyPair, digitsFor, pipSize, fmt, label,
+  data:{H1:{},H4:{}}, conf:{}, state:null,
+  lastFetch:0, ok:{H1:null,H4:null,conf:null,state:null}
+};
+
+/* ── ZONE MODEL ─────────────────────────────────────────────────
+   One shape for order blocks and fair value gaps so everything
+   downstream — the ladder, the list, confluence, sweep — reads the
+   same object. */
+function zonesFrom(node, tf, bare){
+  const out=[];
+  if(!node) return out;
+  (node.orderBlocks||node.order_blocks||[]).forEach(o=>{
+    const hi=parseFloat(o.high), lo=parseFloat(o.low);
+    if(!isFinite(hi)||!isFinite(lo)) return;
+    out.push({kind:'ob', tf,
+      hi:Math.max(hi,lo), lo:Math.min(hi,lo),
+      dir: String(o.direction||o.type||'').toLowerCase().indexOf('bear')>=0?'bear':'bull',
+      at: o.timeStart||o.time||null,
+      mitigated: !!(o.mitigated||o.filled||o.tested)});
+  });
+  (node.fvgs||node.fvg||[]).forEach(f=>{
+    const hi=parseFloat(f.high), lo=parseFloat(f.low);
+    if(!isFinite(hi)||!isFinite(lo)) return;
+    out.push({kind:'fvg', tf,
+      hi:Math.max(hi,lo), lo:Math.min(hi,lo),
+      dir: String(f.direction||f.type||'').toLowerCase().indexOf('bear')>=0?'bear':'bull',
+      at: f.timeStart||f.time||null,
+      mitigated: !!(f.filled||f.mitigated)});
+  });
+  return out;
+}
+
+/* ── STRENGTH, NORMALISED ───────────────────────────────────────
+   The old panel graded a zone by RAW price height:
+       if (r > 0.0015) 'High'; else if (r > 0.0008) 'Medium'
+   which only makes sense for a 5-decimal FX pair. On XAU/USD every
+   zone scored High; on USD/JPY almost every zone scored Low.
+   Height is now measured against the SPREAD OF THIS PAIR'S OWN
+   ZONES, so "big" means big for this instrument. A zone that is a
+   large share of the local range is a stronger level than a thin
+   one, whatever the instrument's price scale. */
+function scoreStrength(zone, all, price){
+  const heights=all.map(z=>z.hi-z.lo).filter(h=>h>0).sort((a,b)=>a-b);
+  const med=heights.length?heights[Math.floor(heights.length/2)]:(zone.hi-zone.lo);
+  const h=zone.hi-zone.lo;
+  let pct = med>0 ? Math.round(Math.min(100, (h/med)*45)) : 50;
+  /* Untouched zones hold better than ones price has already worked. */
+  if(zone.touches>=4) pct=Math.round(pct*0.6);
+  else if(zone.touches>=2) pct=Math.round(pct*0.8);
+  /* An older block that has survived is not weaker for being old, but a
+     very old one is more likely to be stale data than a live level. */
+  const days=zone.ageMs?zone.ageMs/86400000:0;
+  if(days>4) pct=Math.round(pct*0.75);
+  return Math.max(6, Math.min(100, pct));
+}
+
+/* ── SPENT / MITIGATED ──────────────────────────────────────────
+   The EA marks a block mitigated only if price broke it within 20
+   bars of forming, so a zone breached later still arrives as live.
+   Structure levels tell us what price has since traded through. */
+function markSpent(zones, price){
+  /* A zone is spent when price has traded DECISIVELY THROUGH it — past the
+     far side by more than the zone's own height. Nothing else is reliable
+     from this feed.
+
+     An earlier version also treated "a structure level sits beyond this
+     zone" as proof it was spent. That was wrong and it marked almost
+     everything spent: a break of structure BELOW a demand block is the
+     normal case — it is often the very move that CREATED the block. Only
+     price position is used now. */
+  zones.forEach(z=>{
+    const h=Math.max(z.hi-z.lo, 1e-9);
+    if(z.mitigated){ z.spent=true; z.spentWhy='the feed marked it mitigated'; return; }
+    /* Only ORDER BLOCKS are judged by price position. A fair value gap
+       sitting above price is a target, not a spent level — it is only
+       done when the feed says it is filled. Judging gaps by position
+       marked every unfilled gap above price as spent. */
+    if(z.kind==='ob' && isFinite(price)){
+      if(z.dir==='bull' && price < z.lo - h){ z.spent=true; z.spentWhy='price has traded well below it'; return; }
+      if(z.dir==='bear' && price > z.hi + h){ z.spent=true; z.spentWhy='price has traded well above it'; return; }
+    }
+    z.spent=false;
+  });
+}
+
+/* ── CONFLUENCE ─────────────────────────────────────────────────
+   A zone on one timeframe overlapping a same-direction zone on the
+   other. The H4 block says where the size sits; the H1 block inside
+   it says where to enter. */
+function overlaps(a,b){ return a.lo<=b.hi && b.lo<=a.hi; }
+SMC.confluenceOf=function(z, allBothTF){
+  const other = z.tf==='H1' ? 'H4' : 'H1';
+  return allBothTF.find(x=>x.tf===other && !x.spent && x.dir===z.dir && overlaps(x,z)) || null;
+};
+
+/* ── DISTANCE ───────────────────────────────────────────────────── */
+SMC.pipsAway=function(z, price, bare){
+  if(!isFinite(price)) return Infinity;
+  if(price>=z.lo && price<=z.hi) return 0;
+  const raw = price>z.hi ? price-z.hi : z.lo-price;
+  return raw / pipSize(bare);
+};
+
+/* ── SWEEP, in the Trading Brain's own four states ──────────────
+   Wait   – price approaching, the liquidity beyond has NOT been taken
+   Watch  – it has been swept, waiting for price to come back in
+   Enter  – swept and reclaimed
+   null   – no live block to sweep (the Brain shows this as "Expired") */
+SMC.sweepFor=function(zones, price, bare){
+  if(!isFinite(price)) return null;
+  const live=zones.filter(z=>!z.spent && z.kind==='ob');
+  if(!live.length) return null;
+  let best=null;
+  live.forEach(z=>{
+    const height=z.hi-z.lo;
+    const buf=height*3;
+    const away=SMC.pipsAway(z,price,bare);
+    let status=null,msg='';
+    if(z.dir==='bull'){
+      if(price>z.lo && price<z.lo+buf && price>z.hi){
+        status='warning';
+        msg='Price is approaching the demand block at '+fmt(z.lo,digitsFor(bare))+
+            ' but the low has not been swept yet. Entering before the sweep is the commonest way this setup fails.';
+      }else if(price>=z.lo && price<=z.hi){
+        status='swept';
+        msg='Price is inside the demand block. The low has been taken — watch for it to reclaim before committing.';
+      }else if(price>z.hi && price<z.hi+buf){
+        status='confirmed';
+        msg='Price swept the demand block and has reclaimed above it.';
+      }
+    }else{
+      if(price<z.hi && price>z.hi-buf && price<z.lo){
+        status='warning';
+        msg='Price is approaching the supply block at '+fmt(z.hi,digitsFor(bare))+
+            ' but the high has not been swept yet.';
+      }else if(price>=z.lo && price<=z.hi){
+        status='swept';
+        msg='Price is inside the supply block. The high has been taken — watch for rejection before committing.';
+      }else if(price<z.lo && price>z.lo-buf){
+        status='confirmed';
+        msg='Price swept the supply block and has rejected below it.';
+      }
+    }
+    if(status && (!best || away<best.away)) best={status,msg,zone:z,away};
+  });
+  return best;
+};
+SMC.sweepLabel=function(s){
+  if(!s) return {text:'No live block', cls:'mut',
+    note:'No unmitigated order block is in play on this timeframe — the same state the Trading Brain shows as "Expired".'};
+  if(s.status==='confirmed') return {text:'Enter now', cls:'up', note:s.msg};
+  if(s.status==='swept')     return {text:'Watch',     cls:'bl', note:s.msg};
+  return {text:'Wait', cls:'gd', note:s.msg};
+};
+
+/* ── STRUCTURE ──────────────────────────────────────────────────── */
+SMC.structureFrom=function(node){
+  return ((node&&node.structure)||[]).map(s=>{
+    const t=String(s.type||'').toUpperCase();
+    return {
+      kind: t.indexOf('CHOCH')>=0?'CHoCH' : t.indexOf('BOS')>=0?'BOS' : t||'—',
+      dir:  t.indexOf('BEAR')>=0?'bear':'bull',
+      level: parseFloat(s.level),
+      breach: parseFloat(s.breach),
+      at: s.time||null
+    };
+  }).filter(x=>isFinite(x.level)).sort((a,b)=>bwDate(b.at)-bwDate(a.at));
+};
+
+/* ── CROSS-MODULE READS ─────────────────────────────────────────
+   All three are honest reads of what the other modules actually
+   produced. Nothing here is computed by this panel.
+     news    – /api/state, the same feed the Brain uses
+     verdict – the Brain writes bw-brain-history to localStorage
+     risk    – the Assistant writes bw-risk-log on every escalation
+   localStorage is shared because every module is same-origin. */
+/* How long a published risk snapshot counts as "now". The Risk Radar
+   recomputes every ~5s, so 3 minutes is generous; past that the
+   Assistant is closed or the feed is down and we must not pretend. */
+const RISK_FRESH_MS = 180000;
+SMC.crossFor=function(bare){
+  const out={news:null, verdict:null, risk:null};
+
+  const st=SMC.state||{};
+  const news=st.news||st.newsEvents||[];
+  if(Array.isArray(news)&&news.length){
+    const now=Date.now()/1000;
+    const ccy=[bare.slice(0,3), bare.slice(3,6)];
+    const next=news.map(e=>({e, dt:(+e.timestamp||0)-now}))
+      .filter(x=>x.dt>0 && ccy.indexOf(x.e.country)>=0 && /high/i.test(x.e.impact||''))
+      .sort((a,b)=>a.dt-b.dt)[0];
+    if(next) out.news={title:next.e.title||'—', mins:Math.round(next.dt/60), ccy:next.e.country};
+  }
+
+  try{
+    const h=JSON.parse(localStorage.getItem('bw-brain-history')||'[]');
+    const hit=(h||[]).find(x=>prettyPair(x.sym)===bare);
+    if(hit) out.verdict={call:hit.call, conf:hit.conf, tf:hit.tf, when:hit.stamp};
+  }catch(e){}
+
+  /* RISK — CURRENT STATE, NOT HISTORY.
+     This used to read `bw-risk-log`, which is the Assistant's ESCALATION
+     HISTORY: one entry per escalation, kept for 60 entries, never
+     expiring and with no age check here. So a flag raised 11 hours ago
+     was presented as a live warning, and the top banner fired on it.
+     The Assistant now also publishes `bw-risk-now` — every pair's
+     CURRENT level rewritten on each Risk Radar cycle, with the time it
+     was computed. Use that, and only while it is actually fresh.
+     If it is stale or absent we fall back to the log, but the result is
+     marked `stale:true` so the banner will NOT fire on it and the rail
+     shows it as history with its real age. */
+  out.riskStale=false;
+  try{
+    const now=JSON.parse(localStorage.getItem('bw-risk-now')||'null');
+    if(now && now.pairs && (Date.now()-(+now.t||0)) < RISK_FRESH_MS){
+      const p=now.pairs[bare] || now.pairs[Object.keys(now.pairs).find(k=>prettyPair(k)===bare)||''];
+      if(p) out.risk={level:p.level, name:p.name, score:p.score, t:now.t, factors:p.factors||[]};
+    }
+  }catch(e){}
+  if(!out.risk){
+    try{
+      const r=JSON.parse(localStorage.getItem('bw-risk-log')||'[]');
+      const hit=(r||[]).filter(x=>prettyPair(x.sym)===bare)
+                       .sort((a,b)=>(+b.t||0)-(+a.t||0))[0];
+      if(hit){
+        out.risk={level:hit.level, score:hit.score, t:hit.t,
+                  factors:(hit.factors||[]).slice(0,2)};
+        out.riskStale=true;
+      }
+    }catch(e){}
+  }
+
+  return out;
+};
+
+/* ── FETCH ──────────────────────────────────────────────────────
+   Both timeframes every cycle so confluence is always available.
+   Same endpoints and cadence as the original panel. */
+function get(url){
+  return fetch(url,{credentials:'same-origin',headers:{Accept:'application/json'}})
+    .then(r=>r.ok?r.json():Promise.reject(r.status));
+}
+SMC.refresh=function(){
+  return Promise.all([
+    get('/smc').then(j=>{SMC.data.H1=j||{};SMC.ok.H1=true;}).catch(()=>{SMC.ok.H1=false;}),
+    get('/smc/tf/H4').then(j=>{SMC.data.H4=j||{};SMC.ok.H4=true;}).catch(()=>{SMC.ok.H4=false;}),
+    get('/confluence').then(j=>{SMC.conf=j||{};SMC.ok.conf=true;}).catch(()=>{SMC.ok.conf=false;}),
+    get('/api/state').then(j=>{SMC.state=j||null;SMC.ok.state=true;}).catch(()=>{SMC.ok.state=false;})
+  ]).then(()=>{ SMC.lastFetch=Date.now(); return SMC; });
+};
+
+/* ── ASSEMBLE one pair ──────────────────────────────────────────── */
+SMC.nodeFor=function(tf, bare){
+  const bag=SMC.data[tf]||{};
+  for(const k of Object.keys(bag)) if(prettyPair(k)===bare) return bag[k];
+  return null;
+};
+SMC.pairs=function(){
+  const set=new Set();
+  ['H1','H4'].forEach(tf=>Object.keys(SMC.data[tf]||{}).forEach(k=>{
+    const p=prettyPair(k); if(p) set.add(p);
+  }));
+  return [...set].sort();
+};
+SMC.build=function(bare){
+  const n1=SMC.nodeFor('H1',bare), n4=SMC.nodeFor('H4',bare);
+  const node=n1||n4;
+  const price=parseFloat((node&&(node.price||node.currentPrice))||NaN);
+  const struct1=SMC.structureFrom(n1), struct4=SMC.structureFrom(n4);
+  const all=[].concat(zonesFrom(n1,'H1',bare), zonesFrom(n4,'H4',bare));
+
+  all.forEach(z=>{
+    const t=bwDate(z.at);
+    z.ageMs = isNaN(+t)?0:(Date.now()-t.getTime());
+    z.touches = 0;   /* the feed carries no touch count; left at 0 rather
+                        than invented, and the UI simply omits it */
+  });
+  markSpent(all, price);
+  all.forEach(z=>{ z.strength=scoreStrength(z, all, price); });
+
+  return {bare, label:label(bare), price, digits:digitsFor(bare),
+          zones:all, structure:{H1:struct1,H4:struct4},
+          receivedAt:(node&&node.receivedAt)||null};
+};
+
+/* Confluence alerts for a pair — VERBATIM matching rule from the old
+   panel: compare on the normalised pair, not the raw broker symbol. */
+SMC.alertsFor=function(bare){
+  return Object.values(SMC.conf||{}).flat()
+    .filter(a=>prettyPair(a.symbol)===bare)
+    .sort((a,b)=>bwDate(b.time)-bwDate(a.time));
+};
+})();
+</script>
+<script>/* ═══════════════════════════════════════════════════════════════════
+   BLACKWOOD — SMC PANEL : UI
+   Renders the approved prototype layout from real engine data.
+   Every repaint is guarded by a content comparison, so nothing is
+   rewritten on the 5s poll unless it actually changed.
+   ═══════════════════════════════════════════════════════════════════ */
+(function boot(){
+'use strict';
+const S=window.BWSMC;
+if(!S){ if(boot.t===undefined)boot.t=0; if(++boot.t>80){console.error('[SMC] engine missing');return;}
+        setTimeout(boot,150); return; }
+
+const $=id=>document.getElementById(id);
+const esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const setHTML=(el,html)=>{ if(el&&el.innerHTML!==html) el.innerHTML=html; };
+const setTxt=(el,t)=>{ if(el&&el.textContent!==t) el.textContent=t; };
+
+let activeTF='H1', activePair=null, zoneFilter='live', view=null;
+
+/* ── OPENING ANOTHER MODULE ─────────────────────────────────────
+   This panel runs inside the dashboard's iframe, so it ASKS the shell
+   to switch rather than navigating itself — replacing the iframe's
+   location would leave the shell's sidebar pointing at the wrong
+   module, and window.top would reload the whole dashboard.
+   The shell needs one listener:
+     window.addEventListener('message', e => {
+       if (e.data && e.data.bw === 'open') openModule(e.data.module, e.data.view);
+     });
+   Until that exists, the fallback still gets the user there. */
+function openModule(module,viewName){
+  const msg={bw:'open',module,view:viewName||null,pair:activePair,timeframe:activeTF};
+  let asked=false;
+  try{ if(window.parent&&window.parent!==window){ window.parent.postMessage(msg,'*'); asked=true; } }catch(e){}
+  if(!asked){
+    const path={assistant:'/',brain:'/brain'}[module]||'/';
+    const q='?pair='+encodeURIComponent(activePair||'')+(viewName?'&view='+viewName:'');
+    try{ window.top.location.href=path+q; }catch(e){ window.location.href=path+q; }
+  }
+}
+window.openModule=openModule;
+
+/* ── controls ───────────────────────────────────────────────────── */
+window.setTF=function(tf,el){
+  if(tf===activeTF) return;
+  activeTF=tf;
+  el.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===el));
+  render();
+};
+window.setZoneFilter=function(f,el){
+  zoneFilter=f;
+  el.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===el));
+  renderZones();
+};
+window.pickPair=function(p){
+  activePair=p;
+  document.querySelectorAll('.pair').forEach(b=>b.classList.toggle('on',b.dataset.s===p));
+  render();
+};
+window.showZone=function(){};
+
+/* ── pair strip ─────────────────────────────────────────────────── */
+function pairState(v){
+  if(!v.zones.length) return 'var(--border2)';
+  const live=v.zones.filter(z=>!z.spent);
+  if(!live.length) return 'var(--border2)';
+  const near=Math.min(...live.map(z=>S.pipsAway(z,v.price,v.bare)));
+  return near===0?'var(--green)':near<=25?'var(--gold-lt)':'var(--border2)';
+}
+function renderPairs(){
+  const list=S.pairs();
+  if(!list.length){ setHTML($('pairs'),'<span class="empty" style="padding:4px 2px">Waiting for the SMC feed…</span>'); return; }
+  if(!activePair||list.indexOf(activePair)<0) activePair=list[0];
+  const html=list.map(p=>{
+    const v=S.build(p);
+    return '<button class="pair'+(p===activePair?' on':'')+'" data-s="'+p+'" onclick="pickPair(\''+p+'\')">'+
+      '<i class="pdot" style="background:'+pairState(v)+'"></i>'+esc(S.label(p))+'</button>';
+  }).join('');
+  setHTML($('pairs'),html);
+}
+
+/* ── the ladder ─────────────────────────────────────────────────── */
+function tfZones(v){ return v.zones.filter(z=>z.tf===activeTF); }
+function renderLadder(v){
+  const z=tfZones(v), d=v.digits;
+  if(!z.length||!isFinite(v.price)){
+    setHTML($('ladder'),'<div class="empty" style="padding:20px">'+
+      (isFinite(v.price)?('No '+activeTF+' zones on '+esc(v.label)+' right now. Switch timeframe, or watch for the next block to form.')
+        :'Waiting for a price on this pair.')+'</div>');
+    setTxt($('mapRange'),''); return;
+  }
+  const lo=Math.min(v.price,...z.map(x=>x.lo)), hi=Math.max(v.price,...z.map(x=>x.hi));
+  const pad=(hi-lo)*0.12||v.price*0.001;
+  const top=hi+pad, bot=lo-pad, span=top-bot;
+  const y=q=>((top-q)/span)*100;
+  let h='<div class="axis"></div>';
+  for(let i=0;i<=4;i++){
+    h+='<span style="top:'+(i*25)+'%;position:absolute;right:calc(100% - 66px);font-size:9px;'+
+       'color:var(--muted);font-family:\'IBM Plex Mono\',monospace;transform:translateY(-50%)">'+
+       S.fmt(top-(span*i/4),d)+'</span>';
+  }
+  z.slice().sort((a,b)=>b.hi-a.hi).forEach(x=>{
+    const t=y(x.hi), hgt=Math.max(y(x.lo)-y(x.hi),3.2);
+    const cf=x.spent?null:S.confluenceOf(x,v.zones);
+    const cls=x.spent?'spent':x.kind==='fvg'?'fvg':(x.dir==='bull'?'bull':'bear');
+    const nm=(x.kind==='ob'?(x.dir==='bull'?'Demand':'Supply'):'Gap')+' · '+x.tf+(cf?' ✦':'');
+    const away=S.pipsAway(x,v.price,v.bare);
+    const st=x.spent?'spent':away===0?'price inside':away.toFixed(1)+' pips';
+    h+='<div class="zone '+cls+(cf?' conf':'')+'" style="top:'+t+'%;height:'+hgt+'%" '+
+       'title="'+esc(nm+' '+S.fmt(x.lo,d)+'–'+S.fmt(x.hi,d))+(cf?' — confluence with '+cf.tf:'')+'" '+
+       'onclick="showZone()">'+esc(nm)+'<span class="zt">'+st+'</span></div>';
+  });
+  h+='<div class="price-line" style="top:'+y(v.price)+'%" data-p="'+S.fmt(v.price,d)+'"></div>';
+  setHTML($('ladder'),h);
+  setTxt($('mapRange'),S.fmt(bot,d)+' – '+S.fmt(top,d));
+}
+
+/* ── zone list ──────────────────────────────────────────────────── */
+function renderZones(){
+  const v=S.build(activePair||''), d=v.digits;
+  let z=tfZones(v).slice();
+  if(zoneFilter==='live') z=z.filter(x=>!x.spent);
+  if(zoneFilter==='ob')   z=z.filter(x=>x.kind==='ob');
+  if(zoneFilter==='fvg')  z=z.filter(x=>x.kind==='fvg');
+  z.sort((a,b)=>S.pipsAway(a,v.price,v.bare)-S.pipsAway(b,v.price,v.bare));
+
+  const html = z.length ? z.map(x=>{
+    const away=S.pipsAway(x,v.price,v.bare), inside=away===0;
+    const cf=x.spent?null:S.confluenceOf(x,v.zones);
+    const kind=x.kind==='ob'?(x.dir==='bull'?'Demand block':'Supply block')
+                            :(x.dir==='bull'?'Bullish gap':'Bearish gap');
+    const age=x.ageMs?(x.ageMs<3600000?Math.round(x.ageMs/60000)+'m'
+      :x.ageMs<86400000?Math.round(x.ageMs/3600000)+'h':Math.round(x.ageMs/86400000)+'d'):null;
+    return '<div class="row"><div style="flex:1">'+
+      '<div class="row-t">'+kind+
+        ' <span class="tag t-tf">'+x.tf+'</span>'+
+        ' <span class="tag '+(x.dir==='bull'?'t-bull':'t-bear')+'">'+x.dir+'</span>'+
+        (cf?' <span class="tag t-conf">H1 + H4</span>':'')+
+        (x.spent?' <span class="tag t-mute">spent</span>':inside?' <span class="tag t-gold">price inside</span>':'')+
+      '</div>'+
+      '<div class="row-s">'+S.fmt(x.lo,d)+' – '+S.fmt(x.hi,d)+
+        (age?' · formed '+age+' ago':'')+
+        (x.spent&&x.spentWhy?' · '+esc(x.spentWhy):'')+
+        ' · strength '+x.strength+'/100</div>'+
+      (cf?'<div class="conf-note">Sits inside the '+cf.tf+' '+(cf.dir==='bull'?'demand':'supply')+
+          ' zone '+S.fmt(cf.lo,d)+' – '+S.fmt(cf.hi,d)+'. Both timeframes want the same thing here.</div>':'')+
+      '<div class="meter"><i style="width:'+x.strength+'%;background:'+
+        (x.spent?'var(--border2)':x.dir==='bull'?'var(--green)':'var(--red)')+'"></i></div>'+
+      '</div>'+
+      '<div class="dist'+(inside?' gd':'')+'">'+(inside?'here':isFinite(away)?away.toFixed(1):'—')+
+      '<small>'+(inside?'in the zone':'pips away')+'</small></div></div>';
+  }).join('') : '<div class="empty">No zones match this filter on '+activeTF+'.</div>';
+  setHTML($('zoneList'),html);
+  setTxt($('cZones'),String(tfZones(v).filter(x=>!x.spent).length));
+}
+
+/* ── structure ──────────────────────────────────────────────────── */
+function renderStructure(v){
+  const s=v.structure[activeTF]||[], d=v.digits;
+  const html = s.length ? s.slice(0,12).map(x=>{
+    const t=S.bwDate(x.at), ago=isNaN(+t)?'':timeAgo(t);
+    return '<div class="row"><div style="flex:1">'+
+      '<div class="row-t">'+(x.kind==='BOS'?'Break of structure':x.kind==='CHoCH'?'Change of character':esc(x.kind))+
+      ' <span class="tag t-tf">'+activeTF+'</span>'+
+      ' <span class="tag '+(x.dir==='bull'?'t-bull':'t-bear')+'">'+x.dir+'</span></div>'+
+      '<div class="row-s">'+(x.kind==='BOS'
+        ?'Broke the prior swing and held past it'
+        :'First break against the run — the earliest warning the move is done')+
+      ' · level '+S.fmt(x.level,d)+'</div></div>'+
+      '<div class="dist mut" style="font-weight:500">'+ago+'</div></div>';
+  }).join('') : '<div class="empty">No '+activeTF+' structure events yet.</div>';
+  setHTML($('structList'),html);
+  setTxt($('cStruct'),String(s.length));
+
+  const last=s[0];
+  const bos=s.filter(x=>x.kind==='BOS').length, ch=s.filter(x=>x.kind==='CHoCH').length;
+  setHTML($('biasBox'),
+    '<div class="kv"><span>Most recent event</span><b class="'+(last?(last.dir==='bull'?'up':'dn'):'mut')+'">'+
+      (last?last.kind+' '+last.dir:'—')+'</b></div>'+
+    '<div class="kv"><span>Breaks vs reversals</span><b class="n">'+bos+' BOS · '+ch+' CHoCH</b></div>'+
+    '<div class="kv"><span>Reading</span><b class="'+(!s.length?'mut':ch?'gd':'up')+'">'+
+      (!s.length?'Nothing to read yet':ch?'Trend intact but warned':'Trend intact')+'</b></div>');
+  setTxt($('structVal'), last?last.kind+' '+last.dir:'—');
+  setTxt($('structNote'), last?('level '+S.fmt(last.level,d)):'No structure on this timeframe');
+  setTxt($('rStruct'), last?last.kind+' '+last.dir:'—');
+}
+function timeAgo(t){
+  const ms=Date.now()-t.getTime();
+  if(ms<0) return 'just now';
+  /* Rounding to the nearest minute reported a 20-second-old alert as
+     "0m ago", which reads like a bug, and a 90-second-old one as "2m",
+     which overstates its age. Seconds below a minute, and no rounding up
+     past the truth. */
+  if(ms<45000) return 'just now';
+  if(ms<90000) return '1 min ago';
+  if(ms<3600000) return Math.floor(ms/60000)+' min ago';
+  if(ms<86400000) return Math.round(ms/3600000)+'h ago';
+  return Math.round(ms/86400000)+'d ago';
+}
+
+/* ── alerts + sweep ─────────────────────────────────────────────── */
+/* ── PRICE MAP HEIGHT ─────────────────────────────────────────────
+   Zones are drawn at their true distance from price, so when several sit
+   within a few pips of each other their labels land on top of one
+   another and the prices become unreadable — the exact case a trader
+   needs them for. Height is the only honest fix: spreading them apart
+   artificially would put them at distances they are not at. So the map
+   can be made taller, or taken full screen, and the choice is remembered.
+   Re-rendering after the resize is required — the ladder positions every
+   band from the container's height, so it must be recomputed, not just
+   stretched. */
+let ladMode=(function(){ try{ return localStorage.getItem('bw-smc-ladder')||'normal'; }catch(e){ return 'normal'; } })();
+function applyLadder(){
+  const el=$('ladder'); if(!el) return;
+  el.classList.toggle('tall', ladMode==='tall');
+  el.classList.toggle('full', ladMode==='full');
+  document.body.classList.toggle('lad-full', ladMode==='full');
+  const bn=$('ladNorm'), bt=$('ladTall'), bf=$('ladFull');
+  if(bn) bn.classList.toggle('on',ladMode==='normal');
+  if(bt) bt.classList.toggle('on',ladMode==='tall');
+  if(bf) bf.classList.toggle('on',ladMode==='full');
+  const h=$('ladHint');
+  if(h) h.style.display = ladMode==='normal' ? '' : 'none';
+  try{ localStorage.setItem('bw-smc-ladder',ladMode); }catch(e){}
+  /* Positions are derived from the new height, so redraw. */
+  try{ renderLadder(S.build(activePair)); }catch(e){}
+}
+let ladWired=false;
+function wireLadder(){
+  if(ladWired) return;
+  const bn=$('ladNorm'), bt=$('ladTall'), bf=$('ladFull');
+  if(!bn||!bt||!bf) return;
+  ladWired=true;
+  bn.onclick=()=>setLadder('normal');
+  bt.onclick=()=>setLadder('tall');
+  bf.onclick=()=>setLadder('full');
+  if(!document.querySelector('.lad-esc')){
+    const b=document.createElement('button');
+    b.className='lad-esc'; b.innerHTML='Close map <kbd>Esc</kbd>';
+    b.onclick=()=>{ ladMode='normal'; applyLadder(); };
+    document.body.appendChild(b);
+  }
+  applyLadder();
+}
+function setLadder(m){ ladMode=m; applyLadder(); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&ladMode==='full'){ ladMode='normal'; applyLadder(); } });
+
+function renderAlerts(v){
+  const d=v.digits;
+  const a=S.alertsFor(v.bare).slice(0,6);
+  const html = a.length ? a.map(x=>{
+    const bull=String(x.direction||'').toLowerCase().indexOf('bull')>=0;
+    const t=S.bwDate(x.time);
+    /* One bar on the alert's own timeframe is the natural cut-off: past
+       that, the setup it described has already been answered by a new
+       candle. */
+    const barMs=(String(x.timeframe||'').toUpperCase()==='H4'?4:1)*3600000;
+    const age=isNaN(+t)?null:(Date.now()-t.getTime());
+    const stale=age!=null&&age>barMs;
+    const fresh=age!=null&&age<=barMs*0.5;
+    return '<div class="banner '+(bull?'bull':'bear')+(stale?' aged':'')+'" style="margin-bottom:11px"><div style="flex:1">'+
+      '<div class="b-t '+(bull?'up':'dn')+'">'+(bull?'Bullish':'Bearish')+' confluence — '+
+        esc(x.confidence)+'% confidence</div>'+
+      '<div class="b-s">'+esc(x.pattern||'Pattern')+' on '+esc(x.timeframe||'')+
+        ' aligns with the order block at '+S.fmt(x.ob&&x.ob.low,d)+' – '+S.fmt(x.ob&&x.ob.high,d)+
+        '. Pattern, zone and gap point the same way.</div>'+
+      /* AGE IS THE POINT. A confluence that fired forty minutes ago is a
+         different thing from one firing now, and showing only a clock
+         time made the reader work that out. Relative age leads, the
+         clock time follows it, and anything older than the bar it formed
+         on is marked stale so it cannot be mistaken for live. */
+      '<div class="row-s" style="margin-top:6px">'+
+        (isNaN(+t)
+          ? '<span class="mut">no timestamp on this alert</span>'
+          : '<b class="'+(stale?'mut':'')+'">'+timeAgo(t)+'</b>'+
+            '<span class="mut"> · '+t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</span>')+
+        '<span class="mut"> · '+esc(x.timeframe||'')+'</span>'+
+        (stale?'<span class="agetag stale">Stale</span>':'')+
+        (fresh?'<span class="agetag fresh">Live</span>':'')+
+      '</div></div></div>';
+  }).join('') : '<div class="empty">No confluence detected on '+esc(v.label)+' right now.</div>';
+  setHTML($('alertList'),html);
+  setTxt($('cAlerts'),String(a.length));
+
+  const sw=S.sweepFor(tfZones(v), v.price, v.bare);
+  const L=S.sweepLabel(sw);
+  const cls=L.cls==='up'?'bull':L.cls==='dn'?'bear':L.cls==='bl'?'info':L.cls==='gd'?'warn':'info';
+  /* The sweep read had NO timestamp at all, which is the most misleading
+     omission on this tab: a trader could act on a "wait" that was
+     computed from a zone formed two days ago. Two different times matter
+     and they are not the same thing — when the ZONE was formed, and when
+     the FEED last updated. Both are shown. */
+  const zAt=sw&&sw.zone&&sw.zone.at?S.bwDate(sw.zone.at):null;
+  const feed=v.receivedAt?S.bwDate(v.receivedAt):null;
+  const bits=[];
+  if(feed&&!isNaN(+feed)) bits.push('<b>'+timeAgo(feed)+'</b><span class="mut"> · feed updated</span>');
+  if(zAt&&!isNaN(+zAt))   bits.push('<span class="mut">zone formed '+timeAgo(zAt)+'</span>');
+  setHTML($('sweepList'),
+    '<div class="banner '+cls+'"><div style="flex:1">'+
+    '<div class="b-t '+L.cls+'">'+L.text+'</div>'+
+    '<div class="b-s">'+esc(L.note)+'</div>'+
+    (bits.length?'<div class="row-s" style="margin-top:6px">'+bits.join('<span class="mut"> · </span>')+'</div>'
+                :'<div class="row-s" style="margin-top:6px"><span class="mut">No timestamp on this reading — treat it as unverified.</span></div>')+
+    '</div></div>');
+}
+
+/* ── all pairs ──────────────────────────────────────────────────── */
+function renderGrid(){
+  const html=S.pairs().map(p=>{
+    const v=S.build(p);
+    const live=v.zones.filter(z=>!z.spent && z.tf===activeTF);
+    const near=live.length?Math.min(...live.map(z=>S.pipsAway(z,v.price,v.bare))):Infinity;
+    const col=near===0?'var(--green)':near<=25?'var(--gold-lt)':'var(--border2)';
+    return '<div class="gcard" onclick="pickPair(\''+p+'\')">'+
+      '<div class="gname"><i class="pdot" style="background:'+col+'"></i>'+esc(v.label)+'</div>'+
+      '<div class="gpx">'+S.fmt(v.price,v.digits)+'</div>'+
+      '<div class="meter" style="margin:9px 0 7px"><i style="width:'+
+        (isFinite(near)?Math.max(6,100-Math.min(near,50)*2):4)+'%;background:'+col+'"></i></div>'+
+      '<div class="mini"><span>Live zones</span><b class="n">'+live.length+'</b></div>'+
+      '<div class="mini"><span>Nearest</span><b class="n">'+
+        (near===0?'in a zone':isFinite(near)?near.toFixed(1)+' pips':'—')+'</b></div></div>';
+  }).join('');
+  setHTML($('grid'),html||'<div class="empty">No pairs in the SMC feed yet.</div>');
+}
+
+/* ── rail, summaries and the conditional banner ─────────────────── */
+function renderRail(v){
+  const d=v.digits;
+  const live=tfZones(v).filter(z=>!z.spent);
+  const near=live.map(z=>({z,a:S.pipsAway(z,v.price,v.bare)})).sort((a,b)=>a.a-b.a)[0];
+
+  setTxt($('hPx'),S.fmt(v.price,d));
+  setTxt($('rPx'),S.fmt(v.price,d));
+  setTxt($('rZones'),String(live.length));
+  setTxt($('rNear'),near?(near.a===0?'in a zone':near.a.toFixed(1)+' pips'):'—');
+  const cf=live.filter(z=>S.confluenceOf(z,v.zones)).length;
+  const rc=$('rConf'); if(rc){ setTxt(rc,cf?String(cf):'none'); rc.className=cf?'gd':'mut'; }
+  const age=v.receivedAt?S.bwDate(v.receivedAt):null;
+  setTxt($('rAge'), age&&!isNaN(+age)?Math.max(0,Math.round((Date.now()-age.getTime())/1000))+'s':'—');
+
+  const hd=$('hDelta'); if(hd){ setTxt(hd,''); hd.className='hdelta n'; }
+
+  if(near){
+    const ncf=S.confluenceOf(near.z,v.zones);
+    setHTML($('nearName'),(near.z.kind==='ob'?(near.z.dir==='bull'?'Demand':'Supply'):'Gap')+
+      (ncf?' <span class="tag t-conf" style="vertical-align:middle">H1 + H4</span>':''));
+    setTxt($('nearDist'),(near.a===0?'Price is inside it':near.a.toFixed(1)+' pips away')+
+      ' · '+near.z.tf+(ncf?' · backed by '+ncf.tf:''));
+    const nb=$('nearBar'); if(nb) nb.style.width=Math.max(5,100-Math.min(near.a,40)*2.5)+'%';
+  }else{
+    setHTML($('nearName'),'—'); setTxt($('nearDist'),'No live zone on '+activeTF);
+    const nb=$('nearBar'); if(nb) nb.style.width='0%';
+  }
+
+  const bull=live.filter(z=>z.dir==='bull').length, bear=live.filter(z=>z.dir==='bear').length;
+  setTxt($('balVal'),bull+' demand · '+bear+' supply');
+  const bb=$('balBar'); if(bb) bb.style.width=((bull+bear)?bull/(bull+bear)*100:50)+'%';
+  setTxt($('balNote'), bull>bear?'More demand below than supply above'
+    :bear>bull?'More supply above than demand below'
+    :(bull+bear)?'Evenly balanced':'No live zones to weigh');
+
+  /* cross-module — pair-specific, read-only, honest about gaps */
+  const x=S.crossFor(v.bare);
+  const rows=[];
+  if(x.risk){
+    const rl=String(x.risk.level||'').toLowerCase();
+    const col=rl.indexOf('stand')>=0?'dn':rl.indexOf('elev')>=0?'gd':rl.indexOf('caut')>=0?'bl':'up';
+    /* Distinguish a LIVE reading from a historical flag. Before, both
+       read "last flagged 11h ago" in the same colour, which is how an
+       old escalation looked like a current state. */
+    rows.push(['assistant','risk','Risk Radar',
+      x.riskStale
+        ? esc(v.label)+' · no live reading — last flagged '+timeAgo(new Date(x.risk.t))
+        : esc(v.label)+' · live, updated '+timeAgo(new Date(x.risk.t)),
+      x.riskStale?'mut':col,
+      esc(x.risk.name||x.risk.level)+' · '+x.risk.score]);
+  }else{
+    rows.push(['assistant','risk','Risk Radar',esc(v.label)+' · Assistant','mut','no flag recorded']);
+  }
+  if(x.verdict){
+    const c=String(x.verdict.call||'').toUpperCase();
+    rows.push(['brain',null,'Brain verdict',esc(v.label)+' · '+esc(x.verdict.tf||'')+' · '+esc(x.verdict.when||''),
+      c==='BULLISH'?'up':c==='BEARISH'?'dn':'mut',
+      esc(x.verdict.call)+(x.verdict.conf?' · '+esc(x.verdict.conf):'')]);
+  }else{
+    rows.push(['brain',null,'Brain verdict',esc(v.label)+' · not analysed yet','mut','—']);
+  }
+  if(x.news){
+    const inTxt=x.news.mins>=60?Math.floor(x.news.mins/60)+'h '+(x.news.mins%60)+'m':x.news.mins+'m';
+    rows.push(['assistant','news','Next release',esc(x.news.title)+' · '+esc(x.news.ccy),
+      x.news.mins<60?'dn':'',inTxt]);
+  }else{
+    rows.push(['assistant','news','Next release','Nothing high-impact ahead','mut','—']);
+  }
+  setHTML($('crossList'),rows.map(r=>
+    '<button class="xrow" onclick="openModule(\''+r[0]+'\''+(r[1]?',\''+r[1]+'\'':'')+')">'+
+    '<span>'+r[2]+'<small>'+r[3]+'</small></span>'+
+    '<b class="'+r[4]+'">'+r[5]+'</b><i class="chev"></i></button>').join(''));
+
+  /* The banner fires ONLY when a live zone is in reach AND this pair is
+     actually flagged. No zone nearby, or nothing flagged, and it stays
+     away — a warning that is always on screen is furniture. */
+  const b=$('topBanner');
+  const inReach = near && near.a<=25;
+  /* A STALE flag must never raise a live alarm. This is the fix for
+     "it warned me risk was elevated, but that was 11 hours ago". */
+  const risky = x.risk && !x.riskStale && x.risk.score>=50;
+  if(inReach && risky){
+    const stand=x.risk.score>=75;
+    setHTML(b,'<div class="banner '+(stand?'bear':'warn')+'"><div style="flex:1">'+
+      '<div class="b-t '+(stand?'dn':'gd')+'">'+(stand?'Stand down — do not take this zone yet':'Zone is valid, the timing is not')+'</div>'+
+      '<div class="b-s">Price is '+(near.a===0?'inside':near.a.toFixed(1)+' pips from')+' a '+
+        (near.z.dir==='bull'?'demand':'supply')+' zone on '+near.z.tf+
+        ', and the Assistant last flagged '+esc(v.label)+' at <b>'+esc(x.risk.level)+' ('+x.risk.score+')</b>'+
+        (x.news?' with '+esc(x.news.title)+' in '+(x.news.mins<60?x.news.mins+'m':Math.floor(x.news.mins/60)+'h')+'':'')+
+        '. The level is real; this is the wrong moment to act on it.</div>'+
+      '<div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap">'+
+        '<button class="xbtn" onclick="openModule(\'assistant\',\'risk\')">Open Risk Radar</button>'+
+        '<button class="xbtn" onclick="openModule(\'brain\')">Ask the Brain</button></div>'+
+      '</div></div>');
+  }else if(inReach){
+    /* Say WHY nothing is flagged — "no live risk data" and "risk checked
+       and clear" are very different things to act on. */
+    const note = x.riskStale
+      ? 'The Assistant is not reporting live risk right now (last flag '+timeAgo(new Date(x.risk.t))+'), so this is unchecked.'
+      : (x.risk ? 'The Assistant has '+esc(v.label)+' at '+esc(x.risk.name||x.risk.level)+' ('+x.risk.score+').'
+                : 'No live risk flag for '+esc(v.label)+'.');
+    setHTML(b,'<div class="banner bull"><div style="flex:1">'+
+      '<div class="b-t up">Zone in reach, nothing flagged against it</div>'+
+      '<div class="b-s">Price is '+(near.a===0?'inside':near.a.toFixed(1)+' pips from')+' a '+
+        (near.z.dir==='bull'?'demand':'supply')+' zone on '+near.z.tf+'. '+note+'</div></div></div>');
+  }else{
+    setHTML(b,'');
+  }
+}
+
+/* ── render all ─────────────────────────────────────────────────── */
+function render(){
+  renderPairs();
+  if(!activePair) return;
+  const v=S.build(activePair);
+  renderLadder(v); renderZones(); renderStructure(v); renderAlerts(v); renderGrid(); renderRail(v);
+  wireLadder();
+  const t=new Date();
+  setTxt($('upd'),'Updated '+t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}));
+  const dot=$('liveDot');
+  if(dot){ const ok=S.ok.H1!==false||S.ok.H4!==false;
+    dot.style.background=ok?'var(--green)':'var(--red)';
+    dot.className='dot'+(ok?' live':''); }
+  const lbl=$('liveLbl'); if(lbl) setTxt(lbl, (S.ok.H1===false&&S.ok.H4===false)?'Feed down':'Live');
+}
+
+/* ── nav ────────────────────────────────────────────────────────── */
+function moveInk(t, animate){
+  const n=$('nav'), ink=$('ink');
+  if(!n||!ink||!t) return;
+  /* MOBILE SLIDING-UNDERLINE BUG — the `- n.scrollLeft` was the whole
+     problem. `.ink` is position:absolute inside `.nav`, and `.nav` is the
+     scroll container (overflow-x:auto; position:relative). An absolutely
+     positioned child of a scrolling box lives in the CONTENT coordinate
+     space and already scrolls with it, and offsetLeft is measured in that
+     same space. Subtracting scrollLeft therefore compensated a second
+     time, so the underline slid the wrong way — twice as far, in the
+     opposite direction — the moment the nav could actually scroll. On
+     desktop the nav rarely scrolls, so scrollLeft was 0 and it looked
+     fine; on a phone every tab change moved it somewhere wrong.
+     The scroll listener that called this on every scroll event made it
+     visibly chase the finger. Both are gone. */
+  if(!t.offsetWidth){                       // nav not laid out yet
+    requestAnimationFrame(()=>moveInk(t,animate));
+    return;
+  }
+  ink.style.transition = animate===false ? 'none' : '';
+  ink.style.left=(t.offsetLeft+13)+'px';
+  ink.style.width=(t.offsetWidth-26)+'px';
+  if(animate===false) requestAnimationFrame(()=>{ ink.style.transition=''; });
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');
+  const ic=t.querySelector('.ico');
+  if(ic){ ic.classList.remove('go'); void ic.offsetWidth; ic.classList.add('go'); }
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  const pg=$('p-'+t.dataset.p); if(pg) pg.classList.add('on');
+  view=t.dataset.p;
+  moveInk(t);
+  /* On a phone the tapped tab is often half off-screen; bring it fully
+     into view so the underline it just moved to is actually visible. */
+  if(t.scrollIntoView) try{ t.scrollIntoView({inline:'nearest',block:'nearest',behavior:'smooth'}); }catch(e){}
+});
+/* NO scroll listener — see moveInk(). The underline is inside the
+   scrolling content and tracks it for free. */
+window.addEventListener('resize',()=>moveInk(document.querySelector('.tab.on'),false));
+[60,400,1200].forEach(ms=>setTimeout(()=>moveInk(document.querySelector('.tab.on'),false),ms));
+/* Re-measure once webfonts land — Archivo changes tab widths, and the
+   underline was sized against the fallback font until something else
+   happened to move it. */
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>moveInk(document.querySelector('.tab.on'),false));
+
+/* ── poll — same 5s cadence as the original panel ───────────────── */
+function cycle(){ S.refresh().then(render).catch(()=>{}); }
+cycle();
+setInterval(cycle,5000);
+window.BWSMCUI={render,cycle,openModule};
+window.__cross=b=>window.BWSMC.crossFor(b);   /* test hook */
+})();
+</script>
+</body>
+</html>
