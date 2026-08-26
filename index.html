@@ -1,0 +1,3606 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<script src="/bw-source.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MT5 Trading Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/dist/chartjs-chart-financial.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/luxon@3.4.3/build/global/luxon.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js" defer></script>
+<style>
+:root,[data-theme="dark"]{
+  --bg:#09090e;--surface:#0f0f16;--card:#14141c;
+  --border:#22222e;--border2:#2e2e3e;
+  --gold:#c9820a;--gold-lt:#e09b2a;
+  --green:#17a97a;--red:#e0504f;
+  --text:#eceae0;--muted:#72706a;--muted2:#9a9890;
+  --blue:#5b87c9;
+  /* Legacy aliases — the original script writes var(--accent), var(--amber)
+     and var(--t3) directly into inline styles. Without these the confidence
+     bar and several muted labels render as nothing. */
+  --accent:#17a97a;--amber:#e09b2a;--t3:#72706a;
+}
+[data-theme="light"]{
+  --bg:#f8f7f2;--surface:#ffffff;--card:#f0ede6;
+  --border:#d8d4cc;--border2:#c8c4bc;
+  --gold:#c9820a;--gold-lt:#e09b2a;
+  --green:#0f7a54;--red:#c03838;
+  --text:#1a1814;--muted:#8a8678;--muted2:#6a6660;
+  --blue:#3d6ba8;
+  --accent:#0f7a54;--amber:#c9820a;--t3:#8a8678;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'Archivo',system-ui,-apple-system,sans-serif;
+  font-size:13px;display:flex;flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased}
+.n,.num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+
+.head{background:var(--surface);border-bottom:.5px solid var(--border);padding:12px 18px 0;flex-shrink:0}
+.hrow{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.hpair{font-size:20px;font-weight:600;letter-spacing:-.5px}
+.hpx{font-size:20px;font-weight:500}
+.hchg{font-size:12px;font-weight:600}
+.conn{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted)}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--red)}
+.conn-dot.live{background:var(--green);animation:bl 2s infinite}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.35}}
+.hstats{margin-left:auto;display:flex;gap:22px}
+.hstat b{display:block;font-size:13px;font-weight:600;line-height:1.3}
+.hstat span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+
+.tape-h{display:flex;align-items:baseline;gap:9px;margin-bottom:6px}
+.tape-l{font-size:9px;font-weight:600;letter-spacing:1.3px;color:var(--muted);text-transform:uppercase}
+.tape-s{font-size:10px;color:var(--muted)}
+.tape{position:relative;height:34px;border-radius:5px;overflow:hidden;background:var(--card);border:.5px solid var(--border)}
+.sess{position:absolute;top:0;bottom:6px;display:flex;align-items:center;padding-left:8px;
+  font-size:8.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2)}
+.sess::before{content:'';position:absolute;inset:0;background:currentColor;opacity:.13}
+.sess i{position:relative;font-style:normal}
+.sess.ov::after{content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(45deg,rgba(201,130,10,.16) 0 4px,transparent 4px 8px)}
+.ev{position:absolute;top:0;bottom:6px;width:1.5px;background:var(--red);z-index:3}
+.ev::after{content:attr(data-t);position:absolute;top:3px;left:5px;font-size:8px;font-weight:600;
+  color:var(--red);white-space:nowrap;letter-spacing:.3px}
+.ev.m{background:var(--blue)}.ev.m::after{color:var(--blue)}
+.rband{position:absolute;left:0;right:0;bottom:0;height:6px;display:flex}
+.rband i{height:100%}
+.now{position:absolute;top:0;bottom:0;width:1.5px;background:var(--gold-lt);z-index:5}
+.now::after{content:'';position:absolute;top:-2px;left:-2.75px;width:7px;height:7px;border-radius:50%;background:var(--gold-lt)}
+.hrs{display:flex;justify-content:space-between;margin:4px 0 12px}
+.hrs span{font-size:8px;color:var(--muted)}
+
+.nav{display:flex;padding:0 18px;background:var(--surface);border-bottom:.5px solid var(--border);
+  flex-shrink:0;overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav-btn{padding:10px 14px;font-size:12px;font-weight:500;color:var(--muted2);background:none;border:none;
+  cursor:pointer;position:relative;display:flex;align-items:center;gap:7px;font-family:inherit;white-space:nowrap}
+.nav-btn:hover{color:var(--text)}
+.nav-btn.active{color:var(--text);font-weight:600}
+.nav-btn.active::after{content:'';position:absolute;left:14px;right:14px;bottom:-.5px;height:1.5px;background:var(--text)}
+.nav-btn:focus-visible{outline:1.5px solid var(--gold);outline-offset:-3px}
+.nav-btn .c{font-size:9.5px;font-weight:600;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+
+.main{flex:1;display:grid;grid-template-columns:264px 1fr 250px;min-height:0}
+.col{overflow-y:auto;min-height:0}
+.sidebar{background:var(--surface);border-right:.5px solid var(--border)}
+.sidebar-right{background:var(--surface);border-left:.5px solid var(--border)}
+.scroll{padding:16px;display:flex;flex-direction:column;gap:14px}
+.sec{padding:16px}
+.sec+.sec{border-top:.5px solid var(--border)}
+.sec-h{font-size:9px;font-weight:600;letter-spacing:1.3px;color:var(--muted);text-transform:uppercase;
+  margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+
+#watchlist{display:flex;flex-direction:column;gap:2px}
+.pair-row{display:grid;grid-template-columns:3px 1fr auto;column-gap:13px;align-items:center;
+  min-height:60px;padding:10px 12px;cursor:pointer;border-radius:6px;transition:background .12s}
+.pair-row:hover{background:var(--card)}
+.pair-row.active{background:var(--card);box-shadow:inset 3px 0 0 var(--gold)}
+.wl-bar{width:3px;height:30px;border-radius:2px;justify-self:center;background:var(--border2)}
+.wl-l{min-width:0;display:flex;flex-direction:column;gap:4px}
+.pair-name{font-size:13px;font-weight:600;line-height:1.2}
+.wl-note{font-size:10px;color:var(--muted);line-height:1.2;display:flex;align-items:center;gap:6px}
+.wl-risk{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--border2);display:inline-block}
+.wl-riskwrap{display:flex;align-items:center;gap:4px;line-height:1}
+/* LIVE TRADES PULSE — nothing on the nav told the user they had open
+   positions at all. Red while the book is down, green while it is up,
+   hidden when there are no open trades. Under prefers-reduced-motion it
+   stays as a solid dot rather than pulsing. */
+.tr-dot{display:none;width:7px;height:7px;border-radius:50%;margin-left:6px;
+  vertical-align:middle;flex-shrink:0}
+.tr-dot.on{display:inline-block}
+.tr-dot.up{background:var(--green);box-shadow:0 0 0 0 rgba(23,169,122,.6);animation:trPulseUp 1.6s infinite}
+.tr-dot.dn{background:var(--red);box-shadow:0 0 0 0 rgba(224,80,79,.6);animation:trPulseDn 1.1s infinite}
+@keyframes trPulseUp{0%{box-shadow:0 0 0 0 rgba(23,169,122,.55)}70%{box-shadow:0 0 0 6px rgba(23,169,122,0)}100%{box-shadow:0 0 0 0 rgba(23,169,122,0)}}
+@keyframes trPulseDn{0%{box-shadow:0 0 0 0 rgba(224,80,79,.6)}70%{box-shadow:0 0 0 7px rgba(224,80,79,0)}100%{box-shadow:0 0 0 0 rgba(224,80,79,0)}}
+@media (prefers-reduced-motion:reduce){.tr-dot.up,.tr-dot.dn{animation:none}}
+.err-n{display:inline-block;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:4px;background:var(--border2);color:var(--text);font-size:9.5px;font-weight:700;font-family:'IBM Plex Mono',monospace;margin-right:2px}
+.wl-risklbl{font-size:8.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.wl-r{text-align:right;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+.pair-price{font-size:12.5px;font-weight:500;line-height:1.2;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.pair-change{font-size:10px;line-height:1.2;font-family:'IBM Plex Mono',monospace}
+
+.kv,.acct-row,.ind-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 0;font-size:11.5px}
+.kv+.kv,.acct-row+.acct-row,.ind-row+.ind-row{border-top:.5px solid var(--border)}
+.acct-lbl,.ind-lbl,.kv span{color:var(--muted2)}
+.kv b{font-weight:600;text-align:right}
+
+/* The original updateSignalBias() sets box.className='signal-box buy|sell|wait'
+   OUTRIGHT, which wipes any extra class. So every base style has to live on
+   .signal-box itself, never on a companion class. */
+.signal-box{border-radius:7px;padding:16px 12px;text-align:center;border:.5px solid var(--border2);
+  background:var(--card);transition:border-color .3s,background .3s}
+.signal-box.buy{border-color:rgba(23,169,122,.35);background:rgba(23,169,122,.07)}
+.signal-box.sell{border-color:rgba(224,80,79,.35);background:rgba(224,80,79,.07)}
+.signal-box.wait{border-color:var(--border2)}
+.signal-val{font-size:24px;font-weight:700;letter-spacing:1.5px;line-height:1}
+.signal-sub{font-size:10.5px;color:var(--muted2);margin-top:6px;line-height:1.45}
+.progress-bar{height:4px;border-radius:2px;background:var(--border);overflow:hidden;margin-top:11px}
+.progress-fill{display:block;height:100%;border-radius:2px;transition:width .4s}
+.sig-scale{display:flex;justify-content:space-between;margin-top:5px}
+.sig-scale span{font-size:8px;color:var(--muted)}
+
+.verdict{display:grid;grid-template-columns:auto 1fr auto;gap:20px;align-items:center;
+  background:var(--surface);border:.5px solid var(--border);border-radius:8px;padding:18px}
+.dial{width:70px;height:70px;position:relative;display:grid;place-items:center}
+.dial svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.dial b{font-size:21px;font-weight:600}
+.v-w{font-size:22px;font-weight:600;letter-spacing:-.6px;line-height:1.15}
+.v-l{font-size:12px;color:var(--muted2);margin-top:6px;line-height:1.55;max-width:56ch}
+.chks{display:flex;flex-direction:column;gap:7px}
+.chk{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted2);white-space:nowrap}
+.chk i{width:14px;height:14px;border-radius:3px;display:grid;place-items:center;font-style:normal;
+  font-size:9px;font-weight:700;flex-shrink:0}
+.chk.y i{background:rgba(23,169,122,.15);color:var(--green)}
+.chk.n i{background:rgba(224,80,79,.15);color:var(--red)}
+.chk.w i{background:rgba(201,130,10,.15);color:var(--gold-lt)}
+@media (max-width:900px){.verdict{grid-template-columns:1fr;gap:16px}}
+
+.card{background:var(--surface);border:.5px solid var(--border);border-radius:8px;padding:15px 16px}
+.card-title{font-size:9px;font-weight:600;letter-spacing:1.3px;color:var(--muted);text-transform:uppercase;
+  margin-bottom:13px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.metric-val{font-size:25px;font-weight:600;letter-spacing:-.8px;line-height:1.1}
+.metric-sub{font-size:10.5px;color:var(--muted);margin-top:4px}
+
+.rsi-track{position:relative;height:26px;border-radius:4px;overflow:hidden;background:var(--card);border:.5px solid var(--border)}
+.rsi-zone{position:absolute;top:0;bottom:0}
+.rsi-mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--text);z-index:3}
+.rsi-mark::after{content:'';position:absolute;top:-3px;left:-3px;width:8px;height:8px;border-radius:50%;background:var(--text)}
+.rsi-prev{position:absolute;top:0;bottom:0;width:1px;background:var(--muted);opacity:.7}
+.rsi-scale{display:flex;justify-content:space-between;margin-top:4px}
+.rsi-scale span{font-size:8px;color:var(--muted)}
+
+#chartContainer{position:relative;height:280px}
+.chart-no-data{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:var(--muted);pointer-events:none}
+.tf-tabs{display:inline-flex;border:.5px solid var(--border);border-radius:5px;overflow:hidden;
+  background:var(--bg);flex-shrink:0}
+.tf-tab{padding:4px 13px;font-size:10.5px;font-weight:600;border:none;border-radius:0;
+  background:none;color:var(--muted);cursor:pointer;font-family:'IBM Plex Mono',monospace;
+  letter-spacing:.3px;transition:color .15s,background .15s;line-height:1.5}
+.tf-tab+.tf-tab{border-left:.5px solid var(--border)}
+.tf-tab:hover{color:var(--text)}
+.tf-tab.active{background:var(--card);color:var(--text)}
+.tf-tab:focus-visible{outline:1.5px solid var(--gold);outline-offset:-2px}
+
+.pattern-row,.row{display:flex;align-items:flex-start;gap:11px;padding:10px 0}
+.pattern-row+.pattern-row,.row+.row{border-top:.5px solid var(--border)}
+.pname,.row-t{font-size:12px;font-weight:600;line-height:1.4}
+.pmeta,.row-s{font-size:10.5px;color:var(--muted2);margin-top:3px;line-height:1.5}
+.pconf,.conf{font-size:11.5px;font-weight:600;margin-left:auto;flex-shrink:0}
+.dir-tag,.tag,.impact,.conf-pill,.ttype{display:inline-block;font-size:8px;font-weight:600;letter-spacing:.6px;
+  padding:2px 6px;border-radius:3px;text-transform:uppercase;border:.5px solid transparent}
+.dir-bullish,.t-bull,.impact.low,.ttype.buy{color:var(--green);border-color:rgba(23,169,122,.3)}
+.dir-bearish,.t-bear,.impact.high,.ttype.sell{color:var(--red);border-color:rgba(224,80,79,.3)}
+.t-tf{color:var(--blue);border-color:rgba(91,135,201,.3)}
+.t-gold,.impact.medium{color:var(--gold-lt);border-color:rgba(201,130,10,.3)}
+.dir-neutral,.t-mute{color:var(--muted);border-color:var(--border2)}
+.conf-high{color:var(--green);border-color:rgba(23,169,122,.3)}
+.conf-med{color:var(--gold-lt);border-color:rgba(201,130,10,.3)}
+.conf-low{color:var(--muted);border-color:var(--border2)}
+
+.tbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.tbl th{text-align:left;font-size:8.5px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;
+  padding:0 6px 7px;border-bottom:.5px solid var(--border);font-weight:600}
+.tbl td{padding:9px 6px;border-bottom:.5px solid var(--border)}
+.tbl tr:last-child td{border-bottom:none}
+
+.alert-feed{display:flex;flex-direction:column}
+.alert-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:.5px solid var(--border)}
+.alert-item:last-child{border-bottom:none}
+.alert-dot{width:5px;height:5px;border-radius:50%;margin-top:6px;flex-shrink:0}
+.alert-dot.bull{background:var(--green)}.alert-dot.bear{background:var(--red)}.alert-dot.neutral{background:var(--muted)}
+.alert-body{flex:1;min-width:0}
+.alert-name{font-size:12px;font-weight:600;line-height:1.4}
+.alert-meta{font-size:10.5px;color:var(--muted2);margin-top:3px}
+.alert-desc{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5}
+.alert-time{font-size:9.5px;color:var(--muted);white-space:nowrap;flex-shrink:0;
+  font-family:'IBM Plex Mono',monospace}
+.alert-group{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;
+  border-bottom:.5px solid var(--border)}
+.alert-group-time{font-size:10px;font-weight:600;color:var(--muted2);font-family:'IBM Plex Mono',monospace}
+.alert-group-count{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.alert-counts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.alert-count-box{text-align:center}
+.alert-count-val{font-size:20px;font-weight:600;font-family:'IBM Plex Mono',monospace}
+.alert-count-lbl{font-size:9px;color:var(--muted);margin-top:2px}
+
+.news-item{padding:10px 0;border-bottom:.5px solid var(--border)}
+.news-item:last-child{border-bottom:none}
+.news-time{font-size:9.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:4px}
+.news-title{font-size:12px;font-weight:600;line-height:1.4}
+.news-meta{font-size:10.5px;color:var(--muted2);margin-top:3px}
+
+.error-item{display:flex;gap:11px;padding:10px 0;border-bottom:.5px solid var(--border)}
+.error-item:last-child{border-bottom:none}
+.etitle{font-size:12px;font-weight:600;line-height:1.4}
+.edesc{font-size:10.5px;color:var(--muted2);margin-top:3px;line-height:1.5}
+.efix{font-size:10.5px;color:var(--gold-lt);margin-top:4px}
+
+.alert-bar{display:none;align-items:center;gap:9px;padding:9px 12px;border-radius:7px;
+  background:rgba(201,130,10,.09);border:.5px solid rgba(201,130,10,.3);margin-bottom:2px}
+.alert-bar.show{display:flex}
+.atext{font-size:11.5px;color:var(--gold-lt);font-weight:500}
+
+.tab-content{display:none;flex-direction:column;gap:14px}
+.tab-content.active{display:flex}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.muted,.mut{color:var(--muted)}
+.green,.up{color:var(--green)}.red,.dn{color:var(--red)}.amber,.gd{color:var(--gold-lt)}.blue{color:var(--blue)}
+.note{font-size:10px;color:var(--muted);line-height:1.6;margin-top:11px}
+.chart-wrap{position:relative;width:100%}
+
+/* ── IFRAME FIT ───────────────────────────────────────────────────
+   This module renders inside blackwood_dashboard.html, where the frame
+   is flex:1 UNDER a topnav and a url-bar — so it starts with roughly
+   100px less height than a standalone page. Below ~820px of viewport
+   height the header chrome compresses so the actual content still gets
+   the room, rather than the tape and titles eating the frame. */
+/* NOTE: these rules were lost when I reverted the rail change — that revert
+   removed a span of CSS that happened to contain them, which left the
+   Patterns / Pattern Alerts filter buttons completely unstyled and the
+   tables without their scroll wrapper. */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl-wrap .tbl{min-width:520px}
+
+/* Timeframe / filter control on the Patterns and Pattern Alerts tabs —
+   a joined segment, the same shape as the chart's H1/H4 control, so both
+   read as the same kind of switch. */
+.seg{display:inline-flex;border:.5px solid var(--border);border-radius:5px;overflow:hidden;
+  background:var(--bg);flex-shrink:0;vertical-align:middle}
+.seg-btn{padding:4px 13px;font-size:10.5px;font-weight:600;background:none;border:none;
+  cursor:pointer;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:.3px;
+  line-height:1.5;transition:color .15s,background .15s;white-space:nowrap}
+.seg-btn+.seg-btn{border-left:.5px solid var(--border)}
+.seg-btn:hover{color:var(--text)}
+.seg-btn.on{background:var(--card);color:var(--text)}
+.seg-btn:focus-visible{outline:1.5px solid var(--gold);outline-offset:-2px}
+.err-dot{width:6px;height:6px;border-radius:50%;background:var(--red);display:none}
+
+/* Switching filter must not resize the card. Without a floor, H4 having
+   fewer rows than "All" collapses the panel and the page jumps — that is
+   the twitch on switching timeframe. */
+#tab-patterns .card-title,#tab-alerts .card-title{min-height:26px}
+#patternList,#alertFeed{min-height:150px}
+
+@media (max-height:820px){
+  .head{padding:9px 16px 0}
+  .hrow{margin-bottom:8px;gap:12px}
+  .hpair,.hpx{font-size:17px}
+  .hstats{gap:16px}
+  .tape{height:26px}
+  .tape-h{margin-bottom:4px}
+  .tape-s{display:none}
+  .hrs{margin:3px 0 8px}
+  .nav-btn{padding:8px 12px}
+  .scroll{padding:12px;gap:11px}
+  .card{padding:12px 14px}
+  #chartContainer{height:230px}
+  .verdict{padding:14px;gap:16px}
+}
+@media (max-height:660px){
+  /* The tape is NOT hidden here. Inside the dashboard iframe the frame is
+     routinely under 660px tall (browser chrome + the shell's topnav and url
+     bar), so a display:none at this breakpoint removed the session tape in
+     production while it looked fine in a standalone window — the same trap
+     as the rail. It compresses instead. */
+  .tape{height:24px}
+  .sess{font-size:8px}
+  .ev::after{display:none}
+  .tape-s{display:none}
+  .hrs{margin:2px 0 6px}
+  #chartContainer{height:200px}
+}
+@media (max-width:1280px){.main{grid-template-columns:244px 1fr}.sidebar-right{display:none}}
+@media (max-width:860px){
+  /* Scroll stability. The page wobbled because the header, the nav strip
+     and the page itself could all scroll at once: a mostly-vertical drag
+     that started on the horizontally-scrollable nav got claimed by the
+     nav, and the body bounced past its own end. The nav is pinned and
+     told to accept horizontal gestures only; the page owns vertical. */
+  html{-webkit-text-size-adjust:100%}
+  body{overflow-x:hidden;overflow-y:auto;height:auto;font-size:13px;
+    overscroll-behavior-y:contain}
+  /* Only the NAV pins. Making the header sticky too would have stacked
+     both at top:0 and let the nav slide over the price. */
+  .nav{position:sticky;top:0;z-index:29;background:var(--surface);
+    box-shadow:0 1px 0 var(--border);
+    touch-action:pan-x;overscroll-behavior-x:contain}
+  #watchlist{touch-action:pan-x;overscroll-behavior-x:contain}
+  .tbl-wrap{touch-action:pan-x;overscroll-behavior-x:contain}
+  .main{display:flex;flex-direction:column;min-height:0}
+  .col{overflow:visible}
+  .sidebar{border-right:none;border-bottom:.5px solid var(--border)}
+  .sidebar-right{border-left:none;border-top:.5px solid var(--border)}
+  .grid2,.grid3{grid-template-columns:1fr;gap:11px}
+  .scroll{padding:12px;gap:11px}
+  .sec{padding:13px 12px}
+
+  .head{padding:10px 12px 0}
+  .hrow{gap:9px;margin-bottom:9px}
+  .hpair,.hpx{font-size:17px}
+  .conn{order:3;width:100%}
+  .hstats{width:100%;margin-left:0;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .hstat{text-align:left}
+  .hstat b{font-size:12px}
+  .nav{padding:0 12px}
+  .nav-btn{padding:9px 11px;font-size:11.5px}
+
+  #watchlist{flex-direction:row;overflow-x:auto;gap:8px;padding-bottom:4px;
+    scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  .pair-row{min-width:148px;flex:0 0 auto;grid-template-columns:3px 1fr;
+    column-gap:10px;row-gap:6px;min-height:0;padding:10px;
+    border:.5px solid var(--border);scroll-snap-align:start}
+  .pair-row.active{box-shadow:inset 3px 0 0 var(--gold);border-color:var(--border2)}
+  .wl-bar{height:100%;min-height:34px}
+  .wl-r{grid-column:2;text-align:left;align-items:flex-start;flex-direction:row;gap:9px}
+  .wl-note{white-space:normal}
+
+  .verdict{grid-template-columns:1fr;gap:14px;padding:15px}
+  .chks{flex-direction:row;flex-wrap:wrap;gap:8px 14px}
+  .v-w{font-size:19px}
+  #chartContainer{height:220px}
+  .rr-banner{gap:12px;padding:14px}
+  .rr-gauge{width:120px;height:62px}
+  .rr-bscore{font-size:28px}
+  .metric-val{font-size:22px}
+}
+@media (max-width:460px){
+  .hstats{grid-template-columns:repeat(2,1fr)}
+  .nav-btn{padding:9px 9px;font-size:11px}
+  .scroll{padding:10px}
+  #chartContainer{height:190px}
+  .chks{flex-direction:column;gap:6px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.rr-navpill{font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;letter-spacing:.4px;margin-left:2px;
+  background:var(--card);color:var(--muted);font-family:'IBM Plex Mono',monospace}
+.rr-banner{display:flex;gap:16px;align-items:center;padding:18px;border-radius:8px;
+  border:.5px solid var(--border);background:var(--surface);flex-wrap:wrap;transition:all .5s}
+.rr-bscore{font-size:34px;font-weight:600;letter-spacing:-1.5px;line-height:1;
+  font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.rr-bstate{font-size:20px;font-weight:600;letter-spacing:-.5px}
+.rr-badvice{font-size:12px;color:var(--muted2);margin-top:5px;line-height:1.55}
+.rr-gauge{width:140px;height:72px}
+.rr-spark{width:100%;height:52px}
+.rr-factor{display:flex;gap:11px;align-items:flex-start;padding:10px 0}
+.rr-factor+.rr-factor{border-top:.5px solid var(--border)}
+.rr-fw{font-size:12px;font-weight:600;min-width:36px;text-align:right;
+  font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.rr-cd{font-family:'IBM Plex Mono',monospace}
+.rr-fbody{flex:1;min-width:0}
+.rr-flabel{font-size:12px;font-weight:600;display:flex;align-items:center;gap:7px;flex-wrap:wrap;line-height:1.4}
+.rr-fcat{font-size:8px;font-weight:600;letter-spacing:.6px;padding:2px 6px;border-radius:3px;
+  border:.5px solid var(--border2);color:var(--muted);text-transform:uppercase}
+.rr-tf{font-size:8px;font-weight:600;letter-spacing:.5px;padding:2px 6px;border-radius:3px;
+  border:.5px solid rgba(91,135,201,.3);color:var(--blue)}
+.rr-fdetail{font-size:10.5px;color:var(--muted2);margin-top:3px;line-height:1.5}
+.rr-fbar{height:3px;border-radius:2px;margin-top:7px;background:var(--border);overflow:hidden}
+.rr-fbar>i{display:block;height:100%;border-radius:2px;transition:width .4s}
+.rr-empty{font-size:11.5px;color:var(--muted);padding:8px 0}
+.rr-tier{display:inline-block;padding:2px 6px;border-radius:3px;font-size:8px;font-weight:600;
+  letter-spacing:.5px;text-transform:uppercase;border:.5px solid transparent}
+.rr-tier-extreme{color:var(--red);border-color:rgba(224,80,79,.35)}
+.rr-tier-high{color:var(--gold-lt);border-color:rgba(201,130,10,.35)}
+.rr-tier-medium{color:var(--blue);border-color:rgba(91,135,201,.3)}
+.rr-tier-low{color:var(--muted);border-color:var(--border2)}
+.rr-tag{display:inline-block;padding:2px 6px;border-radius:3px;font-size:8.5px;font-weight:700;
+  letter-spacing:.4px;margin-left:6px}
+.rr-contrib{display:flex;align-items:center;gap:9px;padding:7px 0;font-size:11.5px}
+.rr-contrib+.rr-contrib{border-top:.5px solid var(--border)}
+.rr-cbar{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.rr-cbar>i{display:block;height:100%;border-radius:2px;transition:width .4s}
+.rr-dot{width:6px;height:6px;border-radius:50%;display:inline-block;background:var(--border2)}
+.rr-cdot{width:6px;height:6px;border-radius:50%;display:inline-block;background:var(--border2);margin-right:5px}
+</style>
+</head>
+<body>
+
+<header class="head">
+  <div class="hrow">
+    <span class="hpair" id="topSymbol">—</span>
+    <span class="hpx n" id="topBid">—</span>
+    <span class="hchg n" id="currentPrice" style="display:none"></span>
+    <div class="conn"><span class="conn-dot" id="connDot"></span><span id="connLabel">Connecting…</span></div>
+    <div class="hstats">
+      <div class="hstat"><b class="n" id="topSpread">—</b><span>Spread</span></div>
+      <div class="hstat"><b class="n" id="topEquity">—</b><span>Equity</span></div>
+      <div class="hstat"><b class="n" id="symVal">—</b><span>Symbol</span></div>
+      <div class="hstat"><b class="n" id="clock">—</b><span>UTC</span></div>
+    </div>
+  </div>
+  <div class="tape-h"><span class="tape-l">Session tape</span>
+    <span class="tape-s">Sessions, scheduled releases and risk shading across 24 hours</span></div>
+  <div class="tape" id="sessionTape"></div>
+  <div class="hrs" id="tapeHours"></div>
+</header>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="switchTab('signal',this)">Signal</button>
+  <button class="nav-btn" onclick="switchTab('patterns',this)">Patterns <span class="c" id="badgePatterns">0</span></button>
+  <button class="nav-btn" onclick="switchTab('alerts',this)">Pattern Alerts <span class="c" id="badgeAlerts">0</span></button>
+  <button class="nav-btn" onclick="switchTab('news',this)">High Impact News</button>
+  <button class="nav-btn" onclick="switchTab('risk',this)">Risk Radar<span class="rr-navpill" id="rr-navpill">0</span></button>
+  <button class="nav-btn" onclick="switchTab('trades',this)">Live Trades<i class="tr-dot" id="tradeDot"></i></button>
+  <button class="nav-btn" onclick="switchTab('errors',this)">Trade Errors <span class="err-dot" id="badgeErrors"></span></button>
+  <button class="nav-btn" onclick="switchTab('performance',this)">Performance</button>
+</nav>
+
+<div class="main">
+  <aside class="col sidebar">
+    <div class="sec">
+      <div class="sec-h"><span>Watchlist</span><span class="muted" style="letter-spacing:0;text-transform:none">Live</span></div>
+      <div id="watchlist">
+        <div class="pair-row active" data-sym="EURUSD">
+          <div class="wl-l"><div class="pair-name">EUR/USD</div>
+            <div class="wl-note"><span class="wl-note-text">—</span></div></div>
+          <div class="wl-r"><div class="pair-price" id="pw-EURUSD">—</div>
+            <div class="pair-change" id="chg-EURUSD">—</div></div>
+        </div>
+        <div class="pair-row" data-sym="GBPUSD">
+          <div class="wl-l"><div class="pair-name">GBP/USD</div>
+            <div class="wl-note"><span class="wl-note-text">—</span></div></div>
+          <div class="wl-r"><div class="pair-price" id="pw-GBPUSD">—</div>
+            <div class="pair-change" id="chg-GBPUSD">—</div></div>
+        </div>
+        <div class="pair-row" data-sym="USDJPY">
+          <div class="wl-l"><div class="pair-name">USD/JPY</div>
+            <div class="wl-note"><span class="wl-note-text">—</span></div></div>
+          <div class="wl-r"><div class="pair-price" id="pw-USDJPY">—</div>
+            <div class="pair-change" id="chg-USDJPY">—</div></div>
+        </div>
+        <div class="pair-row" data-sym="XAUUSD">
+          <div class="wl-l"><div class="pair-name">XAU/USD</div>
+            <div class="wl-note"><span class="wl-note-text">—</span></div></div>
+          <div class="wl-r"><div class="pair-price" id="pw-XAUUSD">—</div>
+            <div class="pair-change" id="chg-XAUUSD">—</div></div>
+        </div>
+        <div class="pair-row" data-sym="USDCHF">
+          <div class="wl-l"><div class="pair-name">USD/CHF</div>
+            <div class="wl-note"><span class="wl-note-text">—</span></div></div>
+          <div class="wl-r"><div class="pair-price" id="pw-USDCHF">—</div>
+            <div class="pair-change" id="chg-USDCHF">—</div></div>
+        </div>
+        <div class="pair-row" data-sym="GBPJPY">
+          <div class="wl-l"><div class="pair-name">GBP/JPY</div>
+            <div class="wl-note"><span class="wl-note-text">—</span></div></div>
+          <div class="wl-r"><div class="pair-price" id="pw-GBPJPY">—</div>
+            <div class="pair-change" id="chg-GBPJPY">—</div></div>
+        </div>
+      </div>
+      <div class="note">Left edge shows bias — green up, red down, grey undecided. The dot beside each pair is its Risk Radar state.</div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h"><span>Combined signal</span><span class="muted" style="letter-spacing:0;text-transform:none">All signals</span></div>
+      <div class="sig signal-box wait" id="signalBox">
+        <div class="signal-val muted" id="signalVal">—</div>
+        <div class="signal-sub" id="signalSub">Waiting for data…</div>
+        <div class="progress-bar"><span class="progress-fill" id="signalBar" style="width:0%"></span></div>
+        <div class="sig-scale"><span>Sell</span><span>Wait</span><span>Buy</span></div>
+      </div>
+      <div class="note">Every signal the Assistant tracks, reduced to one reading. Above 58% is a buy, below 42% a sell, anything between is wait.</div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h">Account</div>
+      <div class="acct-row"><span class="acct-lbl">Balance</span><span class="n" id="acctBalance">—</span></div>
+      <div class="acct-row"><span class="acct-lbl">Equity</span><span class="n" id="acctEquity">—</span></div>
+      <div class="acct-row"><span class="acct-lbl">Open P&amp;L</span><span class="n" id="acctProfit">—</span></div>
+      <div class="acct-row"><span class="acct-lbl">Free margin</span><span class="n" id="acctFree">—</span></div>
+      <div class="acct-row"><span class="acct-lbl">Margin level</span><span class="n" id="acctMargin">—</span></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h"><span>Indicators</span><span class="muted" id="tfVal" style="letter-spacing:0;text-transform:none">—</span></div>
+      <div class="ind-row"><span class="ind-lbl">RSI (14)</span><span class="n" id="rsiVal">—</span></div>
+      <div class="ind-row"><span class="ind-lbl" id="ema20Key">EMA 20</span><span class="n" id="ema20Val">—</span></div>
+      <div class="ind-row"><span class="ind-lbl" id="ema50Key">EMA 50</span><span class="n" id="ema50Val">—</span></div>
+      <div class="ind-row"><span class="ind-lbl">Trend</span><span id="trendVal">—</span></div>
+      <div class="ind-row"><span class="ind-lbl" id="spreadKey">Spread</span><span class="n" id="dayHigh">—</span></div>
+      <div class="ind-row"><span class="ind-lbl">Day low</span><span class="n" id="dayLow">—</span></div>
+    </div>
+  </aside>
+
+  <main class="col scroll" id="mainScroll">
+    <div class="alert-bar" id="alertBar"><span class="atext" id="alertText"></span></div>
+
+    <!-- SIGNAL -->
+    <div class="tab-content active" id="tab-signal">
+
+      <div class="verdict" id="verdictBlock">
+        <div class="dial">
+          <svg viewBox="0 0 70 70"><circle cx="35" cy="35" r="30" fill="none" stroke="var(--border)" stroke-width="5"/>
+            <circle cx="35" cy="35" r="30" fill="none" stroke="var(--muted)" stroke-width="5" stroke-linecap="round"
+              stroke-dasharray="188" stroke-dashoffset="188" id="verdictArc"/></svg>
+          <b class="n" id="verdictScore">—</b>
+        </div>
+        <div>
+          <div class="v-w" id="verdictWord">Waiting for data</div>
+          <div class="v-l" id="verdictLine">The Assistant needs candles, indicators and patterns from MT5 before it can call a setup.</div>
+        </div>
+        <div class="chks" id="verdictChecks"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span id="chartTitle">Price</span>
+          <span class="tf-tabs"><button class="tf-tab active" id="tfH1" onclick="switchChartTF('H1',this)">H1</button><button class="tf-tab" id="tfH4" onclick="switchChartTF('H4',this)">H4</button></span></div>
+        <div id="chartContainer" class="chart-wrap">
+          <canvas id="priceChart"></canvas>
+          <div class="chart-no-data" id="chartNoData">Waiting for candle data from MT5…</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>RSI momentum</span><span class="muted" style="text-transform:none;letter-spacing:0">14 period</span></div>
+        <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:12px">
+          <span class="metric-val n" id="rsiSignalVal">—</span>
+          <span><span class="tag t-mute" id="rsiState">—</span>
+          <span class="muted" style="font-size:11px;margin-left:8px" id="rsiDelta"></span></span>
+        </div>
+        <div class="rsi-track" id="rsiTrack"></div>
+        <div class="rsi-scale"><span>0</span><span>30</span><span>50</span><span>70</span><span>100</span></div>
+        <div class="note" id="rsiSignalSub">The faint line is where RSI sat a few readings ago, so direction is visible as well as level.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>Combined signal — what agrees</span>
+          <span class="muted" id="agreeCount" style="text-transform:none;letter-spacing:0"></span></div>
+        <div id="signalParts"></div>
+        <div class="note">Signals marked <b>against</b> disagree with the verdict. Disagreement is the useful part — six signals all pointing the same way is rarer than it looks.</div>
+      </div>
+
+      <div class="grid3">
+        <div class="card"><div class="card-title">Trend</div>
+          <div class="metric-val" id="trendSignalVal">—</div>
+          <div class="metric-sub" id="trendSignalSub">EMA 20 vs EMA 50</div></div>
+        <div class="card"><div class="card-title">Key levels</div>
+          <div class="kv" style="padding-top:0"><span>Day high</span><b class="n" id="keyHigh">—</b></div>
+          <div class="kv"><span>Day low</span><b class="n" id="keyLow">—</b></div></div>
+        <div class="card"><div class="card-title"><span>Session</span>
+            <span class="muted" id="sessClock" style="text-transform:none;letter-spacing:0"></span></div>
+          <div class="metric-val" style="font-size:18px" id="sessNow">—</div>
+          <div class="metric-sub" id="sessNote">Current trading session</div>
+          <div class="meter"><i id="sessMeter" style="width:0%;background:var(--gold)"></i></div>
+          <div class="kv" style="padding-bottom:0"><span>Liquidity</span><b id="sessLiq">—</b></div>
+          <div class="kv"><span id="sessNextLbl">Next session</span><b id="sessNext">—</b></div></div>
+      </div>
+    </div>
+
+    <!-- PATTERNS -->
+    <div class="tab-content" id="tab-patterns">
+      <div class="card">
+        <div class="card-title"><span id="patternCardTitle">Detected patterns</span></div>
+        <div id="patternList"></div>
+        <div class="note">Live view — what is forming on the current candle. It clears as the candle changes. Confirmed patterns on closed candles appear under Pattern Alerts.</div>
+      </div>
+    </div>
+
+    <!-- PATTERN ALERTS -->
+    <div class="tab-content" id="tab-alerts">
+      <div class="grid3">
+        <div class="card"><div class="card-title">Bullish</div>
+          <div class="metric-val green" id="cntBull">0</div><div class="metric-sub">Alerts today</div></div>
+        <div class="card"><div class="card-title">Bearish</div>
+          <div class="metric-val red" id="cntBear">0</div><div class="metric-sub">Alerts today</div></div>
+        <div class="card"><div class="card-title">Neutral</div>
+          <div class="metric-val muted" id="cntNeut">0</div><div class="metric-sub">Alerts today</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>Alert feed</span>
+          <span class="seg">
+            <button class="seg-btn on" onclick="setAlertFilter('All',this)">All</button>
+            <button class="seg-btn" onclick="setAlertFilter('H1',this)">H1</button>
+            <button class="seg-btn" onclick="setAlertFilter('H4',this)">H4</button>
+          </span></div>
+        <div class="alert-feed" id="alertFeed"></div>
+        <div class="note">Click any alert to jump to that pair and timeframe. Alerts fired while a pair was flagged carry the Risk Radar state — tagged, never hidden.</div>
+      </div>
+    </div>
+
+    <!-- HIGH IMPACT NEWS -->
+    <div class="tab-content" id="tab-news">
+      <div class="card">
+        <div class="card-title"><span>Upcoming releases</span><span class="muted" style="text-transform:none;letter-spacing:0">Next 24 hours</span></div>
+        <div id="newsUpcoming"></div>
+        <div id="newsFeed" style="display:none"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Release tiers</div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Event</th><th>Ccy</th><th>Feed impact</th><th>Assigned tier</th><th>Points</th><th>Source</th></tr></thead>
+        <tbody id="rr-cls"></tbody></table></div>
+        <div class="note">The calendar feed only labels events high, medium or low, which puts a rate decision in the same bucket as a second-tier print. Proven movers are promoted to <b>extreme</b> so the risk score weights them properly.</div>
+      </div>
+    </div>
+
+    <!-- RISK RADAR -->
+    <div class="tab-content" id="tab-risk">
+      <div class="rr-banner" id="rr-banner">
+        <div style="text-align:center;min-width:70px">
+          <div class="rr-bscore" id="rr-score">0</div>
+          <div style="font-size:9px;color:var(--muted);letter-spacing:.8px;font-weight:600">/100</div>
+        </div>
+        <canvas class="rr-gauge" id="rr-gauge"></canvas>
+        <div style="flex:1;min-width:180px">
+          <div class="rr-bstate" id="rr-state">—</div>
+          <div class="rr-badvice" id="rr-advice">Waiting for data…</div>
+          <div class="note" id="rr-since" style="margin-top:4px"></div>
+        </div>
+        <div style="width:180px"><canvas class="rr-spark" id="rr-spark"></canvas>
+          <div style="font-size:9px;color:var(--muted);text-align:right">recent history</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>Why this score</span>
+          <span id="rr-fcount" class="muted" style="text-transform:none;letter-spacing:0"></span></div>
+        <div id="rr-factors"></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><div class="card-title">News window — this pair's currencies</div><div id="rr-news"></div></div>
+        <div class="card"><div class="card-title">Whole book</div><div id="rr-book"></div></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><div class="card-title">Scoring bands</div>
+          <div class="kv"><span><i style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:8px"></i>Clear</span><b class="n muted">0–24</b></div>
+          <div class="kv"><span><i style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--blue);margin-right:8px"></i>Caution</span><b class="n muted">25–49</b></div>
+          <div class="kv"><span><i style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold-lt);margin-right:8px"></i>Elevated</span><b class="n muted">50–74</b></div>
+          <div class="kv"><span><i style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--red);margin-right:8px"></i>Stand down</span><b class="n muted">75–100</b></div>
+          <div class="note">A higher state must hold for two cycles before it shows, and a lower one for three, so the panel cannot flicker.</div></div>
+        <div class="card"><div class="card-title">Escalation notice</div>
+          <div id="rr-tg" class="note">No warning sent yet. Notices fire only when a pair escalates into Elevated or Stand down.</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Warning outcome log</div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Time</th><th>Pair</th><th>State</th><th>Top factors</th><th>+15m</th><th>+60m</th></tr></thead>
+        <tbody id="rr-log"></tbody></table></div>
+        <div class="note">Every escalation is recorded with the price at the time, then pips moved 15 and 60 minutes later. Stored on this device.</div>
+      </div>
+    </div>
+
+    <!-- LIVE TRADES -->
+    <div class="tab-content" id="tab-trades">
+      <div class="card"><div class="card-title">Open positions — live from MT5</div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pair</th><th>Type</th><th>Lots</th><th>Entry</th><th>Current</th><th>SL</th><th>TP</th><th>P&amp;L</th><th>Risk</th></tr></thead>
+        <tbody id="openTradesBody"></tbody></table></div></div>
+      <div class="card"><div class="card-title">Recent closed trades — last 30 days</div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Closed</th><th>Pair</th><th>Type</th><th>Lots</th><th>P&amp;L</th><th>Result</th></tr></thead>
+        <tbody id="closedTradesBody"></tbody></table></div></div>
+    </div>
+
+    <!-- TRADE ERRORS -->
+    <div class="tab-content" id="tab-errors">
+      <div class="grid3">
+        <div class="card"><div class="card-title">Active errors</div><div class="metric-val red" id="errCount">0</div><div class="metric-sub">Real-time detection</div></div>
+        <div class="card"><div class="card-title">No stop loss</div><div class="metric-val amber" id="noSlCount">0</div><div class="metric-sub">High risk trades</div></div>
+        <div class="card"><div class="card-title">Oversize positions</div><div class="metric-val red" id="oversizeCount">0</div><div class="metric-sub">Above the 2% risk rule</div></div>
+      </div>
+      <div class="card"><div class="card-title">Trade error analysis — real time</div>
+        <div id="errDetail"></div>
+        <div id="errorsList" style="display:none"></div>
+        <div class="note">Size is compared against the median of your own open positions, so "oversized" means oversized for you — not against a generic rule.</div></div>
+      <div class="card"><div class="card-title">Trading rules reminder</div>
+        <div class="ind-row"><span class="ind-lbl">Max risk per trade</span><span class="green">1–2% of account</span></div>
+        <div class="ind-row"><span class="ind-lbl">News blackout</span><span class="amber">15 min before and after high impact</span></div>
+        <div class="ind-row"><span class="ind-lbl">Revenge trading</span><span class="red">30 min cooldown after a loss</span></div>
+        <div class="ind-row"><span class="ind-lbl">Breakeven rule</span><span class="blue">Move the stop only after 60% of target</span></div>
+        <div class="ind-row"><span class="ind-lbl">Always set</span><span class="green">A stop loss on every trade</span></div>
+      </div>
+    </div>
+
+    <!-- PERFORMANCE -->
+    <div class="tab-content" id="tab-performance">
+      <div class="grid3">
+        <div class="card"><div class="card-title">Win rate</div><div class="metric-val n" id="perfWinRate">—</div><div class="metric-sub" id="perfWinLoss">From MT5 history</div></div>
+        <div class="card"><div class="card-title">Net P&amp;L — 30 days</div><div class="metric-val n" id="perfPnl">—</div><div class="metric-sub">Real closed trades</div></div>
+        <div class="card"><div class="card-title">Total trades</div><div class="metric-val n" id="perfTotal">—</div><div class="metric-sub">From MT5 history</div></div>
+      </div>
+      <div class="card"><div class="card-title">P&amp;L by day</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="pnlChart"></canvas></div></div>
+      <div class="card"><div class="card-title">P&amp;L by pair</div><div id="pairPnlList"></div></div>
+    </div>
+  </main>
+
+  <aside class="col sidebar-right">
+    <div class="sec">
+      <div class="sec-h">Now</div>
+      <div class="kv"><span>Risk state</span><b id="nowRisk">—</b></div>
+      <div class="kv"><span>Next release</span><b class="n" id="nowNews">—</b></div>
+      <div class="kv"><span>Open trades</span><b class="n" id="nowTrades">0</b></div>
+      <div class="kv"><span>Alerts today</span><b class="n" id="nowAlerts">0</b></div>
+      <div class="note">Risk elsewhere: <span id="rr-worst" class="muted">—</span></div>
+    </div>
+    <div class="sec">
+      <div class="sec-h"><span>Risk Radar</span><span class="muted" style="letter-spacing:0;text-transform:none" id="rr-chip"><span class="rr-cdot"></span><span class="rr-ctext">—</span></span></div>
+      <div id="rr-alerts"></div>
+    </div>
+    <div class="sec">
+      <div class="sec-h"><span>Latest alerts</span><span class="muted" style="letter-spacing:0;text-transform:none">Live</span></div>
+      <div id="miniAlerts"><div class="note">No alerts yet.</div></div>
+    </div>
+  </aside>
+</div>
+
+<script defer>
+/* ═══ SAFE DATE PARSING (Safari) ═════════════════════════════════════
+   MT5 sends timestamps as "2026.08.09 14:22:08" (MQL5 TimeToString) and
+   the API sometimes sends "2026-08-09 14:22:08". Chrome's parser accepts
+   both; Safari's does NOT - it is strict about ISO 8601 and returns
+   Invalid Date, so every derived value became NaN and rendered as a dash.
+   That is why the dashboards worked in Chrome and showed nothing at all in
+   Safari. Route every date through here instead of new Date(). */
+function bwDate(v){
+  if(v instanceof Date) return v;
+  if(v === null || v === undefined || v === '') return new Date(NaN);
+  if(typeof v === 'number') return new Date(v < 1e12 ? v * 1000 : v); // secs or ms
+  var s = String(v).trim();
+  if(/^\d+$/.test(s)){ var n = parseInt(s,10); return new Date(n < 1e12 ? n*1000 : n); }
+  // 2026.08.09 -> 2026-08-09
+  s = s.replace(/^(\d{4})\.(\d{2})\.(\d{2})/, '$1-$2-$3');
+  // "YYYY-MM-DD HH:MM(:SS)" -> "YYYY-MM-DDTHH:MM(:SS)"  (Safari needs the T)
+  s = s.replace(/^(\d{4}-\d{2}-\d{2})[ ]+(\d{2}:\d{2})/, '$1T$2');
+  var d = new Date(s);
+  if(!isNaN(+d)) return d;
+  // Last resort: pull the numbers out and build it explicitly.
+  var m = s.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3], +(m[4]||0), +(m[5]||0), +(m[6]||0));
+  return new Date(NaN);
+}
+
+let state={candles:[],patterns:[],openTrades:[],closedTrades:[],accountInfo:{},indicators:{},watchlist:[],news:[],symbol:'',timeframe:'',patternAlerts:[]};
+// dataBySymbol caches candles per pair (from CANDLE_UPDATE broadcasts covering
+// ALL watched pairs, not just the EA's active chart) so switching pairs is an
+// instant re-render from cache, no need to wait on new data or touch MT5.
+let dataBySymbol={};
+let activePair='EURUSD'; // placeholder only — overwritten by the EA's actual symbol as soon as data arrives (see updateAll)
+let userSelectedPair=false; // becomes true the moment the user clicks a watchlist row — stops the EA auto-sync from overriding manual pair switches on every heartbeat
+let priceChartObj=null,pnlChartObj=null,perfBuilt=false;
+let alertCounts={bull:0,bear:0,neut:0};
+/* The Bullish/Bearish/Neutral cards are labelled "Alerts today", so only
+   TODAY's alerts may count towards them. Uses the browser's own local
+   date, which gives every user a correct local-midnight boundary with no
+   timezone detection - the same rule the today/earlier split already
+   uses. Nothing is deleted; older alerts stay visible under EARLIER,
+   they just stop counting. */
+function alertIsToday(a){
+  try{ return bwDate(a && a.time ? a.time : Date.now()).toDateString()===new Date().toDateString(); }
+  catch(e){ return true; }
+}
+function bumpAlertCount(a){
+  if(!alertIsToday(a)) return;
+  if(a.direction==='bullish')alertCounts.bull++;
+  else if(a.direction==='bearish')alertCounts.bear++;
+  else alertCounts.neut++;
+}
+
+// ── Broker symbol suffixes ────────────────────────────────────────
+// Exness tags every symbol by account type: GBPUSDc on cent accounts,
+// GBPUSDm on dollar accounts, and .z / e / k variants elsewhere. Every
+// element id, cache key and watchlist row on this page uses the BARE
+// pair (EURUSD), so an untrimmed suffix silently missed every lookup —
+// no bid, no spread, no key levels, and a chart stuck on H1 saying
+// "Waiting for MT5 data".
+//
+// The old code stripped a lowercase "c" only, so EURUSDc worked and
+// EURUSDm, EURUSDC and EURUSD.m all failed. This strips any of them, but
+// ONLY when what remains is a real pair — both halves have to be known
+// currency/metal codes. That guards against mangling a symbol that
+// legitimately ends in one of those letters.
+var BW_CCY = ['USD','EUR','GBP','JPY','CHF','AUD','NZD','CAD','SEK','NOK','DKK',
+              'SGD','HKD','ZAR','MXN','TRY','PLN','CZK','HUF','CNH','THB','INR'];
+var BW_BASE = BW_CCY.concat(['XAU','XAG','XPT','XPD','BTC','ETH','LTC','XRP','SOL','BNB']);
+
+function normalisePair(sym){
+  if(!sym) return '';
+  var up = String(sym).toUpperCase().replace(/[._\-]/g,'');
+  // Try the full string first, then progressively shorter, so EURUSD is
+  // preferred over any truncation of it.
+  for(var cut=0; cut<=3 && up.length-cut>=6; cut++){
+    var cand = up.slice(0, up.length-cut);
+    if(cand.length!==6) continue;
+    if(BW_BASE.indexOf(cand.slice(0,3))>=0 && BW_CCY.indexOf(cand.slice(3,6))>=0) return cand;
+  }
+  return up;
+}
+
+// Finds a watchlist entry for a pair regardless of which suffix the
+// broker uses.
+function findWatch(list, pair){
+  var want = normalisePair(pair);
+  return (list||[]).find(function(w){ return normalisePair(w.symbol) === want; });
+}
+
+let activeChartTF='H1';
+let candlesByTF={H1:[],H4:[]};
+
+setInterval(()=>{document.getElementById('clock').textContent=new Date().toUTCString().slice(17,25)+' UTC';},1000);
+
+function switchTab(tab,btn){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  btn.classList.add('active');
+  if(tab==='performance')buildPerfCharts();
+}
+
+function switchChartTF(tf,btn){
+  activeChartTF=tf;
+  document.querySelectorAll('.tf-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const cached=dataBySymbol[normalisePair(activePair)];
+  const arr=(cached&&cached.candlesByTF[tf])||candlesByTF[tf]||[];
+  state.candles=arr;
+  // Be explicit when a timeframe genuinely has no data yet, rather than
+  // leaving the previous timeframe's chart on screen looking current.
+  if(!arr.length){
+    const t=document.getElementById('chartTitle');
+    if(t) t.textContent='Candlestick Chart — '+normalisePair(activePair)+' '+tf+' (waiting for data)';
+  }
+  if(cached&&cached.patternsByTF&&cached.patternsByTF[tf])     state.patterns=cached.patternsByTF[tf];
+  if(cached&&cached.indicatorsByTF&&cached.indicatorsByTF[tf]) state.indicators=cached.indicatorsByTF[tf];
+  updateCandlestickChart(arr);
+  updatePairDisplay();
+}
+
+// switchToPair — shared by watchlist-row clicks and pattern-alert clicks, so
+// clicking an alert jumps the whole dashboard to that pair exactly the same
+// way clicking its watchlist row would. Optional tf switches the H1/H4 tab
+// too, so an H4 alert actually shows H4 data instead of leaving you on
+// whatever timeframe you happened to already be viewing.
+function switchToPair(sym,tf){
+  if(!sym) return;
+  const stripped=normalisePair(sym);
+  document.querySelectorAll('.pair-row').forEach(r=>{
+    r.classList.toggle('active', normalisePair(r.dataset.sym)===stripped);
+  });
+  activePair=stripped;
+  userSelectedPair=true; // stop EA-symbol auto-sync from overriding this on the next heartbeat
+  if(tf&&tf!==activeChartTF){
+    const btn=document.getElementById('tf'+tf);
+    // switchChartTF applies cached data + updatePairDisplay, but it does NOT
+    // touch the top bar (it's a timeframe change, not a pair change), so the
+    // bid/spread chips have to be refreshed here — otherwise an H4 alert
+    // click left the previous pair's price in the header.
+    if(btn){ updateTopBar(stripped); switchChartTF(tf,btn); return; }
+  }
+  applyCachedSymbolData(activePair);
+}
+
+document.querySelectorAll('.pair-row').forEach(row=>{
+  row.addEventListener('click',()=>{
+    switchToPair(row.dataset.sym);
+  });
+});
+
+// applyCachedSymbolData — pulls a pair's cached candles/patterns (populated by
+// CANDLE_UPDATE messages covering all watched pairs) into the active chart/TF
+// view. This is what makes pair-switching instant — no EA reattachment needed.
+// updateTopBar — reads state.watchlist (all 6 pairs' bid/ask/spread, already
+// refreshed every ~5s regardless of which pair is active) for a given pair
+// and updates the Symbol/Bid/Spread chips. Called both from the regular
+// heartbeat AND instantly on pair click — previously only the former, which
+// is why switching pairs showed the OLD pair's price for up to 5s until the
+// next heartbeat happened to arrive.
+function updateTopBar(pair){
+  const basePair = normalisePair(pair);
+  if(!basePair) return;
+  const pw = findWatch(state.watchlist, pair);
+  // Symbol chip always reflects the active pair, even before any quote has
+  // arrived for it — otherwise a pair switch left the OLD symbol on screen.
+  document.getElementById('topSymbol').textContent = basePair;
+  if(pw && parseFloat(pw.bid) > 0){
+    document.getElementById('topBid').textContent    = formatPrice(basePair, pw.bid);
+    document.getElementById('topSpread').textContent = bwSpreadPts(pw, basePair) + ' pts';
+    return;
+  }
+  // No usable watchlist quote for this pair — happens when the pair isn't on
+  // the watchlist at all (e.g. jumped to from a pattern alert), or before the
+  // first watchlist heartbeat lands. Fall back to the last cached close so
+  // the Bid chip shows something real instead of freezing on another pair's
+  // price. Spread has no fallback — it only exists in the watchlist feed.
+  const cached = dataBySymbol[basePair];
+  const arr = (cached && cached.candlesByTF && (cached.candlesByTF[activeChartTF]||cached.candlesByTF.H1)) || [];
+  const last = arr.length ? arr[arr.length-1] : null;
+  document.getElementById('topBid').textContent    = last ? formatPrice(basePair, last.c) : '—';
+  document.getElementById('topSpread').textContent = '—';
+}
+
+function applyCachedSymbolData(sym){
+  const cached=dataBySymbol[normalisePair(sym)];
+  // The top bar and the pair titles must update for EVERY pair switch, even
+  // one with no cached candles yet (a pattern alert can fire on a pair the
+  // dashboard has never rendered). The old early-return here jumped out
+  // BEFORE updateTopBar, which is why clicking an alert — or switching to a
+  // pair whose candles hadn't arrived — left the previous pair's bid, spread
+  // and chart title sitting on screen.
+  updateTopBar(sym);
+  if(!cached){ updatePairDisplay(); return; } // titles/symbol refresh; chart stays as-is until data lands
+  if(cached.candlesByTF) candlesByTF=cached.candlesByTF;
+  const arr=candlesByTF[activeChartTF]||[];
+  if(arr.length){
+    state.candles=arr;        // price / day-high / day-low readouts use this
+    updateCandlestickChart(arr);
+  }
+  state.patterns=(cached.patternsByTF&&cached.patternsByTF[activeChartTF])||[]; // pattern list + bias score use this
+  state.indicators=(cached.indicatorsByTF&&cached.indicatorsByTF[activeChartTF])||{}; // RSI/EMA/trend panel uses this
+  updatePairDisplay();
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────
+let ws,reconnectTimer;
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss:':'ws:';
+  try{ws=new WebSocket(proto+'//'+location.host);}catch(e){return;}
+  ws.onopen=()=>{
+    document.getElementById('connDot').classList.add('live');
+    document.getElementById('connLabel').textContent='Live — MT5 Connected';
+    clearTimeout(reconnectTimer);
+  };
+  ws.onclose=()=>{
+    document.getElementById('connDot').classList.remove('live');
+    document.getElementById('connLabel').textContent='Disconnected — restarting...';
+    reconnectTimer=setTimeout(connectWS,1200);
+  };
+  ws.onerror=()=>ws.close();
+  ws.onmessage=(evt)=>{try{handleMsg(JSON.parse(evt.data));}catch(e){}};
+}
+
+function handleMsg(msg){
+  const d=msg.data||msg;
+  const type=msg.type;
+  if(type==='TICK'||type==='FULL_STATE') updateAll(d);
+  if(type==='NEWS_UPDATE') updateNews(msg.data);
+  if(type==='NEWS_ALERT') showAlert(msg.data.message);
+  if(type==='PATTERN_ALERT') addPatternAlert(msg.data);
+  if(type==='CANDLE_UPDATE') handleCandleUpdate(msg.data);
+  if(type==='DAILY_RESET'){
+    alertCounts={bull:0,bear:0,neut:0};
+    document.getElementById('alertFeed').innerHTML='';
+    recountAlerts();
+    loadAlertHistory();
+  }
+  if(type==='FULL_STATE'){
+    const feed=document.getElementById('alertFeed');
+    if(d.patternAlerts&&d.patternAlerts.length>0){
+      feed.innerHTML='';
+      alertCounts={bull:0,bear:0,neut:0};
+      d.patternAlerts.forEach(a=>prependAlertRow(a,false));
+      recountAlerts();
+    }
+    // Populate the per-pair cache from whatever the backend already has
+    // stored (d.candles / d.patterns are keyed by symbol -> timeframe),
+    // so a refresh shows every watched pair's last-known data immediately,
+    // not just whichever pair happens to arrive next over the socket.
+    if(d.candles&&typeof d.candles==='object'){
+      Object.entries(d.candles).forEach(([rawSym,byTF])=>{
+        // rawSym is the BROKER's symbol (GBPUSDm); the cache is read back
+        // with a bare pair, so it has to be normalised on write too.
+        const sym = normalisePair(rawSym);
+        if(!dataBySymbol[sym]) dataBySymbol[sym]={candlesByTF:{},patternsByTF:{},indicatorsByTF:{}};
+        dataBySymbol[sym].candlesByTF={...dataBySymbol[sym].candlesByTF,...byTF};
+        if(d.patterns&&d.patterns[rawSym]) dataBySymbol[sym].patternsByTF={...dataBySymbol[sym].patternsByTF,...d.patterns[rawSym]};
+        if(d.indicatorsBySymbol&&d.indicatorsBySymbol[rawSym]) dataBySymbol[sym].indicatorsByTF={...dataBySymbol[sym].indicatorsByTF,...d.indicatorsBySymbol[rawSym]};
+      });
+      applyCachedSymbolData(activePair); // render immediately now cache is filled
+    }
+  }
+}
+
+function handleCandleUpdate(d){
+  if(!d||!d.candles) return;
+  // Must be normalised: dataBySymbol is read back with activePair, which is
+  // always a bare pair. Caching under the raw broker symbol (GBPUSDm) meant
+  // the lookup never matched, so switching timeframe found no cached array
+  // and the chart sat on H1 showing "Waiting for MT5 data".
+  const sym=normalisePair(d.symbol||activePair);
+
+  // candles/patterns/indicators now always arrive as objects keyed by
+  // timeframe, e.g. {H1:[...], H4:[...]} — one multi-candles payload
+  // carries both timeframes for every watched pair.
+  const tfMap = d.candles||{};
+  const patternsByTFIn = d.patterns||{};
+  const indicatorsByTFIn = d.indicators||{};
+
+  if(!dataBySymbol[sym]) dataBySymbol[sym]={candlesByTF:{},patternsByTF:{},indicatorsByTF:{}};
+  Object.entries(tfMap).forEach(([tf,arr])=>{ dataBySymbol[sym].candlesByTF[tf]=arr; });
+  Object.entries(patternsByTFIn).forEach(([tf,p])=>{ dataBySymbol[sym].patternsByTF[tf]=p; });
+  Object.entries(indicatorsByTFIn).forEach(([tf,ind])=>{ dataBySymbol[sym].indicatorsByTF[tf]=ind; });
+
+  // Only push straight to the live chart if this update is for the pair
+  // currently being viewed. Skip just the ONE (pair,timeframe) combo that
+  // the regular heartbeat already drives for the EA's own attached chart —
+  // e.g. GBPUSD/H1 if the EA is attached to a GBPUSD H1 chart — since two
+  // sources racing to update that exact combo was what caused the earlier
+  // flicker. Every other timeframe (like GBPUSD/H4) is only ever fed by
+  // this multi-symbol update, so it's always safe to apply directly.
+  const eaAttachedPair=normalisePair(state.symbol||'');
+  const eaHomeTF=state.timeframe;
+
+  if(sym===activePair){
+    Object.entries(tfMap).forEach(([tf,arr])=>{
+      if(sym===eaAttachedPair && tf===eaHomeTF) return; // regular heartbeat owns this exact combo — don't overwrite its candle array
+      candlesByTF[tf]=arr;
+    });
+
+    // The candle-array skip above wasn't enough on its own — if the user is
+    // VIEWING that exact skipped combo, applying THIS message's patterns/
+    // indicators/chart-redraw would still race against the regular
+    // heartbeat's own version of the same combo. So skip the whole apply
+    // step (not just the candle write) whenever the active view is the
+    // combo the heartbeat already owns.
+    const viewingHeartbeatOwnedCombo = (sym===eaAttachedPair && activeChartTF===eaHomeTF);
+    if(!viewingHeartbeatOwnedCombo && candlesByTF[activeChartTF]){
+      state.candles=candlesByTF[activeChartTF];
+      if(patternsByTFIn[activeChartTF])   state.patterns=patternsByTFIn[activeChartTF];
+      if(indicatorsByTFIn[activeChartTF]) state.indicators=indicatorsByTFIn[activeChartTF];
+      updateCandlestickChart(candlesByTF[activeChartTF]);
+      updatePairDisplay();
+    }
+  }
+}
+
+/* SPREAD FOR DISPLAY — SymbolInfoInteger(SYMBOL_SPREAD) reads 0 on a
+   floating-spread account (Exness raw/zero), which showed "0 pts" in the
+   header and sidebar. Fall back to (ask-bid) in points. Same rule the
+   Risk Radar's spreadPoints() uses, kept separate because that one lives
+   inside the Radar's own module scope. */
+function bwSpreadPts(row, sym){
+  const rep = row && row.spread != null ? +row.spread : 0;
+  if(rep > 0) return rep;
+  const bid = row && +row.bid, ask = row && +row.ask;
+  if(!bid || !ask || ask <= bid) return rep || 0;
+  const dg = /JPY$/i.test(sym||'') ? 3 : (/^(XAU|XAG)/i.test(sym||'') ? 2 : (bid > 50 ? 2 : 5));
+  return Math.round(((ask - bid) / Math.pow(10, -dg)) * 10) / 10;
+}
+function updateAll(d){
+  if(d.watchlist){state.watchlist=d.watchlist;updateWatchlist();}
+
+  // The EA's own attached-chart symbol for THIS heartbeat — used below to
+  // decide whether it's safe to push straight to the live chart/state, or
+  // whether the user is viewing a different pair and this data should only
+  // refresh that pair's cache quietly instead.
+  const eaSym = d.symbol ? normalisePair(d.symbol) : null;
+  const viewingEAPair = !eaSym || eaSym === normalisePair(activePair);
+
+  if(d.candles&&d.candles.length){
+    if(eaSym){
+      if(!dataBySymbol[eaSym]) dataBySymbol[eaSym]={candlesByTF:{},patternsByTF:{},indicatorsByTF:{}};
+      dataBySymbol[eaSym].candlesByTF[d.timeframe||activeChartTF]=d.candles;
+    }
+    if(viewingEAPair){
+      state.candles=d.candles;
+      candlesByTF[d.timeframe||activeChartTF]=d.candles;
+      updateCandlestickChart(candlesByTF[activeChartTF]);
+    }
+  }
+  if(d.patterns){
+    if(eaSym){
+      if(!dataBySymbol[eaSym]) dataBySymbol[eaSym]={candlesByTF:{},patternsByTF:{},indicatorsByTF:{}};
+      dataBySymbol[eaSym].patternsByTF[d.timeframe||activeChartTF]=d.patterns;
+    }
+    if(viewingEAPair) state.patterns=d.patterns;
+  }
+  if(d.indicators){
+    if(eaSym){
+      if(!dataBySymbol[eaSym]) dataBySymbol[eaSym]={candlesByTF:{},patternsByTF:{},indicatorsByTF:{}};
+      dataBySymbol[eaSym].indicatorsByTF[d.timeframe||activeChartTF]=d.indicators;
+    }
+    if(viewingEAPair) state.indicators=d.indicators;
+  }
+  if(d.openTrades){state.openTrades=d.openTrades;renderOpenTrades();analyzeErrors();}
+  if(d.closedTrades&&d.closedTrades.length){state.closedTrades=d.closedTrades;renderClosedTrades();perfBuilt=false;}
+  if(d.accountInfo&&d.accountInfo.balance){state.accountInfo=d.accountInfo;updateAccount();}
+  if(d.symbol){
+    state.symbol=d.symbol;state.timeframe=d.timeframe;
+    const eaPair=eaSym;
+    // Only auto-follow the EA's attached chart until the user manually picks
+    // a pair. After that, a manual click always wins — the EA's own heartbeat
+    // symbol no longer overrides the dashboard's active pair every ~5s.
+    if(!userSelectedPair && eaPair!==normalisePair(activePair)){
+      activePair=eaPair;
+      document.querySelectorAll('.pair-row').forEach(r=>{
+        r.classList.toggle('active', normalisePair(r.dataset.sym)===eaPair);
+      });
+      applyCachedSymbolData(activePair);
+    }
+  }
+  if(d.newsEvents){updateNews(d.newsEvents);}
+  updatePairDisplay();
+  updateTopBar(activePair);
+  if(state.accountInfo.equity)
+    document.getElementById('topEquity').textContent='$'+parseFloat(state.accountInfo.equity).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+// ── Candlestick chart ─────────────────────────────────────────────
+const gridC='rgba(255,255,255,0.04)',textC='rgba(255,255,255,0.35)';
+
+function updateCandlestickChart(candles){
+  const noData=document.getElementById('chartNoData');
+  if(!candles||!candles.length){if(noData)noData.style.display='flex';return;}
+  if(noData)noData.style.display='none';
+  const data=candles.slice(-60).map((c,i)=>({
+    x:c.t?bwDate(typeof c.t==='number'&&c.t<1e10?c.t*1000:c.t).getTime():i,
+    o:parseFloat(c.o),h:parseFloat(c.h),l:parseFloat(c.l),c:parseFloat(c.c)
+  }));
+  const cfg={
+    type:'candlestick',
+    data:{datasets:[{label:'Price',data,color:{up:'#00c896',down:'#e24b4a',unchanged:'#8b90a0'},borderColor:{up:'#00c896',down:'#e24b4a',unchanged:'#8b90a0'}}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const d=ctx.raw;return[`O: ${d.o.toFixed(5)}`,`H: ${d.h.toFixed(5)}`,`L: ${d.l.toFixed(5)}`,`C: ${d.c.toFixed(5)}`];}}}},
+      scales:{x:{type:'time',time:{unit:'hour',displayFormats:{hour:'HH:mm',day:'MMM d'}},grid:{color:gridC},ticks:{color:textC,font:{size:9},maxTicksLimit:8}},
+              y:{position:'right',grid:{color:gridC},ticks:{color:textC,font:{size:9},callback:v=>v.toFixed(4)}}}}
+  };
+  if(!priceChartObj){priceChartObj=new Chart(document.getElementById('priceChart'),cfg);}
+  else{priceChartObj.data.datasets[0].data=data;priceChartObj.update('none');}
+}
+
+// ── Pattern alert feed ────────────────────────────────────────────
+
+// ── Alert time grouping ───────────────────────────────────────────
+// Pattern alerts arrive one-per-pair, so a multi-pair firing looked like
+// six unrelated rows. These group them under a single minute header —
+// "14:35 · 4 pairs" — so it is clear which signals fired together.
+function alertGroupKey(a){
+  const t=bwDate(a.time||Date.now());
+  t.setSeconds(0,0);
+  return t.getTime();
+}
+
+function buildGroupHeader(key){
+  const d=bwDate(key);
+  const hdr=document.createElement('div');
+  hdr.className='alert-group';
+  hdr.dataset.groupKey=String(key);
+  hdr.dataset.count='0';
+  const isToday=d.toDateString()===new Date().toDateString();
+  const label=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+
+              (isToday?'':' · '+d.toLocaleDateString([],{month:'short',day:'numeric'}));
+  hdr.innerHTML='<span class="alert-group-time">'+label+'</span>'+
+                '<span class="alert-group-count"></span>';
+  return hdr;
+}
+
+// Counts only the alert rows that belong to this header (stops at the
+// next header), so the label stays accurate as rows are trimmed off.
+function refreshGroupCount(hdr){
+  if(!hdr) return;
+  let n=0;
+  for(let el=hdr.nextElementSibling; el && !el.classList.contains('alert-group'); el=el.nextElementSibling) n++;
+  const lbl=hdr.querySelector('.alert-group-count');
+  if(lbl) lbl.textContent = n===1 ? '1 signal' : n+' pairs';
+  if(n===0) hdr.remove();
+}
+
+function refreshAllGroupCounts(){
+  document.querySelectorAll('#alertFeed .alert-group').forEach(refreshGroupCount);
+}
+
+function addPatternAlert(a){
+  const feed=document.getElementById('alertFeed');
+  /* Clear only a PLACEHOLDER, never real rows. The old test was
+     querySelector('div[style]') — but prependAlertRow sets
+     row.style.cursor on every alert row, so an existing alert matched it
+     and the whole feed was wiped on each new alert, leaving one row.
+     That is the "sometimes all the pairs, sometimes only one" symptom:
+     a FULL_STATE refilled the list, then the next alert emptied it. */
+  const ph=feed.querySelector('.alert-empty');
+  if(ph) ph.remove();
+  else if(!feed.querySelector('.alert-item') && feed.firstElementChild) feed.innerHTML='';
+  prependAlertRow(a,true);
+  recountAlerts();
+  playAlertSound(a.direction);
+  showAlert(`${a.name} detected on ${a.symbol} ${a.timeframe} — ${a.direction}`);
+}
+
+function prependAlertRow(a,animate){
+  const feed=document.getElementById('alertFeed');
+  const dir=a.direction==='bullish'?'bull':a.direction==='bearish'?'bear':'neutral';
+  const confClass=a.confidence>=85?'conf-high':a.confidence>=70?'conf-med':'conf-low';
+  const t=bwDate(a.time||Date.now());
+  const ts=t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const row=document.createElement('div');
+  row.className=`alert-item ${dir}${animate?' fadeIn':''}`;
+  row.style.cursor='pointer';
+  row.title=`View ${a.symbol} chart`;
+  row.innerHTML=`<span class="alert-dot ${dir}"></span><div class="alert-body"><div class="alert-name">${a.name}<span class="conf-pill ${confClass}">${a.confidence}%</span></div><div class="alert-meta">${a.symbol} · ${a.timeframe} · ${parseFloat(a.price||0).toFixed(5)}</div><div class="alert-desc">${a.desc||''}</div></div><div class="alert-time">${ts}</div>`;
+  row.addEventListener('click',()=>switchToPair(a.symbol,a.timeframe));
+  // Attach to the existing top group if this alert fired in the same
+  // minute; otherwise open a new time group above it.
+  const gk=alertGroupKey(a);
+  let top=feed.firstElementChild;
+  if(!(top && top.classList.contains('alert-group') && top.dataset.groupKey===String(gk))){
+    top=buildGroupHeader(gk);
+    feed.insertBefore(top,feed.firstChild);
+  }
+  feed.insertBefore(row,top.nextSibling);
+
+  // Trim from the bottom, counting only alert rows towards the cap so a
+  // busy multi-pair minute isn't cut short by its own headers.
+  while(feed.querySelectorAll('.alert-item').length>20){
+    const last=feed.lastElementChild;
+    if(!last) break;
+    feed.removeChild(last);
+  }
+  // A header left stranded at the bottom by that trim has no rows left.
+  const tail=feed.lastElementChild;
+  if(tail && tail.classList.contains('alert-group')) tail.remove();
+  refreshAllGroupCounts();
+  bumpAlertCount(a);
+}
+
+function recountAlerts(){
+  document.getElementById('cntBull').textContent=alertCounts.bull;
+  document.getElementById('cntBear').textContent=alertCounts.bear;
+  document.getElementById('cntNeut').textContent=alertCounts.neut;
+}
+
+function playAlertSound(dir){
+  try{
+    const ac=new(window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination);
+    o.frequency.value=dir==='bullish'?660:dir==='bearish'?330:440;
+    o.type='sine';
+    g.gain.setValueAtTime(0.07,ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.2);
+    o.start();o.stop(ac.currentTime+0.2);
+  }catch(e){}
+}
+
+// ── FIXED: broker-agnostic watchlist update (strips 'c' suffix) ──
+function updateWatchlist(){
+  state.watchlist.forEach(w=>{
+    const sym = normalisePair(w.symbol); // works for both EURUSDc and EURUSD
+    const el=document.getElementById('pw-'+sym);
+    if(el){el.textContent=formatPrice(sym,w.bid);}
+    const chgEl=document.getElementById('chg-'+sym);
+    if(chgEl){
+      const chg=parseFloat(w.change)||0;
+      chgEl.textContent=(chg>=0?'+':'')+chg.toFixed(3)+'%';
+      chgEl.className='pair-change '+(chg>=0?'green':'red');
+    }
+  });
+}
+
+function formatPrice(sym,price){
+  const p=parseFloat(price);
+  if(!p)return'—';
+  if(sym==='USDJPY'||sym==='GBPJPY')return p.toFixed(3);
+  if(sym==='XAUUSD')return p.toFixed(2);
+  return p.toFixed(5);
+}
+
+function updatePairDisplay(){
+  const sym=activePair||state.symbol;
+  const baseSym=normalisePair(sym); // strip suffix for display
+  document.getElementById('patternCardTitle').textContent='Candlestick Patterns — '+baseSym+' '+(activeChartTF||'');
+  document.getElementById('chartTitle').textContent='Candlestick Chart — '+baseSym+' '+activeChartTF+' (Live)';
+  document.getElementById('tfVal').textContent=activeChartTF||'—';
+  document.getElementById('symVal').textContent=baseSym;
+  renderPatterns();
+  const ind=state.indicators||{};
+  const rsi=parseFloat(ind.rsi)||0;
+  const ema20=parseFloat(ind.ema20)||0;
+  const ema50=parseFloat(ind.ema50)||0;
+  document.getElementById('rsiVal').textContent=rsi?rsi.toFixed(1):'—';
+  document.getElementById('ema20Val').textContent=ema20?ema20.toFixed(5):'—';
+  document.getElementById('ema50Val').textContent=ema50?ema50.toFixed(5):'—';
+  document.getElementById('ema20Key').textContent=ema20?ema20.toFixed(5):'—';
+  document.getElementById('ema50Key').textContent=ema50?ema50.toFixed(5):'—';
+  let rsiClass='muted',rsiText='—',rsiSub='—';
+  if(rsi>0){if(rsi>70){rsiClass='red';rsiText='Overbought';rsiSub='RSI '+rsi.toFixed(1)+' — possible reversal down';}else if(rsi<30){rsiClass='green';rsiText='Oversold';rsiSub='RSI '+rsi.toFixed(1)+' — possible reversal up';}else if(rsi>50){rsiClass='green';rsiText='Bullish';rsiSub='RSI '+rsi.toFixed(1)+' — momentum up';}else{rsiClass='red';rsiText='Bearish';rsiSub='RSI '+rsi.toFixed(1)+' — momentum down';}}
+  document.getElementById('rsiSignalVal').textContent=rsiText;document.getElementById('rsiSignalVal').className='metric-val '+rsiClass;document.getElementById('rsiSignalSub').textContent=rsiSub;
+  let trendText='—',trendClass='muted',trendSub='Waiting...';
+  if(ema20&&ema50){if(ind.uptrend){trendText='Uptrend';trendClass='green';trendSub='EMA20 > EMA50, price above EMA20';}else if(ind.downtrend){trendText='Downtrend';trendClass='red';trendSub='EMA20 < EMA50, price below EMA20';}else{trendText='Ranging';trendClass='amber';trendSub='No clear trend direction';}}
+  document.getElementById('trendSignalVal').textContent=trendText;document.getElementById('trendSignalVal').className='metric-val '+trendClass;document.getElementById('trendSignalSub').textContent=trendSub;document.getElementById('trendVal').textContent=trendText;document.getElementById('trendVal').className=trendClass;
+  updateSignalBias();
+  if(state.candles.length>0){
+    const last=state.candles[state.candles.length-1];
+    const tc=state.candles.slice(-24);
+    document.getElementById('currentPrice').textContent=formatPrice(baseSym,last.c);
+    document.getElementById('dayHigh').textContent=formatPrice(baseSym,Math.max(...tc.map(c=>c.h)));
+    document.getElementById('dayLow').textContent=formatPrice(baseSym,Math.min(...tc.map(c=>c.l)));
+    const pw=findWatch(state.watchlist, activePair);
+    document.getElementById('spreadKey').textContent=(pw?bwSpreadPts(pw,baseSym):'—')+' pts';
+  }
+}
+
+function renderPatterns(){
+  const el=document.getElementById('patternList');
+  if(!state.patterns||!state.patterns.length){el.innerHTML='<div style="color:var(--t3);font-size:12px;padding:10px 0">No patterns on current candle.</div>';return;}
+  el.innerHTML=state.patterns.map(p=>`<div class="pattern-row"><div><div class="pname">${p.name}</div><div class="pmeta">${activeChartTF||'H1'} · ${p.barsAgo===0?'Current candle':p.barsAgo+' bars ago'}</div></div><div style="text-align:right"><span class="dir-tag dir-${p.direction}">${p.direction.toUpperCase().slice(0,4)}</span><div class="pconf ${p.direction==='bullish'?'green':p.direction==='bearish'?'red':'muted'}" style="margin-top:3px">${p.confidence}%</div></div></div>`).join('');
+}
+
+function updateSignalBias(){
+  /* ── COMBINED SIGNAL — REWRITTEN. Four real flaws in the original:
+
+     1. NO-DATA DEFAULTED TO "SELL". `total = bullScore+bearScore || 1`
+        meant an empty state gave pct = 0/1 = 0, and 0 < 42, so a freshly
+        loaded page or a pair with no patterns showed a confident SELL.
+        That is the worst possible failure direction for a trading tool.
+     2. THE BAR SATURATED ON ONE PATTERN. pct was bull's SHARE of the
+        evidence, not a confidence. One bullish pattern and nothing else
+        gave 10/10 = 100% BUY, while a genuinely strong 50-vs-40 read gave
+        55% WAIT. Weak evidence produced maximum conviction.
+     3. IT COUNTED EVERY PATTERN regardless of confidence — a 44% Doji
+        weighed the same as an 82% Kicker — while the Signal tab's own
+        "Combined signal" card only counts >=70%. Two boxes on the same
+        screen answering the same question differently.
+     4. IT COULD SHOW ANOTHER PAIR'S DATA. updateAll only refreshes
+        state.patterns when the EA's own symbol is the one being viewed
+        (`if(viewingEAPair)`), so switching to a pair the EA is not
+        attached to left the previous pair's patterns in place and this
+        box kept scoring them under the new pair's name.
+
+     Now: patterns are filtered by confidence, the strength of the
+     evidence is separated from its direction, no-data says so instead of
+     guessing, and the box refuses to score a pair whose patterns it
+     cannot verify. */
+  const box=document.getElementById('signalBox'),val=document.getElementById('signalVal'),
+        bar=document.getElementById('signalBar'),sub=document.getElementById('signalSub');
+  if(!box||!val||!bar||!sub) return;
+
+  const setBox=(cls,txt,valCls,width,barCol,note)=>{
+    box.className='signal-box '+cls;
+    val.className='signal-val '+valCls; val.textContent=txt;
+    bar.style.width=width+'%'; bar.style.background=barCol;
+    sub.textContent=note;
+  };
+
+  /* Only score patterns we know belong to the pair on screen. */
+  const viewing = normalisePair(activePair||'');
+  const eaSym   = normalisePair((state.indicators&&state.indicators.symbol)||state.symbol||'');
+  const patsOwned = (!eaSym || !viewing || eaSym===viewing);
+  const pats = patsOwned ? (state.patterns||[]) : [];
+
+  const strong = pats.filter(p=>(+p.confidence||0)>=70);
+  const bulls  = strong.filter(p=>p.direction==='bullish').length;
+  const bears  = strong.filter(p=>p.direction==='bearish').length;
+
+  const ind=state.indicators||{};
+  const rsiRaw=parseFloat(ind.rsi);
+  const rsi=isFinite(rsiRaw)?rsiRaw:null;
+  const haveTrend = !!(ind.uptrend||ind.downtrend);
+
+  /* Nothing to score — say so rather than defaulting into a direction. */
+  if(!strong.length && !haveTrend && rsi===null){
+    setBox('wait','—','signal-val amber',0,'var(--amber)',
+      patsOwned?'Waiting for indicators from MT5':'No pattern data for '+viewing+' yet');
+    return;
+  }
+
+  let bullScore=bulls*10, bearScore=bears*10;
+  if(ind.uptrend)   bullScore+=15;
+  if(ind.downtrend) bearScore+=15;
+  if(rsi!==null && rsi<40) bullScore+=10;
+  if(rsi!==null && rsi>60) bearScore+=10;
+
+  const total=bullScore+bearScore;
+  if(!total){
+    setBox('wait','WAIT','signal-val amber',50,'var(--amber)',
+      'Inputs present but none point either way'+(rsi!==null?' · RSI '+rsi.toFixed(0):''));
+    return;
+  }
+
+  const pct=Math.round((bullScore/total)*100);
+  /* HOW MUCH evidence there is, separate from which way it points. The
+     bar now shows conviction scaled by evidence, so one lone pattern can
+     no longer fill it. 45 points = trend + two strong patterns + RSI. */
+  const evidence=Math.min(1,total/45);
+  const lean=Math.abs(pct-50)/50;                 // 0 = split, 1 = one-sided
+  const conviction=Math.round(lean*evidence*100);
+
+  const inputs=[];
+  if(strong.length) inputs.push(bulls+' bull · '+bears+' bear');
+  else inputs.push('no pattern ≥70%');
+  if(ind.uptrend) inputs.push('H1 up'); else if(ind.downtrend) inputs.push('H1 down');
+  if(rsi!==null) inputs.push('RSI '+rsi.toFixed(0));
+
+  /* Direction still uses the same 58/42 thresholds the dashboard has
+     always used, but a call now also needs enough evidence behind it. */
+  const enough = conviction>=25;
+  if(pct>58 && enough)      setBox('buy','BUY','signal-val green',conviction,'var(--accent)',inputs.join(' · '));
+  else if(pct<42 && enough) setBox('sell','SELL','signal-val red',conviction,'var(--red)',inputs.join(' · '));
+  else setBox('wait','WAIT','signal-val amber',Math.max(conviction,6),'var(--amber)',
+    inputs.join(' · ')+(enough?'':' · thin evidence'));
+}
+
+function updateAccount(){
+  const a=state.accountInfo;
+  document.getElementById('acctBalance').textContent='$'+parseFloat(a.balance||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const eq=parseFloat(a.equity||0),bal=parseFloat(a.balance||1);
+  document.getElementById('acctEquity').textContent='$'+eq.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('acctEquity').className=eq>=bal?'green':'red';
+  document.getElementById('acctMargin').textContent='$'+parseFloat(a.margin||0).toFixed(2);
+  document.getElementById('acctFree').textContent='$'+parseFloat(a.freeMargin||0).toFixed(2);
+  const profit=parseFloat(a.profit||0);
+  document.getElementById('acctProfit').textContent=(profit>=0?'+':'')+'$'+profit.toFixed(2);
+  document.getElementById('acctProfit').className=profit>=0?'green':'red';
+  document.getElementById('topEquity').textContent='$'+eq.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function renderOpenTrades(){
+  const tbody=document.getElementById('openTradesBody');
+  if(!state.openTrades.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:20px">No open trades</td></tr>';return;}
+  tbody.innerHTML=state.openTrades.map(t=>{
+    const p=parseFloat(t.profit||0),r=parseFloat(t.riskPct||0);
+    /* CURRENT PRICE: the EA does not send one per position, so take it from
+       the live watchlist row — bid closes a buy, ask closes a sell. */
+    const base=normalisePair(t.symbol||'');
+    const wr=(state.watchlist||[]).find(x=>normalisePair(x.symbol)===base);
+    const cur=wr?(t.type==='buy'?parseFloat(wr.bid):parseFloat(wr.ask)):NaN;
+    /* toFixed(5) printed gold as 2412.50000 and JPY as 156.20000.
+       formatPrice() already knows each pair's digits. */
+    const fp=v=>formatPrice(base,v);
+    return`<tr><td><strong>${t.symbol}</strong></td><td><span class="ttype ${t.type}">${t.type.toUpperCase()}</span></td><td>${parseFloat(t.volume).toFixed(2)}</td><td style="font-variant-numeric:tabular-nums">${fp(parseFloat(t.openPrice))}</td><td style="font-variant-numeric:tabular-nums">${isFinite(cur)?fp(cur):'—'}</td><td class="red" style="font-size:10px">${t.sl&&parseFloat(t.sl)!==0?fp(parseFloat(t.sl)):'<span class="red">No SL!</span>'}</td><td class="green" style="font-size:10px">${t.tp&&parseFloat(t.tp)!==0?fp(parseFloat(t.tp)):'—'}</td><td class="${p>=0?'green':'red'}">${p>=0?'+':''}$${p.toFixed(2)}</td><td class="${r>2?'red':r>1?'amber':'green'}">${r.toFixed(1)}%</td></tr>`;
+  }).join('');
+}
+
+function renderClosedTrades(){
+  const tbody=document.getElementById('closedTradesBody');
+  if(!state.closedTrades.length){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px">No closed trades in last 30 days</td></tr>';return;}
+  tbody.innerHTML=state.closedTrades.slice(-20).reverse().map(t=>{
+    const p=parseFloat(t.profit||0);
+    /* Emitted in the SAME ORDER as the headings above. The row used to
+       start at Pair while the header started at Closed, so every value
+       sat one column to the left and the date column showed a pair. */
+    const when=t.time?bwDate(+t.time*1000):null;
+    const wl=when?(when.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][when.getMonth()]+' '+String(when.getHours()).padStart(2,'0')+':'+String(when.getMinutes()).padStart(2,'0')):'—';
+    return`<tr><td style="font-size:10px;color:var(--muted)">${wl}</td><td><strong>${t.symbol}</strong></td><td><span class="ttype ${t.type}">${t.type.toUpperCase()}</span></td><td>${parseFloat(t.volume).toFixed(2)}</td><td class="${p>=0?'green':'red'}">${p>=0?'+':''}$${p.toFixed(2)}</td><td class="${p>=0?'green':'red'}">${p>=0?'WIN':'LOSS'}</td></tr>`;
+  }).join('');
+}
+
+function buildPerfCharts(){
+  if(perfBuilt)return;
+  const trades=state.closedTrades;
+  if(!trades.length){
+    document.getElementById('perfWinRate').textContent='—';document.getElementById('perfPnl').textContent='—';
+    document.getElementById('perfTotal').textContent='0';document.getElementById('perfWinLoss').textContent='No trades in last 30 days';
+    document.getElementById('pairPnlList').innerHTML='<div style="color:var(--t3);font-size:12px">No trade history yet</div>';return;
+  }
+  let wins=0,totalPnl=0;const byPair={},daily={};
+  trades.forEach(t=>{
+    const p=parseFloat(t.profit||0);totalPnl+=p;if(p>0)wins++;
+    if(!byPair[t.symbol])byPair[t.symbol]={pnl:0,total:0};
+    byPair[t.symbol].pnl+=p;byPair[t.symbol].total++;
+    const day=bwDate((t.time||0)*1000).toLocaleDateString('en',{month:'short',day:'numeric'});
+    if(!daily[day])daily[day]=0;daily[day]+=p;
+  });
+  const wr=Math.round((wins/trades.length)*100);
+  document.getElementById('perfWinRate').textContent=wr+'%';document.getElementById('perfWinRate').className='metric-val '+(wr>=50?'green':'red');
+  document.getElementById('perfPnl').textContent=(totalPnl>=0?'+':'')+'$'+totalPnl.toFixed(2);document.getElementById('perfPnl').className='metric-val '+(totalPnl>=0?'green':'red');
+  document.getElementById('perfTotal').textContent=trades.length;document.getElementById('perfWinLoss').textContent=wins+' wins · '+(trades.length-wins)+' losses';
+  document.getElementById('pairPnlList').innerHTML=Object.entries(byPair).sort((a,b)=>b[1].pnl-a[1].pnl).map(([sym,d])=>`<div class="ind-row"><span class="ind-lbl">${sym}</span><span class="${d.pnl>=0?'green':'red'}">${d.pnl>=0?'+':''}$${d.pnl.toFixed(2)} (${d.total})</span></div>`).join('');
+  const days=Object.keys(daily).slice(-15);const pnls=days.map(d=>daily[d]);
+  if(pnlChartObj){pnlChartObj.destroy();pnlChartObj=null;}
+  pnlChartObj=new Chart(document.getElementById('pnlChart'),{type:'bar',data:{labels:days,datasets:[{label:'P&L',data:pnls,backgroundColor:pnls.map(v=>v>=0?'rgba(0,200,150,0.7)':'rgba(226,75,74,0.7)'),borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridC},ticks:{color:textC,font:{size:9},maxTicksLimit:8}},y:{grid:{color:gridC},ticks:{color:textC,font:{size:9},callback:v=>'$'+v}}}}});
+  perfBuilt=true;
+}
+
+/* Daily trade ceiling for the overtrading check. Six is the old
+   dashboard's figure; one constant so it is easy to change. */
+const OVERTRADE_LIMIT = 6;
+function analyzeErrors(){
+  const errors=[],trades=state.openTrades,now=Date.now()/1000;
+  trades.forEach(t=>{
+    if(!t.sl||parseFloat(t.sl)===0)errors.push({severity:'high',icon:'⚠️',title:`No Stop Loss — ${t.symbol} #${t.ticket}`,desc:`Trade on ${t.symbol} has no stop loss set.`,fix:'Set a stop loss immediately. Max risk 1-2% of account.'});
+    if(parseFloat(t.riskPct||0)>2.5)errors.push({severity:'medium',icon:'📊',title:`Oversize Position — ${t.symbol} (${parseFloat(t.riskPct).toFixed(1)}% risk)`,desc:`Risks ${parseFloat(t.riskPct).toFixed(1)}% of account — above 2% rule.`,fix:'Reduce lot size or tighten stop loss.'});
+  });
+  /* REVENGE TRADING — rewritten. The old test counted OPEN trades whose
+     openTime was inside 5 minutes. That misses the actual pattern, which is
+     re-entering straight after a LOSS: by the time you look, the losing
+     trade is closed and only the replacement is open, so 3 simultaneous
+     opens was the only thing it could ever catch. Now it pairs a closed
+     LOSING trade against the next entry within 15 minutes, which is what
+     revenge trading actually is. */
+  const closed=(state.closedTrades||[]).map(t=>({sym:t.symbol,p:parseFloat(t.profit||0),t:parseInt(t.time||0)}))
+                                        .filter(t=>t.t>0);
+  const losses=closed.filter(t=>t.p<0 && (now-t.t)<3600);
+  let revenge=null;
+  losses.forEach(L=>{
+    trades.forEach(t=>{
+      const ot=parseInt(t.openTime||0); if(!ot) return;
+      const gap=ot-L.t;
+      if(gap>=0 && gap<=900){
+        const mins=Math.max(1,Math.round(gap/60));
+        if(!revenge||gap<revenge.gap) revenge={gap:gap,mins:mins,sym:t.symbol,lost:L.sym,amt:Math.abs(L.p)};
+      }
+    });
+  });
+  if(revenge)errors.push({severity:'high',icon:'🔄',
+    title:`Possible Revenge Trading — re-entered ${revenge.mins} min after a loss`,
+    desc:`A losing trade on ${revenge.lost} closed down ${revenge.amt.toFixed(2)}, then ${revenge.sym} was opened ${revenge.mins} minute${revenge.mins===1?'':'s'} later. Re-entering this fast is usually the loss talking, not the setup.`,
+    fix:'Apply a 30-minute cooldown after any loss. Re-read the setup before re-entering.'});
+  /* Still worth flagging a burst of simultaneous opens, separately. */
+  const recentTrades=trades.filter(t=>(now-parseInt(t.openTime||0))<300);
+  if(recentTrades.length>=3)errors.push({severity:'high',icon:'⚡',
+    title:`Rapid Entries — ${recentTrades.length} trades opened in 5 min`,
+    desc:`${recentTrades.length} positions were opened inside five minutes. Clustered entries mean one bad read is taken ${recentTrades.length} times at once.`,
+    fix:'Close the ones you cannot justify individually. Stagger entries.'});
+  /* OVERTRADING — this was in the old dashboard and was LOST in the
+     redesign. Counts everything opened today (closed entries plus what is
+     still open) against a daily ceiling. */
+  const dayStart=Math.floor(new Date().setHours(0,0,0,0)/1000);
+  const todayClosed=closed.filter(t=>t.t>=dayStart).length;
+  const todayOpen=trades.filter(t=>parseInt(t.openTime||0)>=dayStart).length;
+  const todayTotal=todayClosed+todayOpen;
+  if(todayTotal>=OVERTRADE_LIMIT){
+    const dayLoss=closed.filter(t=>t.t>=dayStart).reduce((a,b)=>a+b.p,0);
+    errors.push({severity:dayLoss<0?'high':'medium',icon:'📈',
+      title:`Overtrading — ${todayTotal} trades today`,
+      desc:`${todayTotal} trades placed today (limit ${OVERTRADE_LIMIT}): ${todayClosed} closed, ${todayOpen} still open.`+
+           (dayLoss<0?` The day is down ${Math.abs(dayLoss).toFixed(2)}, so volume is not being rewarded.`:''),
+      fix:'Stop opening new positions today. Review whether each one met your own entry rules.'});
+  }
+  // The Indicators panel advertises this blackout as "15 min before/after
+  // HIGH impact", but the filter below only ever caught events still in the
+  // FUTURE (diff>0) — so the moment a release printed, the warning vanished,
+  // exactly when spreads are at their worst. Now genuinely +/-15 min, matching
+  // the label.
+  const nearHigh=(state.news||[]).filter(n=>{const diff=(n.timestamp||0)-now;return n.impact==='high'&&diff>-900&&diff<900;});
+  if(nearHigh.length>0&&trades.length>0){
+    const diff=(nearHigh[0].timestamp||0)-now;
+    const mins=Math.round(Math.abs(diff)/60);
+    errors.push({severity:'medium',icon:'📰',
+      title:diff>=0?`HIGH Impact News in ${mins} minutes`:`HIGH Impact News released ${mins} minutes ago`,
+      desc:`${nearHigh[0].title} ${diff>=0?'releasing soon':'just released'} with open trades.`,
+      fix:diff>=0?'Consider closing positions before news. Spreads will widen.':'Spreads are still wide. Avoid new entries until the blackout clears.'});
+  }
+  document.getElementById('errCount').textContent=errors.length;
+  document.getElementById('noSlCount').textContent=trades.filter(t=>!t.sl||parseFloat(t.sl)===0).length;
+  document.getElementById('oversizeCount').textContent=trades.filter(t=>parseFloat(t.riskPct||0)>2.5).length;
+  /* THE COUNT AND THE LIST MUST AGREE. errCount is written above from
+     errors.length, but #errorsList (which holds the reasons) was set to
+     display:none in the redesign, and #errDetail - a DIFFERENT list with
+     DIFFERENT thresholds - is what the user actually sees. So the card
+     could read 4 while three unrelated rows showed. Publishing the array
+     lets the visible list render every counted error with its reason. */
+  window.__bwTradeErrors = errors;
+  /* Repaint the visible list in the same beat, so #errCount is never
+     briefly the host's number while the list still shows the old rows. */
+  if(window.BWSkinPaintErrors) window.BWSkinPaintErrors();
+  const el=document.getElementById('errorsList');
+  if(!errors.length){el.innerHTML='<div style="color:var(--accent);font-size:12px;padding:10px 0">✓ No trade errors detected. Good discipline!</div>';return;}
+  el.innerHTML=errors.map(e=>`<div class="error-item ${e.severity}"><span style="font-size:18px;flex-shrink:0">${e.icon}</span><div><div class="etitle">${e.title}</div><div class="edesc">${e.desc}</div><div class="efix">→ ${e.fix}</div></div></div>`).join('');
+}
+
+function updateNews(events){
+  if(!events||!events.length)return;
+  state.news=events;
+  const now=Date.now()/1000;
+  const el=document.getElementById('newsFeed');
+  el.innerHTML=[...events].sort((a,b)=>(a.timestamp||0)-(b.timestamp||0)).slice(0,10).map(e=>{
+    const diff=(e.timestamp||0)-now;
+    const ts=diff>0?(diff<3600?Math.round(diff/60)+'m':Math.floor(diff/3600)+'h '+Math.round((diff%3600)/60)+'m'):'Released';
+    return`<div class="news-item"><div class="news-time">${ts}</div><div style="display:flex;align-items:center;flex-wrap:wrap;gap:3px;margin-bottom:2px"><span class="impact ${e.impact}">${(e.impact||'').toUpperCase()}</span><div class="news-title">${e.title} (${e.country||''})</div></div><div class="news-meta">Fcst: ${e.forecast||'—'} · Prev: ${e.previous||'—'}${e.actual?' · <strong>Actual: '+e.actual+'</strong>':''}</div></div>`;
+  }).join('');
+}
+
+function showAlert(msg){
+  const bar=document.getElementById('alertBar');
+  document.getElementById('alertText').textContent=msg;
+  bar.classList.add('show');
+  setTimeout(()=>bar.classList.remove('show'),20000);
+}
+
+connectWS();
+
+async function loadAlertHistory(){
+  try{
+    const res=await fetch('/api/alerts');
+    const alerts=await res.json();
+    if(!alerts||!alerts.length) return;
+
+    const feed=document.getElementById('alertFeed');
+    feed.innerHTML='';alertCounts={bull:0,bear:0,neut:0};
+
+    // Bucket into "today" vs "earlier" using the BROWSER'S OWN local date —
+    // not server time, not UTC. bwDate(x).toDateString() already reflects
+    // whatever timezone this specific viewer's device is set to, so this
+    // naturally gives each user a correct local-midnight boundary with zero
+    // timezone detection needed. No alerts are ever deleted for this — it's
+    // purely a display grouping, recomputed fresh on every load.
+    const todayStr=new Date().toDateString();
+    const sorted=[...alerts].sort((a,b)=>bwDate(b.time)-bwDate(a.time));
+    const today=sorted.filter(a=>bwDate(a.time).toDateString()===todayStr);
+    const earlier=sorted.filter(a=>bwDate(a.time).toDateString()!==todayStr);
+
+    today.forEach(a=>appendAlertRow(a));
+    if(earlier.length){
+      const divider=document.createElement('div');
+      divider.style.cssText='padding:6px 10px;font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px;text-transform:uppercase;border-bottom:0.5px solid var(--border);margin-top:4px';
+      divider.textContent='EARLIER';
+      feed.appendChild(divider);
+      earlier.forEach(a=>appendAlertRow(a));
+    }
+    recountAlerts();
+  }catch(e){console.log('[INIT] Could not fetch alert history:',e.message);}
+}
+
+// Keeps the today/earlier split correct for a tab left open across local
+// midnight, without deleting anything — just re-buckets what's already
+// loaded. Checks every minute; cheap, and only acts on an actual date change.
+let lastSeenLocalDate=new Date().toDateString();
+setInterval(()=>{
+  const nowStr=new Date().toDateString();
+  if(nowStr!==lastSeenLocalDate){
+    lastSeenLocalDate=nowStr;
+    /* Zero the cards the moment local midnight passes, so a tab left open
+       overnight shows 0 immediately instead of yesterday's totals until
+       the re-fetch lands. loadAlertHistory() then re-buckets everything
+       and recounts today's (now none) properly. */
+    alertCounts={bull:0,bear:0,neut:0};
+    recountAlerts();
+    loadAlertHistory(); // re-fetch + re-bucket now that local "today" has changed
+  }
+},60000);
+
+function appendAlertRow(a){
+  const feed=document.getElementById('alertFeed');
+  const dir=a.direction==='bullish'?'bull':a.direction==='bearish'?'bear':'neutral';
+  const confClass=a.confidence>=85?'conf-high':a.confidence>=70?'conf-med':'conf-low';
+  const t=bwDate(a.time||Date.now());
+  const ts=t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const row=document.createElement('div');
+  row.className='alert-item '+dir;
+  row.style.cursor='pointer';
+  row.title='View '+a.symbol+' chart';
+  row.innerHTML='<span class="alert-dot '+dir+'"></span><div class="alert-body"><div class="alert-name">'+a.name+'<span class="conf-pill '+confClass+'">'+a.confidence+'%</span></div><div class="alert-meta">'+a.symbol+' · '+a.timeframe+' · '+parseFloat(a.price||0).toFixed(5)+'</div><div class="alert-desc">'+(a.desc||'')+'</div></div><div class="alert-time">'+ts+'</div>';
+  row.addEventListener('click',()=>switchToPair(a.symbol,a.timeframe));
+  const gk=alertGroupKey(a);
+  let tail=feed.lastElementChild;
+  let hdr=null;
+  for(let el=tail; el; el=el.previousElementSibling){
+    if(el.classList.contains('alert-group')){ hdr=el; break; }
+  }
+  if(!(hdr && hdr.dataset.groupKey===String(gk))){
+    hdr=buildGroupHeader(gk);
+    feed.appendChild(hdr);
+  }
+  feed.appendChild(row);
+  refreshGroupCount(hdr);
+  bumpAlertCount(a);
+}
+
+loadAlertHistory();
+</script>
+<script>/* ═══════════════════════════════════════════════════════════════════
+   BLACKWOOD — RISK RADAR  (per-pair manipulation-risk scoring)
+   ───────────────────────────────────────────────────────────────────
+   Self-contained. Reads ONLY what index.html already holds:
+     state.watchlist   bid / ask / spread / change per pair
+     dataBySymbol      candlesByTF {H1,H4}, patternsByTF, indicatorsByTF
+     state.news        calendar events (impact / country / timestamp)
+     activePair        currently viewed pair (BARE, already normalised)
+
+   It does not modify updateAll(), handleCandleUpdate(), the pair-switch
+   logic, or any existing render function. It polls the state object on
+   its own timer, so nothing in the existing data path changes.
+
+   Symbol handling follows the house rule: normalisePair() on every
+   lookup, bare pair as the key, pretty pair in the UI.
+   ═══════════════════════════════════════════════════════════════════ */
+(function boot(){
+'use strict';
+
+/* The host page's main script is <script defer>, so it runs AFTER every
+   inline script on the page — including this one. normalisePair, state and
+   dataBySymbol therefore do not exist yet at first execution. Wait for
+   them by NAME (arguments.callee throws under 'use strict', which silently
+   killed this module the first time round). */
+/* NOTE: the host page declares its globals with `let` (let state,
+   let dataBySymbol, let activePair). A top-level `let` does NOT create a
+   window property - only function declarations do, which is why
+   normalisePair was found but the data objects never were. Bare
+   identifiers DO work, because script-level lexical declarations are
+   visible to every other script in the global scope, and `typeof` on an
+   undeclared name is safe and does not throw. */
+if(typeof normalisePair!=='function' || typeof state==='undefined' || typeof dataBySymbol==='undefined'){
+  if(boot.tries===undefined) boot.tries=0;
+  if(++boot.tries > 120){ console.error('[RiskRadar] host page never initialised — giving up'); return; }
+  setTimeout(boot, 250);
+  return;
+}
+console.log('[RiskRadar] engine ready after', (boot.tries||0)*250, 'ms');
+
+const RR = window.BWRiskRadar = {};
+
+/* ── Configuration ───────────────────────────────────────────────
+   Every weight lives here so tuning never means touching logic. */
+const CFG = {
+  cycleMs: 5000,          // recompute cadence
+  histLen: 120,           // sparkline points
+  spreadSamples: 120,     // rolling window for the median spread
+  promoteCycles: 2,       // cycles a higher state must hold before it shows
+  demoteCycles: 3,        // cycles a lower state must hold
+  /* demoteMargin was 8, which created a DEAD ZONE below every band where
+     the level could never fall: to leave Caution (min 25) the score had to
+     drop under 17, so a score of 23 sat on "Caution" forever even though
+     23 is squarely in the Clear band. Same at 42-49 (stuck Elevated) and
+     67-74 (stuck Stand down). The margin exists to stop flapping exactly
+     on a boundary, and 2 points does that; the real anti-flap protection
+     is demoteCycles, which is unchanged. */
+  demoteMargin: 2,        // and it must be this far below the band
+  smcUrlH1: '/smc',       // GET /smc  -> default (H1) entries
+  smcUrlH4: '/smc/tf/H4', // GET /smc/tf/H4 -> H4 entries
+  smcMaxAgeMin: 20,       // ignore SMC data staler than this
+  weights: {
+    obH4: 30, obH1: 18, obCounterBias: 8,
+    spread15: 7, spread20: 14, spread30: 22,
+    sweep: 18, failbreak: 20, conflict: 10,
+    vol18: 9, vol25: 15,
+    magnet: 8,
+    sessLondon: 6, sessNY: 6, sessRollover: 10, sessAsia: 5,
+    newsDecay: [1, 0.35, 0.15]   // 1st, 2nd, 3rd+ overlapping event
+  }
+};
+
+/* ── The gap fix: EXTREME tier for the calendar ──────────────────
+   The feed only supplies impact = high|medium|low, which puts NFP in
+   the same bucket as a second-tier print. Titles are matched here and
+   promoted. Editable data, not code. */
+const EVENT_TIERS = [
+  {tier:'extreme', w:40, patterns:[
+    /non[- ]?farm|\bnfp\b/i,
+    /\bcpi\b|consumer price index/i,
+    /\bfomc\b|federal funds|fed (interest )?rate/i,
+    /interest rate decision|rate statement|monetary policy (decision|statement)/i,
+    /press conference|powell|lagarde|bailey|ueda/i,
+    /\bgdp\b.*(advance|prelim|q\/q)|advance gdp/i,
+    /unemployment rate/i,
+    /\bppi\b|producer price index/i
+  ]},
+  {tier:'high', w:22, patterns:[
+    /retail sales/i, /\bpmi\b/i, /\bism\b/i, /jobless claims/i,
+    /trade balance/i, /consumer confidence/i, /\badp\b/i
+  ]},
+  {tier:'medium', w:8, patterns:[
+    /housing|building permits|inventories|sentiment|orders/i
+  ]}
+];
+const FALLBACK = {high:{tier:'high',w:20}, medium:{tier:'medium',w:8}, low:{tier:'low',w:2}};
+
+RR.classifyEvent = function(ev){
+  const title = String(ev && ev.title || '');
+  for(const t of EVENT_TIERS)
+    if(t.patterns.some(p=>p.test(title))) return {tier:t.tier, weight:t.w, matched:true};
+  const f = FALLBACK[(ev&&ev.impact)||'low'] || FALLBACK.low;
+  return {tier:f.tier, weight:f.w, matched:false};
+};
+
+/* Time weighting around a release. Peak T−5 → T+15 (the spike-and-
+   reverse window), then a decay tail out to T+60. */
+function newsTimeMultiplier(mins){
+  if(mins >  60) return 0;
+  if(mins >  30) return 0.25;
+  if(mins >   5) return 0.60;
+  if(mins > -15) return 1.00;
+  if(mins > -35) return 0.65;
+  if(mins > -60) return 0.30;
+  return 0;
+}
+
+const FACTOR_META = {
+  news:      {label:'Scheduled news window',   cat:'Event'},
+  ob:        {label:'Order block interaction', cat:'Structure'},
+  spread:    {label:'Spread expansion',        cat:'Execution'},
+  sweep:     {label:'Liquidity sweep',         cat:'Structure'},
+  failbreak: {label:'Failed break / whipsaw',  cat:'Structure'},
+  vol:       {label:'Volatility spike',        cat:'Execution'},
+  session:   {label:'Session boundary',        cat:'Timing'},
+  conflict:  {label:'Contradictory patterns',  cat:'Signal'},
+  magnet:    {label:'Liquidity magnet nearby', cat:'Structure'}
+};
+
+const LEVELS = [
+  {key:'clear',     name:'Clear',      min:0,  color:'#00c896', advice:'Normal conditions. Trade your plan.'},
+  {key:'caution',   name:'Caution',    min:25, color:'#4a9eff', advice:'One risk factor live. Confirm before entry.'},
+  {key:'elevated',  name:'Elevated',   min:50, color:'#f5a623', advice:'Stacked conditions. Reduce size, widen stops.'},
+  {key:'standdown', name:'Stand down', min:75, color:'#e24b4a', advice:'Engineered-move window. Avoid fresh entries.'}
+];
+function levelFor(s){ let l=LEVELS[0]; for(const x of LEVELS) if(s>=x.min) l=x; return l; }
+RR.LEVELS = LEVELS;
+
+/* ── Per-pair rolling memory ─────────────────────────────────────
+   Everything the score needs that a single snapshot cannot provide:
+   spread history, previous swing points, recent structure events. */
+const mem = {};   // bare pair -> record
+function memFor(sym){
+  if(!mem[sym]) mem[sym] = {
+    sym, spreads:[], score:0, rawScore:0, factors:[],
+    level:LEVELS[0], pendingLevel:null, pendingCount:0,
+    history:[], events:[], cool:{}, lastBar:{},
+    lastStruct:null, levelChangedAt:null, prevLevel:null,
+    unavailable:{}
+  };
+  return mem[sym];
+}
+RR.mem = mem;
+
+/* ── Candle field accessors ───────────────────────────────────────
+   The EA serialises candles as {t,o,h,l,c,v} (BuildCandlesJSON in
+   Mt5_tradingassistant_v3_9.mq5), NOT {time,open,high,low,close}.
+   Reading .high/.close directly yields undefined and every derived
+   number becomes NaN — silently, because NaN comparisons are just
+   false. These accept either shape. */
+function cH(b){ return parseFloat(b && (b.h !== undefined ? b.h : b.high)); }
+function cL(b){ return parseFloat(b && (b.l !== undefined ? b.l : b.low)); }
+function cC(b){ return parseFloat(b && (b.c !== undefined ? b.c : b.close)); }
+function cO(b){ return parseFloat(b && (b.o !== undefined ? b.o : b.open)); }
+function cT(b){ return b && (b.t !== undefined ? b.t : b.time); }
+
+/* ── Data accessors — read the host page, never mutate it ────────── */
+function watchRow(sym){
+  const list = (typeof state!=='undefined'&&state.watchlist) || [];
+  const want = normalisePair(sym);
+  return list.find(w=>normalisePair(w.symbol)===want) || null;
+}
+function candles(sym, tf){
+  const c = (typeof dataBySymbol!=='undefined') ? dataBySymbol[normalisePair(sym)] : null;
+  return (c && c.candlesByTF && c.candlesByTF[tf]) || [];
+}
+function patternsOf(sym, tf){
+  const c = (typeof dataBySymbol!=='undefined') ? dataBySymbol[normalisePair(sym)] : null;
+  return (c && c.patternsByTF && c.patternsByTF[tf]) || [];
+}
+function pairList(){
+  const list = (typeof state!=='undefined'&&state.watchlist) || [];
+  return list.map(w=>normalisePair(w.symbol)).filter((v,i,a)=>v&&a.indexOf(v)===i);
+}
+function ccyOf(sym){
+  const s = normalisePair(sym);
+  return s.length===6 ? [s.slice(0,3), s.slice(3,6)] : [s];
+}
+function digitsOf(sym){
+  const b = candles(sym,'H1'); const px = b.length? cC(b[b.length-1]) : 0;
+  if(/JPY$/.test(sym)) return 3;
+  if(/^XAU|^XAG/.test(sym)) return 2;
+  return px && px>50 ? 2 : 5;
+}
+/* SPREAD IN POINTS — never trust wr.spread alone.
+   The EA reads SymbolInfoInteger(p, SYMBOL_SPREAD). On a FLOATING-spread
+   account (Exness raw/zero being the common case) MT5 can report that as
+   0, so `if(sp > 0)` rejected every sample, m.spreads never reached its
+   12-sample minimum, and the Spread expansion factor could never fire —
+   on that account only. Deriving it from ask-bid, which the EA sends for
+   every watchlist row anyway, gives the same number on a fixed-spread
+   account and a real number on a floating one. */
+function spreadPoints(wr, sym){
+  const rep = wr && wr.spread != null ? +wr.spread : 0;
+  if(rep > 0) return rep;
+  const bid = wr && +wr.bid, ask = wr && +wr.ask;
+  if(!bid || !ask || ask <= bid) return 0;
+  const point = Math.pow(10, -digitsOf(sym));
+  return (ask - bid) / point;
+}
+function lastPrice(sym){
+  const w = watchRow(sym);
+  if(w && w.bid) return +w.bid;
+  const b = candles(sym,'H1');
+  return b.length ? cC(b[b.length-1]) : 0;
+}
+
+/* ── SMC adapter ────────────────────────────────────────────────
+   index.html carries no SMC data of its own — order blocks live in
+   the separate SMC module. This fetches them if the endpoint answers
+   and marks the factor UNAVAILABLE if it does not, so a missing feed
+   is visible in the UI rather than silently scoring zero. */
+let smcH1 = null, smcH4 = null, smcOk = null, smcLastTry = 0;
+function loadSMC(){
+  if(Date.now()-smcLastTry < 30000) return;
+  smcLastTry = Date.now();
+  const get = url => fetch(url, {credentials:'same-origin', headers:{'Accept':'application/json'}})
+    .then(r=>r.ok?r.json():Promise.reject(r.status));
+  // Both timeframes: GET /smc returns default (H1) entries only; H4 lives
+  // behind /smc/tf/H4. Both are requirePlan('pro') and cookie-authenticated,
+  // so credentials must be sent.
+  Promise.all([ get(CFG.smcUrlH1).catch(()=>null), get(CFG.smcUrlH4).catch(()=>null) ])
+    .then(([h1,h4])=>{
+      if(h1===null && h4===null){ smcOk=false; return; }
+      smcH1 = h1 || {}; smcH4 = h4 || {}; smcOk = true;
+    })
+    .catch(()=>{ smcOk=false; });
+}
+
+/* Real payload shape, confirmed against smc-route.js:
+     GET /smc -> { "<BROKER SYMBOL>": { symbol, timeframe, orderBlocks:[],
+                   fvgs:[], structure:[], receivedAt } }
+   Order blocks are ZONES with high/low, not single prices, and the keys are
+   the broker's own symbols (EURUSDc), so every lookup is normalised. */
+function smcNodeFor(bag, sym){
+  if(!bag) return null;
+  const want = normalisePair(sym);
+  for(const k of Object.keys(bag)) if(normalisePair(k)===want) return bag[k];
+  return null;
+}
+function freshEnough(node){
+  if(!node || !node.receivedAt) return true;   // no stamp -> don't discard
+  const t = (typeof bwDate==='function' ? bwDate(node.receivedAt) : new Date(node.receivedAt));
+  if(isNaN(+t)) return true;
+  return (Date.now()-t.getTime())/60000 <= CFG.smcMaxAgeMin;
+}
+function zonesFor(sym){
+  const out = {obs:[], structure:[], stale:false, any:false};
+  [['H1',smcH1],['H4',smcH4]].forEach(([tf,bag])=>{
+    const node = smcNodeFor(bag, sym);
+    if(!node) return;
+    out.any = true;
+    if(!freshEnough(node)){ out.stale = true; return; }
+    (node.orderBlocks||[]).forEach(o=>{
+      const hi=parseFloat(o.high), lo=parseFloat(o.low);
+      if(!isFinite(hi)||!isFinite(lo)) return;
+      const ot = o.timeStart ? (typeof bwDate==='function'?bwDate(o.timeStart):new Date(o.timeStart)) : null;
+      out.obs.push({
+        tf, high:Math.max(hi,lo), low:Math.min(hi,lo),
+        at: (ot && !isNaN(+ot)) ? ot.getTime() : null,
+        dir: String(o.direction||'').toLowerCase().indexOf('bear')>=0?'bearish':'bullish'
+        // NOTE: the EA sends only direction/high/low. There is NO mitigated,
+        // filled, tested, time or index field, so freshness has to be
+        // inferred from price action — see obMitigated() below.
+      });
+    });
+    /* The EA emits type as "BOS_Bull" / "BOS_Bear" / "CHoCH_Bull" /
+       "CHoCH_Bear" and a `time` — there is NO separate direction field
+       and NO bar_index. Kind and direction both come out of the type
+       string, and ordering comes from the timestamp. */
+    (node.structure||[]).forEach(st=>{
+      const label = String(st.type||st.name||st.event||st.label||'').toUpperCase();
+      const kind = label.indexOf('CHOCH')>=0 ? 'CHOCH'
+                 : label.indexOf('BOS')>=0   ? 'BOS' : null;
+      if(!kind) return;
+      const dir = label.indexOf('BEAR')>=0 ? 'bearish' : 'bullish';
+      const t = (typeof bwDate==='function' ? bwDate(st.time) : new Date(st.time));
+      out.structure.push({ tf, kind, dir, at: isNaN(+t) ? 0 : t.getTime(), level:+st.level||0 });
+    });
+  });
+  return out;
+}
+
+/* ── Order block freshness ───────────────────────────────────────
+   The SMC payload carries no mitigation flag and no timestamp, so an old
+   block that price has already traded clean through looks identical to a
+   fresh untouched one. Infer it from the candles the dashboard already
+   holds: a demand (bullish) block is spent once a bar CLOSES below its
+   low; a supply (bearish) block is spent once a bar closes above its high.
+   Returns {spent, touches} — touches is how many bars have traded inside
+   it, because a zone hit repeatedly is weaker than a virgin one. */
+function obState(sym, ob, lookback){
+  const c = candles(sym, ob.tf);
+  if(c.length < 3) return {spent:false, touches:0, known:false};
+  const s = c.slice(-(lookback||60));
+  let spent=false, touches=0, brokeAt=-1, inside=false;
+  for(let i=0;i<s.length;i++){
+    const b=s[i], cl=cC(b), hi=cH(b), lo=cL(b);
+    // Count distinct VISITS, not bars. Price parked inside a zone for 40
+    // bars is one test of it, not forty.
+    const nowIn = (hi >= ob.low && lo <= ob.high);
+    if(nowIn && !inside) touches++;
+    inside = nowIn;
+    if(ob.dir==='bullish' && cl < ob.low){ spent=true; brokeAt=s.length-1-i; }
+    if(ob.dir==='bearish' && cl > ob.high){ spent=true; brokeAt=s.length-1-i; }
+  }
+  return {spent, touches, brokeAt, known:true};
+}
+
+/* ── Candle-derived detectors ───────────────────────────────────── */
+function atr(sym, tf, n){
+  const c = candles(sym, tf); if(c.length<3) return 0;
+  const s = c.slice(-(n||20));
+  return s.reduce((a,b)=>a+Math.abs(cH(b)-cL(b)),0)/s.length;
+}
+function swings(sym, tf, look){
+  const c = candles(sym, tf); if(c.length < 10) return null;
+  const s = c.slice(-(look||20), -1);
+  return {
+    hi: Math.max.apply(null, s.map(cH)),
+    lo: Math.min.apply(null, s.map(cL))
+  };
+}
+/* A sweep is a wick beyond the prior swing that closes back inside. */
+function detectSweep(sym, tf){
+  const c = candles(sym, tf); if(c.length < 12) return null;
+  const last = c[c.length-1], sw = swings(sym, tf, 20);
+  if(!sw) return null;
+  const hi=cH(last), lo=cL(last), cl=cC(last);
+  if(hi > sw.hi && cl < sw.hi) return {side:'high', level:sw.hi};
+  if(lo < sw.lo && cl > sw.lo) return {side:'low',  level:sw.lo};
+  return null;
+}
+
+/* ── Session clock (server/UTC) ─────────────────────────────────── */
+function sessionFactor(){
+  const h = new Date().getUTCHours();
+  const W = CFG.weights;
+  if(h===7||h===8)   return {w:W.sessLondon,   why:'London open — first-hour stop runs are routine'};
+  if(h===12||h===13) return {w:W.sessNY,       why:'New York open — session overlap volatility'};
+  if(h===21)         return {w:W.sessRollover, why:'Daily rollover — thin book, spreads widen'};
+  if(h>=0 && h<6)    return {w:W.sessAsia,     why:'Asian session — thin liquidity, range fakeouts'};
+  return null;
+}
+
+/* ── Scoring ─────────────────────────────────────────────────────── */
+function scorePair(sym){
+  const m = memFor(sym), W = CFG.weights, f = [];
+  const push=(id,weight,detail)=>{ if(weight>0.5) f.push(Object.assign({id,weight:Math.round(weight),detail}, FACTOR_META[id])); };
+  const px = lastPrice(sym);
+  if(!px){ m.factors=[]; m.rawScore=0; return m; }
+  m.obSkipped = 0;   // per-cycle counter, not cumulative
+  const dg = digitsOf(sym);
+  const fmt = v => (+v).toFixed(dg);
+
+  /* 1 — NEWS, with the EXTREME tier and diminishing overlap weights */
+  const ccy = ccyOf(sym), now = Date.now()/1000;
+  const evs = ((typeof state!=='undefined'&&state.news) || [])
+    .map(ev=>{
+      const cls = RR.classifyEvent(ev);
+      const mins = ((+ev.timestamp||0) - now)/60;
+      const mult = newsTimeMultiplier(mins);
+      return {ev, cls, mins, mult, score: ccy.indexOf(ev.country)>=0 ? cls.weight*mult : 0};
+    })
+    .filter(x=>x.score>0.5)
+    .sort((a,b)=>b.score-a.score);
+  evs.forEach((e,i)=>{
+    const dec = W.newsDecay[Math.min(i, W.newsDecay.length-1)];
+    const when = e.mins>=0 ? ('in '+(e.mins<1?'<1':Math.round(e.mins))+'m') : (Math.round(-e.mins)+'m ago');
+    push('news', e.score*dec,
+      e.cls.tier.toUpperCase()+' · '+e.ev.title+' ('+e.ev.country+') '+when +
+      (e.cls.matched ? '' : ' · tier from feed impact, title not in table') +
+      (i>0 ? ' · overlapping, weighted down' : ''));
+  });
+  m.newsRows = evs;
+
+  /* Queue for events detected before addEv() is defined below. */
+  const _q = m._deferred || (m._deferred = []);
+  const addEvLater=(id,w,life,detail)=>_q.push([id,w,life,detail]);
+
+  /* 2 — ORDER BLOCKS, and 5 — FAILED BREAK, both from the SMC store */
+  const z = (smcOk === true) ? zonesFor(sym) : null;
+  if(!z || (!z.any && smcOk!==true)){
+    m.unavailable.ob = true; m.unavailable.failbreak = true;
+  }else{
+    m.unavailable.ob = z.stale ? 'stale' : false;
+    m.unavailable.failbreak = z.stale ? 'stale' : false;
+    const bias = (((typeof dataBySymbol!=='undefined'&&dataBySymbol[sym])||{}).indicatorsByTF||{}).H4;
+    const htf = bias && bias.trend ? String(bias.trend).toLowerCase() : '';
+    // Proximity is measured against the zone itself, with a tolerance
+    // proportional to the zone's own height — a wide block should not need
+    // pinpoint accuracy to count as "price is in it".
+    z.obs.forEach(ob=>{
+      const tol = Math.max((ob.high-ob.low)*0.25, px*0.00008);
+      if(!(px >= ob.low-tol && px <= ob.high+tol)) return;
+      const st = obState(sym, ob);
+      // Price has already closed clean through it — the liquidity there is
+      // gone. Score nothing rather than warning about a dead zone.
+      if(st.spent){ m.obSkipped = (m.obSkipped||0)+1; return; }
+      let w = ob.tf==='H4' ? W.obH4 : W.obH1;
+      const counter = (ob.dir==='bearish' && htf.indexOf('bull')>=0) ||
+                      (ob.dir==='bullish' && htf.indexOf('bear')>=0);
+      if(counter) w += W.obCounterBias;
+      // A zone tapped several times already is weaker than a virgin one.
+      if(st.touches >= 4) w *= 0.6;
+      else if(st.touches >= 2) w *= 0.8;
+      const ageBars = ob.at ? Math.round((Date.now()-ob.at)/((ob.tf==='H4'?4:1)*3600*1000)) : null;
+      push('ob', w, '['+ob.tf+'] Price inside '+ob.dir+' order block '+
+        fmt(ob.low)+' – '+fmt(ob.high) +
+        (ageBars!==null ? ' · formed '+ageBars+' bar(s) ago' : '') +
+        (st.touches>1 ? ' · tapped '+st.touches+'× already, weighted down' : ' · untouched') +
+        (counter ? ' — sits against H4 bias, classic trap location' : ''));
+    });
+    // A CHoCH printing shortly after a BOS in the OPPOSITE direction is a
+    // failed break by definition — the move that broke structure reversed.
+    ['H1','H4'].forEach(tf=>{
+      // Ordered by the EA's own timestamps — ascending is chronological.
+      const st = z.structure.filter(x=>x.tf===tf && x.at).sort((a,b)=>a.at-b.at);
+      const barMs = (tf==='H4'?4:1)*3600*1000;
+      for(let i=1;i<st.length;i++){
+        const prev=st[i-1], cur=st[i];
+        const gapBars   = (cur.at-prev.at)/barMs;
+        const ageBars   = (Date.now()-cur.at)/barMs;
+        if(prev.kind==='BOS' && cur.kind==='CHOCH' && prev.dir!==cur.dir &&
+           gapBars <= 5 && ageBars <= 6){
+          addEvLater('failbreak', W.failbreak, 60*60*1000,
+            '['+tf+'] CHoCH ('+cur.dir+') printed '+Math.max(1,Math.round(gapBars))+
+            ' bar(s) after a BOS ('+prev.dir+') — the break failed');
+          break;
+        }
+      }
+    });
+  }
+
+  /* 3 — SPREAD expansion vs this pair's own rolling median */
+  const wr = watchRow(sym);
+  if(wr){
+    const sp = spreadPoints(wr, sym);
+    if(sp > 0){
+      m.spreads.push(sp);
+      if(m.spreads.length > CFG.spreadSamples) m.spreads.shift();
+      if(m.spreads.length >= 12){
+        const sorted = m.spreads.slice().sort((a,b)=>a-b);
+        const med = sorted[Math.floor(sorted.length/2)] || sp;
+        const ratio = sp/med;
+        if(ratio >= 1.5){
+          const w = ratio>=3 ? W.spread30 : ratio>=2 ? W.spread20 : W.spread15;
+          push('spread', w, 'Spread '+sp.toFixed(1)+'pt vs '+med.toFixed(1)+'pt normal — '+ratio.toFixed(1)+'× wider');
+        }
+      }
+    }
+  }
+
+  /* Transient structure events: one live instance per id, then a
+     cooldown, so a re-detecting condition can't sit on permanently. */
+  const deferred = m._deferred || (m._deferred = []);
+  m.events = m.events.filter(e=>e.until > Date.now());
+  const addEv=(id,w,lifeMs,detail)=>{
+    if(m.events.some(e=>e.id===id)) return;
+    if((m.cool[id]||0) > Date.now()) return;
+    m.events.push({id,w,until:Date.now()+lifeMs,detail});
+    m.cool[id] = Date.now() + lifeMs + 20*60*1000;
+  };
+  while(deferred.length){ const d=deferred.shift(); addEv(d[0],d[1],d[2],d[3]); }
+
+  /* 4 — LIQUIDITY SWEEP, evaluated once per new bar */
+  ['H1','H4'].forEach(tf=>{
+    const c = candles(sym, tf); if(!c.length) return;
+    const t = cT(c[c.length-1]);
+    // One slot PER TIMEFRAME. A single shared slot meant H1 and H4 kept
+    // overwriting each other's "last bar seen", so the per-bar guard never
+    // actually held and only one timeframe was ever evaluated properly.
+    if(m.lastBar[tf] === t) return;
+    m.lastBar[tf] = t;
+    const sw = detectSweep(sym, tf);
+    if(sw) addEv('sweep', W.sweep, 45*60*1000,
+      '['+tf+'] wick took out the prior swing '+sw.side+' at '+fmt(sw.level)+' and closed back inside — stops harvested');
+  });
+
+  /* 6 — VOLATILITY spike, on BOTH timeframes. H4 carries more weight:
+     an outsized 4-hour range is a bigger statement than an outsized hour. */
+  ['H1','H4'].forEach(tf=>{
+    const cc = candles(sym, tf);
+    if(cc.length <= 21) return;
+    const last = cc[cc.length-1];
+    const rng = Math.abs(cH(last)-cL(last));
+    const a = atr(sym, tf, 20);
+    if(!(a>0)) return;
+    const vr = rng/a;
+    if(vr >= 1.8){
+      const base = vr>=2.5 ? W.vol25 : W.vol18;
+      push('vol', tf==='H4' ? base*1.3 : base,
+        '['+tf+'] Current bar range is '+vr.toFixed(1)+'× the 20-bar average');
+    }
+  });
+
+  /* 7 — SESSION boundary */
+  const s = sessionFactor();
+  if(s) push('session', s.w, s.why + ' · ' + String(new Date().getUTCHours()).padStart(2,'0') + ':00 UTC');
+
+  /* 8 — CONTRADICTORY PATTERNS on the same pair within a few bars */
+  ['H1','H4'].forEach(tf=>{
+    const ps = patternsOf(sym, tf).filter(p=>(+p.confidence||0) >= 70);
+    const bull = ps.filter(p=>/bull/i.test(p.direction||''));
+    const bear = ps.filter(p=>/bear/i.test(p.direction||''));
+    if(bull.length && bear.length){
+      const b = bull[0], r = bear[0];
+      if(Math.abs((+b.bar_index||0) - (+r.bar_index||0)) <= 3)
+        addEv('conflict', W.conflict, 40*60*1000,
+          '['+tf+'] '+b.name+' ('+b.confidence+'%) and '+r.name+' ('+r.confidence+'%) within 3 bars');
+    }
+  });
+
+  m.events.forEach(e=>push(e.id, e.w, e.detail));
+
+  /* 9 — LIQUIDITY MAGNET: round numbers and the prior day extremes */
+  const step = dg>=5 ? 0.0050 : dg===3 ? 0.500 : 10;
+  const nearest = Math.round(px/step)*step;
+  if(Math.abs(px-nearest)/px < 0.00035)
+    push('magnet', W.magnet, 'Price '+fmt(px)+' is sitting on the '+fmt(nearest)+' round level — resting orders cluster here');
+
+  /* Total, smoothed so the number doesn't strobe */
+  const raw = Math.min(100, f.reduce((a,b)=>a+b.weight,0));
+  m.rawScore = raw;
+  m.score = Math.round(m.score*0.45 + raw*0.55);
+  m.factors = f.sort((a,b)=>b.weight-a.weight);
+  m.history.push(m.score);
+  if(m.history.length > CFG.histLen) m.history.shift();
+
+  /* Persistence + decay */
+  const want = levelFor(m.score);
+  if(want.key !== m.level.key){
+    const promoting = LEVELS.indexOf(want) > LEVELS.indexOf(m.level);
+    const need = promoting ? CFG.promoteCycles : CFG.demoteCycles;
+    const ok = promoting ? true : (m.score < m.level.min - CFG.demoteMargin);
+    if(m.pendingLevel && m.pendingLevel.key===want.key && ok) m.pendingCount++;
+    else { m.pendingLevel = want; m.pendingCount = 1; }
+    if(m.pendingCount >= need && ok){
+      m.prevLevel = m.level; m.level = want;
+      m.levelChangedAt = Date.now(); m.pendingCount = 0;
+      onLevelChange(m);
+    }
+  }else{ m.pendingLevel=null; m.pendingCount=0; }
+
+  return m;
+}
+
+/* ── Warning outcome log (self-validation) ─────────────────────── */
+RR.log = [];
+function onLevelChange(m){
+  const up = LEVELS.indexOf(m.level) > LEVELS.indexOf(m.prevLevel||LEVELS[0]);
+  if(!up) return;
+  if(m.level.key!=='elevated' && m.level.key!=='standdown') return;
+  RR.log.unshift({
+    t: Date.now(), sym: m.sym, level: m.level.key, score: m.score,
+    priceAt: lastPrice(m.sym), digits: digitsOf(m.sym),
+    factors: m.factors.slice(0,3).map(x=>x.label),
+    after15: null, after60: null
+  });
+  if(RR.log.length > 60) RR.log.pop();
+  RR.pendingTelegram = {sym:m.sym, level:m.level, score:m.score, factors:m.factors.slice(0,3), t:Date.now()};
+  try{ localStorage.setItem('bw-risk-log', JSON.stringify(RR.log.slice(0,60))); }catch(e){}
+}
+function updateLog(){
+  RR.log.forEach(e=>{
+    const mins = (Date.now()-e.t)/60000;
+    const px = lastPrice(e.sym);
+    if(!px || !e.priceAt) return;
+    const pips = (px-e.priceAt)/e.priceAt*10000;
+    if(e.after15===null && mins>=15) e.after15 = pips;
+    if(e.after60===null && mins>=60) e.after60 = pips;
+  });
+  try{ localStorage.setItem('bw-risk-log', JSON.stringify(RR.log.slice(0,60))); }catch(e){}
+}
+try{
+  const saved = JSON.parse(localStorage.getItem('bw-risk-log')||'[]');
+  if(Array.isArray(saved)) RR.log = saved;
+}catch(e){}
+
+/* ── Public API used by the UI layer ────────────────────────────── */
+RR.cycle = function(){
+  loadSMC();
+  const pairs = pairList();
+  if(!pairs.length) return;
+  pairs.forEach(scorePair);
+  updateLog();
+};
+RR.for = function(sym){ return memFor(normalisePair(sym)); };
+RR.worst = function(){
+  const p = pairList().map(memFor);
+  return p.length ? p.reduce((a,b)=>b.score>a.score?b:a) : null;
+};
+RR.smcStatus = function(){ return smcOk; };
+RR.levelFor = levelFor;
+RR.newsTimeMultiplier = newsTimeMultiplier;
+RR.CFG = CFG;
+
+})();
+</script>
+<script>/* ═══════════════════════════════════════════════════════════════════
+   BLACKWOOD — RISK RADAR : UI layer
+   Renders the Risk Radar tab, the top-bar chip and the watchlist dots.
+   Touches nothing outside its own element ids (all prefixed rr-) plus
+   the per-pair dot spans it injects into existing watchlist rows.
+   ═══════════════════════════════════════════════════════════════════ */
+(function boot(){
+'use strict';
+const RR = window.BWRiskRadar;
+/* Waits for the engine, which itself waits for the host page. Named
+   function, not arguments.callee — the latter throws under 'use strict'. */
+if(!RR){
+  if(boot.tries===undefined) boot.tries=0;
+  if(++boot.tries > 160){ console.error('[RiskRadar] engine never loaded'); return; }
+  setTimeout(boot, 250);
+  return;
+}
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function ago(t){ const s=Math.round((Date.now()-t)/1000); return s<60?s+'s':s<3600?Math.round(s/60)+'m':Math.round(s/3600)+'h'; }
+
+/* ── Sparkline + gauge (canvas, no library) ─────────────────────── */
+function sparkline(cv, data, color){
+  if(!cv || !cv.clientWidth) return;
+  const c=cv.getContext('2d'), W=cv.width=cv.clientWidth*2, H=cv.height=cv.clientHeight*2;
+  c.clearRect(0,0,W,H);
+  [[75,'rgba(226,75,74,0.10)'],[50,'rgba(245,166,35,0.09)'],[25,'rgba(74,158,255,0.07)']]
+    .forEach(([v,col])=>{ c.fillStyle=col; c.fillRect(0,0,W,H-(v/100*H)); });
+  if(data.length<2) return;
+  c.beginPath();
+  data.forEach((v,i)=>{ const x=i/(data.length-1)*W, y=H-(v/100*H); i?c.lineTo(x,y):c.moveTo(x,y); });
+  c.strokeStyle=color; c.lineWidth=4; c.lineJoin='round'; c.stroke();
+  c.lineTo(W,H); c.lineTo(0,H); c.closePath(); c.fillStyle=color+'22'; c.fill();
+}
+function gauge(cv, score, color){
+  if(!cv || !cv.clientWidth) return;
+  const c=cv.getContext('2d'), W=cv.width=cv.clientWidth*2, H=cv.height=cv.clientHeight*2;
+  c.clearRect(0,0,W,H);
+  const cx=W/2, cy=H*0.92, r=Math.min(W/2,H)*0.82;
+  c.lineWidth=r*0.16; c.lineCap='round';
+  c.beginPath(); c.arc(cx,cy,r,Math.PI,2*Math.PI); c.strokeStyle='rgba(255,255,255,0.06)'; c.stroke();
+  c.beginPath(); c.arc(cx,cy,r,Math.PI,Math.PI+(Math.max(score,1)/100)*Math.PI); c.strokeStyle=color; c.stroke();
+}
+
+/* ── Watchlist dots — injected once, updated every cycle ─────────── */
+/* DISABLED — skin-adapter.js owns the watchlist risk dot (.wl-risk).
+   Running both put TWO dots on every pair row. */
+function ensureDots(){ return; }
+function ensureDotsLegacy(){
+  document.querySelectorAll('.pair-row').forEach(row=>{
+    const sym = normalisePair(row.dataset.sym||'');
+    if(!sym) return;
+    const name = row.querySelector('.pair-name');
+    if(name && !name.querySelector('.rr-dot')){
+      const d=document.createElement('span');
+      d.className='rr-dot'; d.id='rr-dot-'+sym;
+      name.insertBefore(d, name.firstChild);
+    }
+  });
+}
+
+/* ── Main render ─────────────────────────────────────────────────── */
+function render(){
+  const sym = normalisePair((typeof activePair!=='undefined'&&activePair)||'');
+  const m = RR.for(sym);
+  if(!m) return;
+  const L = m.level;
+
+  /* top-bar chip — follows the active pair */
+  const chip=$('rr-chip');
+  if(chip){
+    chip.style.color=L.color; chip.style.borderColor=L.color+'55'; chip.style.background=L.color+'14';
+    chip.classList.toggle('rr-pulse', L.key==='elevated'||L.key==='standdown');
+    const dot=chip.querySelector('.rr-cdot'); if(dot) dot.style.background=L.color;
+    const txt=chip.querySelector('.rr-ctext'); if(txt) txt.textContent=sym+' '+L.name+' '+m.score;
+  }
+  const pill=$('rr-navpill');
+  if(pill){ pill.textContent=m.score; pill.style.background=L.color+'22'; pill.style.color=L.color; }
+
+  /* watchlist dots + worst-elsewhere */
+  ensureDots();
+  const worst = RR.worst();
+  (typeof state!=='undefined'&&state.watchlist||[]).forEach(w=>{
+    const s=normalisePair(w.symbol), mm=RR.for(s), d=$('rr-dot-'+s);
+    if(d && mm){ d.style.background=mm.level.color; d.title=s+' — '+mm.level.name+' '+mm.score; }
+  });
+  const wh=$('rr-worst');
+  if(wh) wh.innerHTML = (worst && worst.sym!==sym && worst.score>=50)
+    ? '<span style="color:'+worst.level.color+'">'+worst.sym+' '+worst.level.name+' '+worst.score+'</span>'
+    : '<span class="muted">book clear elsewhere</span>';
+
+  /* only paint the tab body when it is visible */
+  const tab=$('tab-risk');
+  if(!tab || !tab.classList.contains('active')) return;
+
+  const b=$('rr-banner');
+  if(b){ b.style.borderColor=L.color+'55'; b.style.background=L.color+'12'; }
+  $('rr-score').textContent=m.score; $('rr-score').style.color=L.color;
+  $('rr-state').textContent=sym+' — '+L.name; $('rr-state').style.color=L.color;
+  $('rr-advice').textContent=L.advice;
+  /* If the smoothed score has already moved into a different band but the
+     level has not switched yet, SAY SO. Showing "Caution" over a score of
+     23 with no explanation is what read as misinforming. */
+  /* levelFor, LEVELS and CFG all live INSIDE the engine's `(function boot(){…})()`
+     closure and are NOT visible from this UI block. Referencing them here threw a
+     ReferenceError partway through render(), which killed every panel drawn after
+     this line — the score dial, its animation and the momentum sparkline included.
+     The engine deliberately exposes RR.levelFor / RR.LEVELS / RR.CFG for exactly
+     this; use those. */
+  const RRL = RR.LEVELS || [];
+  const wantNow = RR.levelFor ? RR.levelFor(m.score) : m.level;
+  if(wantNow && wantNow.key!==m.level.key){
+    const up = RRL.indexOf(wantNow)>RRL.indexOf(m.level);
+    const dir = up ? 'rising to' : 'easing to';
+    const need = up ? ((RR.CFG&&RR.CFG.promoteCycles)||2) : ((RR.CFG&&RR.CFG.demoteCycles)||3);
+    const left = Math.max(1, need-(m.pendingCount||0));
+    $('rr-since').textContent = 'holding '+m.level.name+' — '+dir+' '+wantNow.name+
+      ' in '+left+' more check'+(left===1?'':'s');
+  }else{
+    $('rr-since').textContent = m.levelChangedAt ? ('state held '+ago(m.levelChangedAt)) : 'settling…';
+  }
+  gauge($('rr-gauge'), m.score, L.color);
+  sparkline($('rr-spark'), m.history, L.color);
+
+  /* factors */
+  let fh = m.factors.map(f=>{
+    /* Factors that come from a specific timeframe prefix their detail with
+       [H1] / [H4]; lift that out and show it as a badge so it is obvious at
+       a glance which timeframe each contribution came from. */
+    const mt = /^\[(H\d)\]\s*/.exec(f.detail||'');
+    const tfb = mt ? '<span class="rr-tf">'+mt[1]+'</span>' : '';
+    const det = mt ? f.detail.slice(mt[0].length) : (f.detail||'');
+    return '<div class="rr-factor"><div class="rr-fw" style="color:'+L.color+'">+'+f.weight+'</div>'+
+    '<div class="rr-fbody"><div class="rr-flabel">'+esc(f.label)+tfb+'<span class="rr-fcat">'+esc(f.cat)+'</span></div>'+
+    '<div class="rr-fdetail">'+esc(det)+'</div>'+
+    '<div class="rr-fbar"><i style="width:'+Math.min(100,f.weight*2.2)+'%;background:'+L.color+'"></i></div></div></div>';
+  }).join('');
+  if(m.obSkipped) fh += '<div class="rr-factor"><div class="rr-fw muted">0</div><div class="rr-fbody">'+
+    '<div class="rr-flabel muted">Order block(s) ignored as spent</div>'+
+    '<div class="rr-fdetail">'+m.obSkipped+' block(s) at this price have already been closed through on their own timeframe, so they are treated as mitigated and score nothing. The feed carries no mitigation flag — this is inferred from the candles.</div></div></div>';
+  const un=[];
+  if(m.unavailable && m.unavailable.ob) un.push('Order block interaction');
+  if(RR.smcStatus()===false) un.push('Failed break / whipsaw');
+  if(un.length) fh += '<div class="rr-factor"><div class="rr-fw muted">n/a</div><div class="rr-fbody">'+
+    '<div class="rr-flabel muted">'+un.join(' · ')+'</div>'+
+    '<div class="rr-fdetail">SMC feed not reachable — these factors are excluded from the score rather than counted as zero.</div></div></div>';
+  $('rr-factors').innerHTML = fh || '<div class="rr-empty">No contributing factors. Conditions are normal for this pair.</div>';
+  $('rr-fcount').textContent = m.factors.length+' active';
+
+  /* news window */
+  const rows=(m.newsRows||[]).slice(0,4);
+  $('rr-news').innerHTML = rows.length ? rows.map(x=>{
+    const mm=x.mins, t = mm>0 ? ('T−'+Math.floor(mm)+':'+String(Math.floor((mm%1)*60)).padStart(2,'0')) : ('T+'+Math.floor(-mm)+'m');
+    const col = x.mult>0.9?'var(--red)':x.mult>0.5?'var(--amber)':'var(--t2)';
+    return '<div class="rr-factor"><div class="rr-fw rr-cd" style="color:'+col+'">'+t+'</div><div class="rr-fbody">'+
+      '<div class="rr-flabel">'+esc(x.ev.title)+'<span class="rr-tier rr-tier-'+x.cls.tier+'">'+x.cls.tier+'</span></div>'+
+      '<div class="rr-fdetail">'+esc(x.ev.country||'')+' · fcst '+esc(x.ev.forecast||'—')+' · prev '+esc(x.ev.previous||'—')+
+      ' · contributing '+Math.round(x.cls.weight*x.mult)+' pts'+(x.cls.matched?'':' · title not in table, fell back to feed impact')+'</div>'+
+      '<div class="rr-fbar"><i style="width:'+(x.mult*100)+'%;background:var(--amber)"></i></div></div></div>';
+  }).join('') : '<div class="rr-empty">No releases for '+sym+'\u2019s currencies inside the 60-minute window.</div>';
+
+  /* pattern alerts, tagged with the state of THEIR OWN pair */
+  const al=(typeof state!=='undefined'&&state.patternAlerts||[]).slice(0,8);
+  $('rr-alerts').innerHTML = al.length ? al.map(a=>{
+    const s2=normalisePair(a.symbol||''), am=RR.for(s2);
+    const tag = (am && am.level.key!=='clear')
+      ? '<span class="rr-tag" style="background:'+am.level.color+'22;color:'+am.level.color+'">'+am.level.name.toUpperCase()+' '+am.score+'</span>' : '';
+    const warn = (am && (am.level.key==='elevated'||am.level.key==='standdown'))
+      ? ' · fired inside a flagged window — verify before acting' : '';
+    return '<div class="rr-factor"><div class="rr-fbody">'+
+      '<div class="rr-flabel">'+esc(a.name||'')+'<span class="muted" style="font-weight:400">'+esc(s2)+' '+esc(a.timeframe||'')+'</span>'+tag+'</div>'+
+      '<div class="rr-fdetail">'+esc(a.confidence||'?')+'% confidence · '+esc(a.direction||'')+warn+'</div></div></div>';
+  }).join('') : '<div class="rr-empty">No pattern alerts yet.</div>';
+
+  /* classifier table */
+  /* Same watchlist filter the release list uses — otherwise the tier
+     table explains events the user is never shown. */
+  const evs=(typeof window.newsForWatchlist==='function'
+      ? window.newsForWatchlist()
+      : ((typeof state!=='undefined'&&state.news)||[])).slice(0,12);
+  $('rr-cls').innerHTML = evs.map(e=>{
+    const c=RR.classifyEvent(e);
+    return '<tr><td>'+esc(e.title)+'</td><td>'+esc(e.country||'')+'</td>'+
+      '<td><span class="rr-tier rr-tier-'+(e.impact==='high'?'high':'medium')+'">'+esc(e.impact||'')+'</span></td>'+
+      '<td><span class="rr-tier rr-tier-'+c.tier+'">'+c.tier+'</span></td>'+
+      '<td style="font-weight:700">'+c.weight+'</td>'+
+      '<td class="muted">'+(c.matched?'title matched':'fallback')+'</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="rr-empty">No calendar events loaded.</td></tr>';
+
+  /* outcome log */
+  $('rr-log').innerHTML = RR.log.length ? RR.log.slice(0,10).map(l=>{
+    const lv=RR.levelFor(l.score);
+    const cell=v=> v===null ? '<span class="muted">…</span>' : (v>=0?'+':'')+v.toFixed(1);
+    return '<tr><td>'+new Date(l.t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</td>'+
+      '<td>'+esc(l.sym)+'</td><td><span style="color:'+lv.color+';font-weight:700">'+esc(l.level)+'</span> '+l.score+'</td>'+
+      '<td class="muted">'+esc((l.factors||[]).join(', '))+'</td>'+
+      '<td>'+cell(l.after15)+'</td><td>'+cell(l.after60)+'</td></tr>';
+  }).join('') : '<tr><td colspan="6" class="rr-empty">No warnings recorded yet. The log fills as pairs escalate.</td></tr>';
+
+  /* whole book */
+  $('rr-book').innerHTML = (typeof state!=='undefined'&&state.watchlist||[])
+    .map(w=>RR.for(normalisePair(w.symbol)))
+    .sort((a,b)=>b.score-a.score)
+    .map(q=>'<div class="rr-contrib"><span style="width:62px;font-weight:600">'+esc(q.sym)+'</span>'+
+      '<div class="rr-cbar"><i style="width:'+q.score+'%;background:'+q.level.color+'"></i></div>'+
+      '<span style="width:74px;text-align:right;color:'+q.level.color+';font-weight:700">'+q.level.name+' '+q.score+'</span></div>').join('');
+}
+
+/* ── Tag existing pattern alerts instead of suppressing them ─────── */
+function tagAlerts(){
+  document.querySelectorAll('#alertFeed .alert-item').forEach(row=>{
+    if(row.dataset.rrTagged) return;
+    const txt=row.textContent||'';
+    const hit=(typeof state!=='undefined'&&state.watchlist||[]).map(w=>normalisePair(w.symbol))
+      .find(s=>txt.indexOf(s)>=0 || txt.indexOf(s.slice(0,3)+'/'+s.slice(3))>=0);
+    if(!hit) return;
+    const m=RR.for(hit);
+    if(!m || m.level.key==='clear') return;
+    row.dataset.rrTagged='1';
+    const name=row.querySelector('.alert-name');
+    if(name){
+      const tag=document.createElement('span');
+      tag.className='rr-tag';
+      tag.style.background=m.level.color+'22'; tag.style.color=m.level.color;
+      tag.textContent=m.level.name.toUpperCase()+' '+m.score;
+      tag.title='This alert fired while '+hit+' was flagged — verify before acting.';
+      name.appendChild(tag);
+    }
+  });
+}
+
+/* ── Telegram: only on escalation ────────────────────────────────── */
+function pushTelegram(){
+  const t=RR.pendingTelegram;
+  if(!t) return;
+  RR.pendingTelegram=null;
+  const box=$('rr-tg');
+  if(box) box.innerHTML='<b>⚠️ '+esc(t.sym)+' — '+esc(t.level.name)+'</b><br>Risk score <b>'+t.score+'/100</b><br>'+
+    t.factors.map(f=>'• '+esc(f.label)+' (+'+f.weight+')').join('<br>')+
+    '<br><span class="muted">'+esc(t.level.advice)+' — '+ago(t.t)+' ago</span>';
+  fetch('/api/risk-alert',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({symbol:t.sym, level:t.level.key, score:t.score,
+      factors:t.factors.map(f=>({label:f.label,weight:f.weight,detail:f.detail}))})
+  }).catch(()=>{});   // silent — the panel is the source of truth if the route isn't live
+}
+
+/* ── Loop ────────────────────────────────────────────────────────── */
+/* ── WHY THE RADAR LOOKED SLOW, AND WHY cycleMs IS NOT THE FIX ─────
+   The Radar recomputed on a fixed 5s timer with no relation to when the
+   EA's data actually landed, so a fresh heartbeat could sit for almost a
+   full cycle before it was read — up to 5s of visible lag on top of the
+   EA's own 5s send. Total worst case ~10s.
+   Lowering CFG.cycleMs would NOT be safe: the score is smoothed per
+   cycle (score*0.45 + raw*0.55) and the level persistence counts CYCLES
+   (promoteCycles / demoteCycles). Halving the interval would halve the
+   smoothing time-constant and halve the anti-flicker hold — the exact
+   strobing the persistence exists to prevent.
+   So instead: keep one cycle per DATA UPDATE, but run it as soon as the
+   update arrives. A cheap signature is polled 4x a second; when it
+   changes the cycle runs immediately. Cycle count per update is
+   unchanged, so smoothing and persistence behave exactly as before —
+   they just happen sooner. The 5s heartbeat stays as a floor so the
+   time-based factors (session, news countdown, event expiry) keep
+   advancing when no data is arriving. */
+function dataSig(){
+  try{
+    const wl=(typeof state!=='undefined'&&state.watchlist)||[];
+    let sig=wl.length+'|';
+    for(let i=0;i<wl.length;i++) sig+=wl[i].symbol+':'+wl[i].bid+':'+wl[i].ask+':'+wl[i].spread+';';
+    const dbs=(typeof dataBySymbol!=='undefined')?dataBySymbol:{};
+    for(const k in dbs){
+      const c=dbs[k].candlesByTF||{};
+      sig+=k+'#'+((c.H1&&c.H1.length)||0)+','+((c.H4&&c.H4.length)||0);
+      const l=c.H1&&c.H1.length?c.H1[c.H1.length-1]:null;
+      if(l) sig+='@'+cT(l)+':'+cC(l);
+    }
+    return sig;
+  }catch(e){ return ''; }
+}
+let lastSig='', lastCycleAt=0;
+/* MIN_GAP: a single heartbeat can fire TICK, CANDLE_UPDATE and FULL_STATE
+   within the same second. Without this floor those would be three cycles,
+   fast-forwarding the persistence counter and defeating the hold. */
+const MIN_CYCLE_GAP = 1500;
+function maybeTick(){
+  const sig=dataSig();
+  if(sig===lastSig) return;
+  if(Date.now()-lastCycleAt < MIN_CYCLE_GAP) return;   // coalesce the burst
+  lastSig=sig;
+  tick();
+}
+/* ── LIVE RISK SNAPSHOT FOR OTHER MODULES ─────────────────────────
+   `bw-risk-log` is an ESCALATION HISTORY — one entry per escalation,
+   kept for 60 entries, never expiring. Other modules (the SMC panel)
+   were reading the newest matching entry and presenting it as the
+   CURRENT risk state, so an escalation from 11 hours ago was shown as a
+   live warning. The log is the wrong source for "what is the risk right
+   now" and always was; there was no key that answered that question.
+   This publishes one: every pair's CURRENT level and score, with the
+   time it was computed, rewritten on every cycle. Consumers must check
+   `t` and ignore anything stale. The log stays exactly as it is — it is
+   still the right source for history and outcomes. */
+function publishRiskNow(){
+  try{
+    const out={};
+    (RR.mem?Object.keys(RR.mem):[]).forEach(k=>{
+      const m=RR.mem[k];
+      if(!m||!m.level) return;
+      out[m.sym]={ level:m.level.key, name:m.level.name, score:m.score,
+                   factors:(m.factors||[]).slice(0,2).map(x=>x.label) };
+    });
+    localStorage.setItem('bw-risk-now', JSON.stringify({t:Date.now(), pairs:out}));
+  }catch(e){}
+}
+function tick(){
+  lastCycleAt=Date.now(); lastSig=dataSig();
+  try{ RR.cycle(); render(); tagAlerts(); pushTelegram();
+       /* Repaint the watchlist NOW rather than waiting for the skin's
+          own 4s timer - two independent timers meant the dot could
+          lag the panel by a whole cycle. */
+       if(window.BWSkinPaintWatchlist) window.BWSkinPaintWatchlist();
+       publishRiskNow();
+  }catch(e){ console.warn('[RiskRadar]', e); }
+}
+setTimeout(tick, 2500);
+setInterval(tick, RR.CFG.cycleMs);   // heartbeat floor - time-based factors
+setInterval(maybeTick, 250);          // reacts to fresh EA data within ~250ms
+window.BWRiskRadarRender = render;
+})();
+</script>
+<script>/* ═══════════════════════════════════════════════════════════════════
+   BLACKWOOD — MT5 ASSISTANT : SKIN ADAPTER
+   ───────────────────────────────────────────────────────────────────
+   Everything the REDESIGN adds on top of the original dashboard logic.
+   The original script is untouched: all 56 wired ids, switchTab,
+   switchToPair, applyCachedSymbolData, updateCandlestickChart and the
+   .pair-row click binding still do exactly what they did before.
+
+   This file only:
+     - draws the session tape
+     - draws the RSI momentum track from the existing rsiVal
+     - mirrors bias + risk state onto the watchlist rows
+     - keeps the "Now" rail in sync
+     - resizes the price chart when a tab becomes visible again
+   It never writes to `state` or `dataBySymbol`.
+   ═══════════════════════════════════════════════════════════════════ */
+(function boot(){
+'use strict';
+/* The host page's main script is `defer`, so it runs AFTER this inline
+   script. Wait for its globals by BARE name — they are declared with
+   `let`, which never creates a window property. */
+if(typeof normalisePair!=='function' || typeof state==='undefined' || typeof dataBySymbol==='undefined'){
+  if(boot.tries===undefined) boot.tries=0;
+  if(++boot.tries>160){ console.error('[Skin] host page never initialised'); return; }
+  setTimeout(boot,250); return;
+}
+console.log('[Skin] ready after',(boot.tries||0)*250,'ms');
+
+function $(id){ return document.getElementById(id); }
+const RRlevel = s => s>=75?['Stand down','var(--red)'] : s>=50?['Elevated','var(--gold-lt)']
+                    : s>=25?['Caution','var(--blue)'] : ['Clear','var(--green)'];
+
+/* ── SESSION TAPE ────────────────────────────────────────────────
+   Sessions are fixed UTC windows. News markers come from the SAME
+   state.news the old news feed uses — no new data source. */
+const SESS=[{n:'Sydney',a:21,b:6},{n:'Tokyo',a:0,b:9},{n:'London',a:7,b:16},{n:'New York',a:12,b:21}];
+function drawTape(){
+  const tape=$('sessionTape'); if(!tape) return;
+  const d=new Date(), nowH=d.getUTCHours()+d.getUTCMinutes()/60;
+  const today=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())/1000;
+  /* Tape markers follow the watchlist too, so a marker always belongs
+     to a pair the user is actually watching. */
+  const src=(typeof window.newsForWatchlist==='function')
+      ? window.newsForWatchlist() : ((typeof state!=='undefined'&&state.news)||[]);
+  const evs=src.map(e=>{
+    const ts=+e.timestamp||0; if(!ts) return null;
+    const h=(ts-today)/3600;
+    if(h<0||h>24) return null;
+    const hi=/high/i.test(e.impact||'');
+    return {h, hi, t:(e.title||'').split(/\s+/).slice(0,3).join(' ')};
+  }).filter(Boolean).slice(0,8);
+
+  let html='';
+  SESS.forEach(s=>{
+    (s.a<s.b?[[s.a,s.b]]:[[s.a,24],[0,s.b]]).forEach((g,i)=>{
+      html+='<div class="sess" style="left:'+(g[0]/24*100)+'%;width:'+((g[1]-g[0])/24*100)+'%">'+
+            (i?'':'<i>'+s.n+'</i>')+'</div>';
+    });
+  });
+  html+='<div class="sess ov" style="left:50%;width:'+(4/24*100)+'%"></div>';
+  html+='<div class="rband">'+Array.from({length:48},function(_,i){
+    const t=i/2;
+    const near=evs.some(e=>e.hi&&Math.abs(t-e.h)<0.75);
+    const ov=t>=12&&t<16;
+    const col=near?'var(--red)':ov?'var(--gold)':(t>=7&&t<21?'var(--border2)':'var(--border)');
+    return '<i style="width:'+(100/48)+'%;background:'+col+'"></i>';
+  }).join('')+'</div>';
+  evs.forEach(e=>{ html+='<div class="ev '+(e.hi?'':'m')+'" style="left:'+(e.h/24*100)+'%" data-t="'+
+    e.t.replace(/"/g,'')+'"></div>'; });
+  html+='<div class="now" style="left:'+(nowH/24*100)+'%"></div>';
+  tape.innerHTML=html;
+  const hrs=$('tapeHours');
+  if(hrs && !hrs.dataset.done){
+    hrs.innerHTML=[0,3,6,9,12,15,18,21,24].map(x=>'<span>'+String(x).padStart(2,'0')+'</span>').join('');
+    hrs.dataset.done='1';
+  }
+}
+
+/* ── RSI MOMENTUM ────────────────────────────────────────────────
+   Reads the value the original script already puts in #rsiVal and
+   keeps a short history per pair so DIRECTION is visible, not just
+   level. Three bars back is the comparison point. */
+/* History is keyed by PAIR **and TIMEFRAME**. Keying it by pair alone was
+   the glitch: switching H1<->H4 fed a completely different RSI series into
+   the same history, so the "previous" marker jumped across the track and
+   the delta reported a move that never happened. Same on a pair switch.
+   A key change RESETS the series rather than diffing across it. */
+const rsiHist={};
+let rsiKey='';
+/* How far back "momentum" looks. 3 minutes is short enough to feel live on
+   a 4s repaint and long enough that a single tick cannot flip the tag. */
+const RSI_WINDOW_MS   = 180000;
+const RSI_MIN_SPAN_MS = 20000;   // below this the delta is noise, not direction
+const RSI_STALE_GRACE = 30000;
+function drawRSI(){
+  const track=$('rsiTrack'); if(!track) return;
+  const v=parseFloat((($('rsiVal')||{}).textContent)||'');
+  const pair=normalisePair(typeof activePair!=='undefined'?activePair:'');
+  const tf=(typeof activeChartTF!=='undefined'&&activeChartTF)||'H1';
+  const key=pair+':'+tf;
+  const st=$('rsiState'), dl=$('rsiDelta');
+
+  if(!isFinite(v)||v<0||v>100){
+    track.innerHTML='';
+    if(st){ st.textContent='—'; st.className='tag t-mute'; }
+    if(dl) dl.textContent='waiting for indicator data';
+    return;
+  }
+  if(key!==rsiKey){ rsiKey=key; }              // series switched
+  /* BUG 1 — the series was a bare list of VALUES pushed only when the
+     number changed, from a 4s repaint. So "the last 3 readings" was three
+     CHANGES at arbitrary spacing: 12 seconds if RSI was moving, or half an
+     hour if it was flat. The label claimed a fixed window it never had, and
+     the old comment above claimed "three bars back", which it also never
+     was. Readings are now TIMESTAMPED and the comparison point is the
+     oldest reading inside a real time window, so the label can tell the
+     truth about what it measured.
+     BUG 2 — nothing ever expired. Switching to another pair and back
+     minutes later reused the stale series, so the "previous" marker
+     compared against an ancient reading and reported a jump that had not
+     just happened. Entries older than the window are now dropped. */
+  const nowMs=Date.now();
+  const h=rsiHist[key]||(rsiHist[key]=[]);
+  if(!h.length || Math.abs(h[h.length-1].v-v)>0.01) h.push({v:v,t:nowMs});
+  while(h.length && nowMs-h[0].t > RSI_WINDOW_MS+RSI_STALE_GRACE) h.shift();
+  if(h.length>240) h.shift();
+
+  /* Always draw the marker. The PREVIOUS marker only appears once there
+     are enough readings from THIS series to mean anything. */
+  let html='';
+  html+='<div class="rsi-zone" style="left:0;width:30%;background:var(--green);opacity:.10"></div>';
+  html+='<div class="rsi-zone" style="left:70%;width:30%;background:var(--red);opacity:.10"></div>';
+  [30,50,70].forEach(t=>{ html+='<div class="rsi-zone" style="left:'+t+'%;width:1px;background:var(--border2)"></div>'; });
+
+  /* Comparison point = the oldest reading still inside the window. */
+  let base=null, spanMs=0;
+  for(let i=0;i<h.length;i++){
+    if(nowMs-h[i].t <= RSI_WINDOW_MS){ base=h[i]; break; }
+  }
+  if(!base && h.length) base=h[h.length-1];
+  const ready = !!(base && base!==h[h.length-1] && (nowMs-base.t)>=RSI_MIN_SPAN_MS);
+  const prev = ready ? base.v : null;
+  const delta = ready ? v-prev : 0;
+  if(ready) spanMs = nowMs-base.t;
+  if(ready && Math.abs(delta)>0.05)
+    html+='<div class="rsi-prev" style="left:'+Math.max(0,Math.min(100,prev))+'%"></div>';
+  html+='<div class="rsi-mark" style="left:'+Math.max(0,Math.min(100,v))+'%"></div>';
+  track.innerHTML=html;
+
+  if(st){
+    if(!ready){ st.textContent=v>=70?'Overbought':v<=30?'Oversold':'Neutral'; st.className='tag t-mute'; }
+    else{
+      const rising=delta>0.3, falling=delta<-0.3;
+      st.textContent=rising?'Rising':falling?'Falling':'Flat';
+      st.className='tag '+(rising?'t-bull':falling?'t-bear':'t-mute');
+    }
+  }
+  if(dl){
+    /* Say what was actually measured, not a made-up unit. */
+    const mins=Math.round(spanMs/60000), secs=Math.round(spanMs/1000);
+    const span = mins>=1 ? (mins+' min') : (secs+'s');
+    dl.textContent = !ready ? 'direction settling — needs a few seconds on '+tf
+      : Math.abs(delta)<0.05 ? 'holding this level for '+span+' on '+tf
+      : (delta>0?'+':'')+delta.toFixed(1)+' over '+span+' on '+tf;
+  }
+}
+
+/* ── KEY LEVELS + SESSION ────────────────────────────────────────
+   These ids existed in the markup with nothing writing to them, so they
+   sat on a dash forever. Both come from candles already on the page. */
+function paintLevels(){
+  const sym=normalisePair(typeof activePair!=='undefined'?activePair:'');
+  const c=candlesOf(sym,'H1');
+  const hi=$('keyHigh'), lo=$('keyLow');
+  if(c.length>2){
+    const d=c.slice(-24);
+    const H=Math.max.apply(null,d.map(cH)), L=Math.min.apply(null,d.map(cL));
+    const dg=/JPY$/.test(sym)?3:/^XA[UG]/.test(sym)?2:5;
+    if(hi) hi.textContent=H.toFixed(dg);
+    if(lo) lo.textContent=L.toFixed(dg);
+  }else{
+    if(hi) hi.textContent='—';
+    if(lo) lo.textContent='—';
+  }
+  /* ── SESSION ───────────────────────────────────────────────────
+     Which sessions are open, how deep the book is right now, and when
+     the picture next changes. Liquidity is scored by which sessions
+     overlap, because that is what actually sets depth: the London-New
+     York overlap is the deepest window of the day, the Asian session
+     the thinnest. */
+  const el=$('sessNow'); if(!el) return;
+  const d0=new Date(), h=d0.getUTCHours()+d0.getUTCMinutes()/60;
+  const SESS=[{n:'Sydney',a:21,b:6},{n:'Tokyo',a:0,b:9},
+              {n:'London',a:7,b:16},{n:'New York',a:12,b:21}];
+  const open=SESS.filter(x=> x.a<x.b ? (h>=x.a&&h<x.b) : (h>=x.a||h<x.b));
+  el.textContent = open.length ? open.map(x=>x.n).join(' · ') : 'Between sessions';
+
+  const overlap = open.length>=2;
+  const londonNY = open.some(x=>x.n==='London') && open.some(x=>x.n==='New York');
+  const depth = londonNY ? 100 : overlap ? 70 : open.length===1 ? 45 : 15;
+  const meter=$('sessMeter');
+  if(meter){
+    meter.style.width=depth+'%';
+    meter.style.background = depth>=100?'var(--gold)' : depth>=70?'var(--accent)'
+      : depth>=45?'var(--blue)' : 'var(--border2)';
+  }
+  const liq=$('sessLiq');
+  if(liq){
+    liq.textContent = londonNY?'Deepest of the day' : overlap?'Good'
+      : open.length===1?'Moderate' : 'Thin';
+    liq.className = londonNY?'gd' : overlap?'green' : open.length===1?'blue' : 'muted';
+  }
+  const note=$('sessNote');
+  if(note) note.textContent = londonNY
+    ? 'London–New York overlap — tightest spreads, fastest moves'
+    : open.length>=2 ? 'Two sessions open — reasonable depth'
+    : open.length===1 ? open[0].n+' only — moves can be thinner than they look'
+    : 'No major session open — wide spreads, unreliable moves';
+
+  /* Next change: either the next open, or the close of what is running. */
+  const nxt=$('sessNext'), nxtL=$('sessNextLbl');
+  if(nxt){
+    const events=[];
+    SESS.forEach(x=>{
+      const isOpen = x.a<x.b ? (h>=x.a&&h<x.b) : (h>=x.a||h<x.b);
+      const at = isOpen ? x.b : x.a;
+      let inHrs = at-h; if(inHrs<0) inHrs+=24;
+      events.push({t:inHrs, what:(isOpen?x.n+' closes':x.n+' opens')});
+    });
+    events.sort((a,b)=>a.t-b.t);
+    const e=events[0];
+    const mins=Math.round(e.t*60);
+    nxt.textContent = (mins<60?mins+'m':Math.floor(mins/60)+'h '+(mins%60)+'m');
+    if(nxtL) nxtL.textContent=e.what;
+  }
+  const clk=$('sessClock');
+  if(clk) clk.textContent=String(d0.getUTCHours()).padStart(2,'0')+':'+
+    String(d0.getUTCMinutes()).padStart(2,'0')+' UTC';
+}
+
+/* ── WATCHLIST: bias bar + risk dot ──────────────────────────────
+   Injected into the existing .pair-row markup. The original click
+   binding and updateWatchlist() are untouched. */
+function decorateWatchlist(){
+  document.querySelectorAll('.pair-row').forEach(row=>{
+    const sym=normalisePair(row.dataset.sym||''); if(!sym) return;
+    if(!row.querySelector('.wl-bar')){
+      const b=document.createElement('span');
+      b.className='wl-bar'; b.id='wlbar-'+sym;
+      row.insertBefore(b,row.firstChild);
+    }
+    /* The risk dot USED to sit inside .wl-note, immediately left of the
+       "Bullish"/"Bearish" text - two unrelated meanings touching each
+       other, which read as if the dot coloured the bias. It now lives in
+       the right-hand column under the price, so the LEFT side is entirely
+       bias (colour bar + word) and the RIGHT side carries price and risk. */
+    const stale=row.querySelector('.wl-note .wl-risk');
+    if(stale) stale.remove();
+    const right=row.querySelector('.wl-r');
+    if(right && !right.querySelector('.wl-risk')){
+      const chip=document.createElement('span');
+      chip.className='wl-riskwrap';
+      chip.innerHTML='<i class="wl-risk" id="wlrisk-'+sym+'"></i><span class="wl-risklbl">risk</span>';
+      right.appendChild(chip);
+    }
+  });
+}
+/* ── WATCHLIST BIAS — rewritten after a deep dive ─────────────────
+   The old rule was `const tv = t4 || t1`, with the trend coming from
+   tfIndicators(). Four separate flaws, all of which pushed it toward a
+   confident bullish/bearish answer it had not earned:
+
+   1. `t4 || t1` is || on a NUMBER, so a t4 of 0 fell through to H1. But 0
+      means H4 is FLAT — a real reading — as well as "no H4 data". A
+      genuinely flat H4 was silently overridden by H1 and reported as a
+      trend.
+   2. tfIndicators() derives its trend from ema20 vs ema50 with NO minimum
+      bar count. ema(closes,20) returns a number off three candles, so a
+      pair that had just loaded showed a confident bias built on nothing.
+   3. ema20 > ema50 is a crossover STATE, not a trend. A gap of 0.00001
+      scored identically to a strong trend and there was no neutral band,
+      so "No clear bias" was very nearly unreachable — which is why almost
+      every pair read Bullish or Bearish.
+   4. It used the FEED's trend string when present and a derived one
+      otherwise, and indicatorsByTF is normally only filled for the ACTIVE
+      timeframe. So the same UI element meant different things depending on
+      which timeframe was on screen.
+
+   Now: H4 decides when H4 has enough bars, H1 only when H4 does not; the
+   EMA separation must clear a real threshold before it counts as a trend;
+   and the label says which timeframe it came from, so it is checkable. */
+const BIAS_MIN_BARS = 55;      // ema50 needs real history to mean anything
+const BIAS_MIN_SEP  = 0.0006;  // |ema20-ema50| / price, below this = flat
+/* Price for the separation test. lastPrice() lives in the Risk Radar's
+   own module scope and is NOT visible here, so read the watchlist row
+   directly (falling back to the last close). */
+function biasPrice(sym){
+  const wl=(typeof state!=='undefined'&&state.watchlist)||[];
+  for(let i=0;i<wl.length;i++){
+    if(normalisePair(wl[i].symbol)===sym){ const b=parseFloat(wl[i].bid); if(isFinite(b)&&b) return b; }
+  }
+  const c=candlesOf(sym,'H1');
+  return c.length?cC(c[c.length-1]):NaN;
+}
+function biasTF(sym,tf){
+  const ind=tfIndicators(sym,tf);
+  const px=biasPrice(sym);
+  if(!ind.have || ind.bars<BIAS_MIN_BARS || !isFinite(px) || !px) return null;
+  const sep=Math.abs(ind.ema20-ind.ema50)/px;
+  if(sep<BIAS_MIN_SEP) return {sign:0, sep:sep, tf:tf};
+  return {sign: ind.ema20>ind.ema50?1:-1, sep:sep, tf:tf};
+}
+function biasOf(sym){
+  const b = biasTF(sym,'H4') || biasTF(sym,'H1');
+  if(!b) return {sign:0, label:'Building history', why:'Not enough candles yet to judge a trend'};
+  const word = b.sign>0?'Bullish' : b.sign<0?'Bearish' : 'Flat';
+  return {
+    sign: b.sign,
+    label: (b.sign===0?'Flat':word)+' · '+b.tf,
+    why: (b.sign===0
+            ? 'EMA 20 and 50 are within '+(BIAS_MIN_SEP*100).toFixed(2)+'% on '+b.tf+' — no trend'
+            : word+' on '+b.tf+' — EMA 20 is '+(b.sign>0?'above':'below')+' EMA 50 by '+(b.sep*100).toFixed(2)+'%')
+  };
+}
+function paintWatchlist(){
+  const RR=window.BWRiskRadar;
+  document.querySelectorAll('.pair-row').forEach(row=>{
+    const sym=normalisePair(row.dataset.sym||''); if(!sym) return;
+    /* bias from the cached H4/H1 indicators the dashboard already holds */
+    /* Computed, not read from the feed — see tfIndicators(). This is why
+       the bias line was grey in production but coloured in the prototype. */
+    const B=biasOf(sym);
+    const tv=B.sign;
+    const bar=$('wlbar-'+sym);
+    if(bar){
+      bar.style.background = tv>0?'var(--green)' : tv<0?'var(--red)' : 'var(--border2)';
+      bar.title = B.why;
+    }
+    const dot=$('wlrisk-'+sym);
+    if(dot){
+      const m=RR&&RR.for?RR.for(sym):null;
+      /* READ m.level, DO NOT RE-DERIVE FROM m.score.
+         RRlevel(m.score) recomputes the band from the raw score and so
+         ignores the Risk Radar's own persistence (2 cycles to escalate,
+         3 to stand down). The dot therefore changed colour the instant
+         the score crossed a band while the Risk Radar tab still held its
+         previous state - which is exactly the "delay" and the dots being
+         out of sync with the panel. m.level IS the state the panel shows,
+         so both now say the same thing at the same moment. */
+      dot.style.background = m ? m.level.color : 'var(--border2)';
+      dot.title = m ? (sym+' risk - '+m.level.name+' '+m.score+'/100') : (sym+' risk - not scored yet');
+    }
+    const note=row.querySelector('.wl-note-text');
+    if(note){
+      const t = B.label;
+      if(note.textContent!==t) note.textContent=t;
+    }
+  });
+}
+
+/* ── LOCAL INDICATORS ────────────────────────────────────────────
+   `indicatorsByTF` is only populated by CANDLE_UPDATE and usually only
+   for the ACTIVE timeframe, so H4 was routinely absent — which is why
+   the verdict showed "!" on H1/H4, "Combined signal" said "No H4 data",
+   and the watchlist bias line stayed grey. Candles for BOTH timeframes
+   ARE always there, so trend and RSI are computed here and the feed's
+   own numbers are used only when present. */
+function ema(vals,n){
+  if(vals.length<n) return NaN;
+  const k=2/(n+1);
+  let e=vals.slice(0,n).reduce((a,b)=>a+b,0)/n;
+  for(let i=n;i<vals.length;i++) e=vals[i]*k+e*(1-k);
+  return e;
+}
+function calcRSI(closes,n){
+  if(closes.length<n+1) return NaN;
+  let g=0,l=0;
+  for(let i=closes.length-n;i<closes.length;i++){
+    const d=closes[i]-closes[i-1];
+    if(d>=0) g+=d; else l-=d;
+  }
+  if(l===0) return g?100:50;
+  const rs=(g/n)/(l/n);
+  return 100-100/(1+rs);
+}
+/* Minimum EMA separation, as a fraction of price, before a crossover is
+   called a trend. Shared by tfIndicators() and the EMA verdict signal so
+   the two can never disagree about what "flat" means. */
+const TREND_MIN_SEP = 0.0006;
+const PIVOT_DEAD_BAND = 0.0004;   // price within 0.04% of the pivot is 'at' it
+function tfIndicators(sym,tf){
+  const feed=(((typeof dataBySymbol!=='undefined'&&dataBySymbol[sym])||{}).indicatorsByTF||{})[tf]||{};
+  const c=candlesOf(sym,tf);
+  const closes=c.map(cC).filter(isFinite);
+  const e20=isFinite(parseFloat(feed.ema20))?parseFloat(feed.ema20):ema(closes,20);
+  const e50=isFinite(parseFloat(feed.ema50))?parseFloat(feed.ema50):ema(closes,50);
+  const rsi=isFinite(parseFloat(feed.rsi))?parseFloat(feed.rsi):calcRSI(closes,14);
+  let trend=String(feed.trend||'').toLowerCase();
+  let derived=false;
+  if(!trend && isFinite(e20) && isFinite(e50)){
+    /* FLICKER FIX. This was `e20>e50 ? bullish : bearish` with no dead
+       band, so when the two EMAs sat almost on top of each other — a
+       ranging market — a single tick flipped the trend every repaint.
+       H4 trend and H1 trend are two of the six verdict signals, and each
+       signal is worth 16.7 points of the verdict score against an 8-point
+       threshold, so ONE flipping signal was enough to swing the headline
+       between "Buy setup forming" and "No setup — wait" on every tick.
+       The separation must now be real before it counts as a trend. */
+    const ref=closes.length?closes[closes.length-1]:NaN;
+    const sep=(isFinite(ref)&&ref)?Math.abs(e20-e50)/ref:0;
+    trend = sep<TREND_MIN_SEP ? 'flat' : (e20>e50?'bullish':'bearish');
+    derived=true;
+  }
+  return {ema20:e20, ema50:e50, rsi, trend, derived,
+          have: isFinite(e20)&&isFinite(e50), bars:closes.length};
+}
+function trendSign(t){ t=String(t||'').toLowerCase();
+  return t.indexOf('bull')>=0?1 : t.indexOf('bear')>=0?-1 : 0; }
+
+/* ── SIGNAL VERDICT + WHAT AGREES ────────────────────────────────
+   Six signals, each read INDEPENDENTLY from data the dashboard already
+   holds. They are allowed to disagree — that disagreement is the point,
+   and it is what the "against" tag marks. */
+function readSignals(sym){
+  const h1=tfIndicators(sym,'H1'), h4=tfIndicators(sym,'H4');
+  const out=[];
+
+  const s4=trendSign(h4.trend);
+  out.push({k:'H4 trend', v:s4,
+    txt: s4>0?'Bullish':s4<0?'Bearish':(h4.bars<50?'Needs '+(50-h4.bars)+' more H4 bars':'Flat'),
+    note: h4.derived?'from H4 candles':''});
+
+  const s1=trendSign(h1.trend);
+  out.push({k:'H1 trend', v:s1,
+    txt: s1>0?'Bullish':s1<0?'Bearish':(h1.bars<50?'Needs '+(50-h1.bars)+' more H1 bars':'Flat'),
+    note: h1.derived?'from H1 candles':''});
+
+  const rsi=h1.rsi;
+  const rv=!isFinite(rsi)?0 : rsi>55?1 : rsi<45?-1 : 0;
+  out.push({k:'RSI momentum', v:rv,
+    txt: !isFinite(rsi)?'—' : rsi>=70?'Overbought '+rsi.toFixed(0)
+       : rsi<=30?'Oversold '+rsi.toFixed(0) : rsi.toFixed(0)});
+
+  /* Same knife edge as above: no dead band meant this flipped on noise. */
+  let ev=0, evTxt='—';
+  if(isFinite(h1.ema20)&&isFinite(h1.ema50)){
+    const ref=lastClose(sym);
+    const sep=(isFinite(ref)&&ref)?Math.abs(h1.ema20-h1.ema50)/ref:0;
+    if(sep<TREND_MIN_SEP){ ev=0; evTxt='Converged'; }
+    else { ev=h1.ema20>h1.ema50?1:-1; evTxt=ev>0?'Above':'Below'; }
+  }
+  out.push({k:'EMA 20 vs 50', v:ev, txt: evTxt});
+
+  const dbs=(typeof dataBySymbol!=='undefined'&&dataBySymbol[sym])||{};
+  const pats=((dbs.patternsByTF||{}).H1||[]).concat((dbs.patternsByTF||{}).H4||[])
+    .filter(p=>patConf(p)>=70);
+  const bull=pats.filter(p=>patDir(p)==='bull').length;
+  const bear=pats.filter(p=>patDir(p)==='bear').length;
+  const pv=bull>bear?1:bear>bull?-1:0;
+  out.push({k:'Candlestick patterns', v:pv,
+    txt: !pats.length?'None above 70%' : bull+' bull · '+bear+' bear'});
+
+  const px=lastClose(sym), c=candlesOf(sym,'H1');
+  let piv=NaN;
+  if(c.length>1){
+    const d=c.slice(-24);
+    piv=(Math.max.apply(null,d.map(cH))+Math.min.apply(null,d.map(cL))+cC(d[d.length-1]))/3;
+  }
+  /* `px>piv?1:-1` could never be neutral, so price resting ON the pivot
+     flipped this signal every single repaint. */
+  let pvv=0, pvTxt='—';
+  if(isFinite(piv)&&px){
+    const d=Math.abs(px-piv)/px;
+    if(d<PIVOT_DEAD_BAND){ pvv=0; pvTxt='At the pivot'; }
+    else { pvv=px>piv?1:-1; pvTxt=pvv>0?'Above':'Below'; }
+  }
+  out.push({k:'Price vs pivot', v:pvv, txt: pvTxt});
+  return out;
+}
+
+function cH(b){ return parseFloat(b&&(b.h!==undefined?b.h:b.high)); }
+function cL(b){ return parseFloat(b&&(b.l!==undefined?b.l:b.low)); }
+function cC(b){ return parseFloat(b&&(b.c!==undefined?b.c:b.close)); }
+function candlesOf(sym,tf){
+  const d=(typeof dataBySymbol!=='undefined'&&dataBySymbol[sym])||{};
+  return (d.candlesByTF&&d.candlesByTF[tf])||[];
+}
+function lastClose(sym){
+  const c=candlesOf(sym,'H1');
+  return c.length?cC(c[c.length-1]):0;
+}
+
+/* Per-pair hold state for the verdict headline. */
+const verdictHold={};
+const VERDICT_HOLD=2;   // consecutive agreeing reads before the word changes
+function paintVerdict(){
+  const sym=normalisePair(typeof activePair!=='undefined'?activePair:'');
+  if(!sym) return;
+  const sigs=readSignals(sym);
+  const known=sigs.filter(s=>s.v!==0).length;
+  const score=Math.round(sigs.reduce((a,s)=>a+s.v,0)/6*50+50);
+  /* HEADLINE HYSTERESIS. Even with the dead bands above, a signal parked
+     exactly on a band edge can still alternate, and one signal is worth
+     16.7 points against an 8-point threshold. So the DISPLAYED direction
+     only changes once the raw direction has agreed with itself twice in a
+     row, per pair. The score and the breakdown keep updating live; it is
+     the headline word that stops strobing. Same principle as the Risk
+     Radar's promote/demote cycles. */
+  const rawDir = score>58?1 : score<42?-1 : 0;
+  const vh = verdictHold[sym] || (verdictHold[sym]={dir:rawDir, pend:rawDir, n:0});
+  if(rawDir===vh.dir){ vh.pend=rawDir; vh.n=0; }
+  else if(rawDir===vh.pend){ if(++vh.n>=VERDICT_HOLD){ vh.dir=rawDir; vh.n=0; } }
+  else { vh.pend=rawDir; vh.n=1; }
+  const dir = vh.dir;
+  const agree=sigs.filter(s=>s.v===dir&&s.v!==0).length;
+
+  const word=$('verdictWord'), line=$('verdictLine'), arc=$('verdictArc'),
+        sc=$('verdictScore'), chk=$('verdictChecks'), parts=$('signalParts'), ac=$('agreeCount');
+
+  if(!known){
+    if(word){ word.textContent='Waiting for data'; word.style.color='var(--muted)'; }
+    if(sc) sc.textContent='—';
+    if(parts) parts.innerHTML='<div class="rr-empty">No indicator data for '+sym+' yet.</div>';
+    return;
+  }
+
+  const conf=Math.abs(score-50)*2;
+  const col = dir>0?'var(--green)' : dir<0?'var(--red)' : 'var(--gold-lt)';
+  if(sc){ sc.textContent=conf; sc.style.color=col; }
+  if(arc){ arc.setAttribute('stroke',col);
+           arc.setAttribute('stroke-dashoffset', String(Math.round(188-(conf/100)*188))); }
+  if(word){
+    word.textContent = dir>0?'Buy setup forming' : dir<0?'Sell setup forming' : 'No setup — wait';
+    word.style.color = col;
+  }
+  /* Risk Radar has the final say on whether to act at all. */
+  const RR=window.BWRiskRadar, m=RR&&RR.for?RR.for(sym):null;
+  if(line){
+    const rl=m?RRlevel(m.score):null;
+    line.textContent = (dir?agree+' of 6 signals point '+(dir>0?'up':'down')+'. '
+                          :'Signals are split, with no clear direction. ')
+      + (m&&m.score>=50
+          ? 'Risk Radar has '+sym+' at '+rl[0]+' ('+m.score+') — size down or wait for the window to pass.'
+          : 'Conditions are normal for '+sym+'.');
+  }
+  if(chk){
+    const rows=[];
+    sigs.slice(0,3).forEach(s=>{
+      rows.push('<div class="chk '+(s.v===dir&&s.v!==0?'y':s.v===0?'w':'n')+'"><i>'+
+        (s.v===dir&&s.v!==0?'✓':s.v===0?'!':'✕')+'</i>'+s.k+'</div>');
+    });
+    if(m&&m.score>=50) rows.push('<div class="chk w"><i>!</i>Risk '+RRlevel(m.score)[0]+'</div>');
+    else rows.push('<div class="chk y"><i>✓</i>Risk clear</div>');
+    chk.innerHTML=rows.join('');
+  }
+  if(ac) ac.textContent = dir? (agree+' of 6 agree') : (known+' of 6 readable');
+  if(parts){
+    parts.innerHTML=sigs.map(s=>{
+      const against = dir && s.v!==0 && s.v!==dir;
+      return '<div class="kv"><span>'+s.k+'</span>'+
+        '<b class="'+(s.v>0?'green':s.v<0?'red':'muted')+'">'+s.txt+
+        (s.note?' <span class="rr-fcat" style="margin-left:5px">'+s.note+'</span>':'')+
+        (against?' <span class="rr-fcat" style="margin-left:5px">against</span>':'')+'</b></div>';
+    }).join('');
+  }
+}
+
+/* ── LATEST ALERTS mirror in the right rail ─────────────────────── */
+function paintMiniAlerts(){
+  const box=$('miniAlerts'), feed=$('alertFeed');
+  if(!box||!feed) return;
+  const items=[...feed.querySelectorAll('.alert-item')].slice(0,5);
+  if(!items.length){ box.innerHTML='<div class="note">No alerts yet.</div>'; return; }
+  box.innerHTML=items.map(it=>{
+    const nm=(it.querySelector('.alert-name')||{}).textContent||'';
+    const mt=(it.querySelector('.alert-meta')||{}).textContent||'';
+    const tm=(it.querySelector('.alert-time')||{}).textContent||'';
+    const dot=it.querySelector('.alert-dot');
+    const cls=dot?dot.className.replace('alert-dot','').trim():'';
+    const col=cls==='bull'?'var(--green)':cls==='bear'?'var(--red)':'var(--muted)';
+    return '<div class="row" style="gap:9px">'+
+      '<span class="alert-time" style="padding-top:2px">'+tm+'</span>'+
+      '<div style="flex:1;min-width:0"><div class="row-t" style="font-size:11.5px">'+nm+'</div>'+
+      '<div class="row-s">'+mt+'</div></div>'+
+      '<span style="width:2px;align-self:stretch;background:'+col+'"></span></div>';
+  }).join('');
+}
+
+/* ── TIMEFRAME TOGGLES + LIVE COUNTS ─────────────────────────────
+   Patterns and Pattern Alerts each get All / H1 / H4. "All" is rendered
+   by us from dataBySymbol into our own container, so we never fight the
+   host's renderPatterns() for #patternList. The tab badges count what is
+   ACTUALLY VISIBLE under the current toggle. */
+let patFilter='All', alertFilter='All';
+function patDir(p){
+  const raw=String((p&&(p.direction!==undefined?p.direction:p.type))||'').toLowerCase();
+  return raw.indexOf('bull')>=0?'bull' : raw.indexOf('bear')>=0?'bear' : 'neutral';
+}
+function patConf(p){
+  const v=(p&&(p.confidence!==undefined?p.confidence:p.confidence_pct));
+  return +v||0;
+}
+
+function setAlertFilter(f,btn){
+  alertFilter=f;
+  if(btn) btn.parentNode.querySelectorAll('.seg-btn').forEach(x=>x.classList.toggle('on',x===btn));
+  const n=decorateAlerts();
+  const b=$('badgeAlerts');
+  if(b && b.textContent!==String(n)) b.textContent=n;
+}
+
+/* Each alert gets its own direction tag, and — when it fired while its
+   pair was flagged — the Risk Radar state plus the reason underneath. */
+function decorateAlerts(){
+  const feed=$('alertFeed'); if(!feed) return 0;
+  /* Tagging is already one-shot per row via data-bwTagged; the visibility
+     pass must still run each tick so newly arrived alerts get filtered. */
+  const RR=window.BWRiskRadar;
+  let shown=0;
+  feed.querySelectorAll('.alert-item').forEach(it=>{
+    const txt=it.textContent||'';
+    const tf=/\bH4\b/.test(txt)?'H4':/\bH1\b/.test(txt)?'H1':'';
+    const show = alertFilter==='All' || tf===alertFilter;
+    it.style.display = show?'':'none';
+    if(show) shown++;
+    if(it.dataset.bwTagged) return;
+    it.dataset.bwTagged='1';
+    const name=it.querySelector('.alert-name'); if(!name) return;
+
+    const dot=it.querySelector('.alert-dot');
+    const dir = dot&&/bull/.test(dot.className)?'bull'
+              : dot&&/bear/.test(dot.className)?'bear' : 'neutral';
+    const dt=document.createElement('span');
+    dt.className='tag '+(dir==='bull'?'t-bull':dir==='bear'?'t-bear':'t-mute');
+    dt.style.marginLeft='6px'; dt.textContent=dir;
+    name.appendChild(dt);
+
+    const sym=((typeof state!=='undefined'&&state.watchlist)||[])
+      .map(w=>normalisePair(w.symbol)).find(x=>txt.indexOf(x)>=0
+        || txt.indexOf(x.slice(0,3)+'/'+x.slice(3))>=0);
+    if(!sym||!RR||!RR.for) return;
+    const m=RR.for(sym); if(!m) return;
+    const L=RRlevel(m.score);
+    if(m.score<50) return;                      // only flag Elevated / Stand down
+    const rt=document.createElement('span');
+    rt.className='tag'; rt.style.marginLeft='6px';
+    rt.style.color=L[1]; rt.style.borderColor=L[1];
+    rt.textContent=L[0]+' '+m.score;
+    name.appendChild(rt);
+
+    const why=(m.factors||[]).slice(0,2)
+      .map(f=>String(f.detail||f.label||'').replace(/^\[H\d\]\s*/,''))
+      .join(' · ');
+    const body=it.querySelector('.alert-body')||it;
+    const r=document.createElement('div');
+    r.className='alert-desc';
+    r.style.color=L[1];
+    r.textContent='Fired while '+sym+' was '+L[0].toLowerCase()+' — '+
+      (why||'several risk conditions were stacked')+'. Verify before acting.';
+    body.appendChild(r);
+  });
+  return shown;
+}
+
+function esc(x){ return String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* Tab badges — counts follow the toggles, and Trade Errors shows a red
+   dot only while there is something to fix. */
+function paintBadges(){
+  const pc=$('badgePatterns');
+  /* Counts the LIVE list the host's renderPatterns() writes into
+     #patternList. Engine 3 clears it as the candle changes, so this
+     goes to 0 between patterns — that is correct for a live view. */
+  /* Live-trades pulse: colour follows the NET open P&L, because that is
+     the number the user is actually exposed to. Hidden with no trades. */
+  const td=$('tradeDot');
+  if(td){
+    const tr=((typeof state!=='undefined'&&state.openTrades)||[]);
+    if(!tr.length){ td.className='tr-dot'; td.title=''; }
+    else{
+      const net=tr.reduce((a,t)=>a+(parseFloat(t.profit)||0),0);
+      const cls='tr-dot on '+(net>=0?'up':'dn');
+      if(td.className!==cls) td.className=cls;
+      td.title=tr.length+' open trade'+(tr.length===1?'':'s')+' · net '+(net>=0?'+':'')+net.toFixed(2);
+    }
+  }
+  if(pc){ const L=$('patternList');
+    const n=(L&&!L.querySelector('div[style*="--t3"]'))?L.querySelectorAll('.pattern-row').length:0;
+    if(pc.textContent!==String(n)) pc.textContent=n; }
+  const ac=$('badgeAlerts');
+  if(ac){ const n=decorateAlerts()||0; ac.textContent=n; }
+  const ed=$('badgeErrors');
+  if(ed){
+    const n=parseInt((($('errCount')||{}).textContent)||'0',10)||0;
+    ed.style.display = n>0?'inline-block':'none';
+    ed.title = n+' trade error'+(n===1?'':'s')+' needing attention';
+  }
+}
+
+/* ── NEWS: countdowns and day labels ─────────────────────────────── */
+/* ── WHICH CURRENCIES THIS ACCOUNT ACTUALLY WATCHES ───────────────
+   The server fetches HIGH-impact events for a FIXED list of eight
+   currencies (HIGH_CURRENCIES in app.js) — it has no idea what is in
+   any one user's watchlist. So the release list showed AUD and NZD
+   events to someone watching only EUR/USD, GBP/USD and gold.
+   This derives the set from the live watchlist: every currency that
+   appears in a watched pair, on either side. An event is kept only if
+   its country code is in that set. Falls back to showing everything if
+   the watchlist has not loaded yet, so the panel is never emptier than
+   before by accident. */
+function watchedCurrencies(){
+  const out={};
+  const wl=(typeof state!=='undefined'&&state.watchlist)||[];
+  wl.forEach(w=>{
+    const p=normalisePair(w.symbol||'');
+    if(p.length<6) return;
+    out[p.slice(0,3)]=1; out[p.slice(3,6)]=1;
+  });
+  /* XAU/XAG are priced in USD and move on USD releases; the metal itself
+     has no calendar of its own, so map it to its quote currency only. */
+  return Object.keys(out).length?out:null;
+}
+window.newsForWatchlist=newsForWatchlist;   /* cross-block: separate IIFEs */
+function newsForWatchlist(){
+  const set=watchedCurrencies();
+  return ((typeof state!=='undefined'&&state.news)||[]).filter(e=>{
+    if(!/high/i.test(e.impact||'')) return false;
+    if(!set) return true;                       // watchlist not loaded yet
+    return !!set[String(e.country||'').toUpperCase()];
+  });
+}
+function paintNews(){
+  const box=$('newsUpcoming'); if(!box) return;
+  const now=Date.now()/1000;
+  const all=((typeof state!=='undefined'&&state.news)||[]).length;
+  const kept=newsForWatchlist();
+  /* The cap used to be a silent .slice(0,12): if fifteen releases were
+     scheduled for the currencies you trade, three simply were not there
+     and nothing said so. A calendar that quietly omits releases is worse
+     than one that shows a long list, because the trader reasonably
+     assumes what they see is all of it. Cap raised, and whatever is
+     still hidden is now counted out loud. */
+  const SHOW=25;
+  const upcoming=kept
+    .map(e=>({e, t:(+e.timestamp||0)-now, ts:+e.timestamp||0}))
+    .filter(x=>x.ts && x.t>-3600)
+    .sort((a,b)=>a.t-b.t);
+  const evs=upcoming.slice(0,SHOW);
+  const hidden=upcoming.length-evs.length;
+  if(!evs.length){
+    box.innerHTML='<div class="rr-empty">'+(all
+      ? 'No upcoming high-impact releases for the currencies in your watchlist. '+
+        (all-kept.length)+' of '+all+' events in the feed are for other currencies and are not shown.'
+      : 'No scheduled releases in the feed.')+'</div>';
+    return;
+  }
+  const today=new Date(); const dayOf=d=>d.getUTCFullYear()+'-'+d.getUTCMonth()+'-'+d.getUTCDate();
+  box.innerHTML=evs.map(x=>{
+    const d=new Date(x.ts*1000);
+    const hhmm=String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0');
+    const dd=Math.round((new Date(dayOf(d))-new Date(dayOf(today)))/864e5);
+    let when;
+    if(x.t<0) when='<span class="muted">released '+Math.round(-x.t/60)+'m ago</span>';
+    else if(dd>=2) when='in '+dd+' days · '+hhmm;
+    else if(dd===1) when='tomorrow '+hhmm;
+    else if(x.t<3600) when='<b>'+Math.floor(x.t/60)+'m '+String(Math.floor(x.t%60)).padStart(2,'0')+'s</b>';
+    else when='in '+Math.floor(x.t/3600)+'h '+Math.round((x.t%3600)/60)+'m · '+hhmm;
+    const cls=window.BWRiskRadar&&window.BWRiskRadar.classifyEvent
+      ? window.BWRiskRadar.classifyEvent(x.e) : {tier:(x.e.impact||'low')};
+    const soon = x.t>0 && x.t<3600 && cls.tier==='extreme';
+    return '<div class="news-item"><div style="display:flex;gap:10px;align-items:flex-start">'+
+      '<div style="flex:1"><div class="news-title">'+esc(x.e.title||'')+
+      ' <span class="rr-tier rr-tier-'+cls.tier+'">'+cls.tier+'</span></div>'+
+      '<div class="news-meta">'+esc(x.e.country||'')+' · forecast '+esc(x.e.forecast||'—')+
+      ' · previous '+esc(x.e.previous||'—')+(x.e.actual?' · actual '+esc(x.e.actual):'')+'</div></div>'+
+      '<div class="news-time" style="text-align:right;'+(soon?'color:var(--red)':'')+'">'+when+
+      '<div style="margin-top:3px;color:var(--muted)">'+hhmm+' UTC</div></div></div></div>';
+  }).join('')
+  /* SOURCE, stated plainly. Users should be able to check a release
+     against its origin rather than trusting an unattributed number. */
+  /* Say exactly what is shown and what is not. Every number here is
+     counted, not asserted — a footer that claims completeness it does
+     not have is worse than no footer. */
+  + '<div class="note" style="margin-top:10px">'+
+    'Showing <b>'+evs.length+'</b> of <b>'+upcoming.length+'</b> upcoming high-impact releases for '+
+    (watchedCurrencies()?Object.keys(watchedCurrencies()).sort().join(', '):'all major currencies')+
+    ' \u2014 the currencies in your watchlist.'+
+    (hidden>0?' <b>'+hidden+' more</b> are scheduled but not listed here.':'')+
+    (all-kept.length>0?' A further '+(all-kept.length)+' of '+all+' events in the feed are for other '+
+      'currencies you do not trade.':'')+
+    '<br>Calendar data: <b>ForexFactory</b> (nfs.faireconomy.media), refreshed every 30 minutes. '+
+    'The feed carries <b>high impact only</b> for the eight majors (USD, EUR, GBP, JPY, CHF, AUD, CAD, NZD) '+
+    'across this week and next \u2014 medium and low impact releases, other currencies, and anything '+
+    'beyond two weeks are not fetched at all. Times are UTC.</div>';
+}
+
+/* ── TRADE ERRORS: the deeper analysis from the prototype ────────── */
+function paintErrors(){
+  const box=$('errDetail'); if(!box) return;
+  const tr=((typeof state!=='undefined'&&state.openTrades)||[]);
+
+  /* ONE LIST, ONE COUNT.
+     Before: the host counted its own errors into #errCount but its list
+     (#errorsList) was hidden, and this function rendered a SEPARATE set of
+     checks with different thresholds (lot vs median 1.8x here, riskPct>2.5
+     there; risk score >=75 here, nothing there). So "4 active errors" could
+     sit above three rows about other things, and a no-stop-loss trade was
+     described twice in different words.
+     Now: every error the host counted is rendered here first, verbatim,
+     each with its own reason and fix. Then this module's extra analysis is
+     appended, skipping anything the host already said. #errCount is set
+     from the number of rows ACTUALLY RENDERED, so the number and the list
+     can never disagree again. */
+  const hostErrs = (window.__bwTradeErrors||[]).slice();
+  const rows=[];
+  const seen={};
+  hostErrs.forEach(e=>{
+    const sev = e.severity==='high' ? ['t-bear','Act now'] : ['t-gold','Check'];
+    rows.push([sev[0], sev[1], e.title, (e.desc||'')+(e.fix?' → '+e.fix:'')]);
+    if(/no stop loss/i.test(e.title)) seen.nosl=true;
+    if(/oversize/i.test(e.title))     seen.size=true;
+  });
+
+  /* Extra analysis this module adds that the host does not do at all:
+     size measured against the user's OWN median, and open positions
+     sitting inside a Risk Radar stand-down window. */
+  const lots=tr.map(t=>Math.abs(+t.lots||+t.volume||0)).filter(x=>x>0).sort((a,b)=>a-b);
+  const med=lots.length?lots[Math.floor(lots.length/2)]:0;
+  tr.forEach(t=>{
+    const sym=normalisePair(t.symbol||'');
+    const lot=Math.abs(+t.lots||+t.volume||0);
+    if(!seen.size && med && lot>med*1.8){
+      rows.push(['t-gold','Check', sym+' is '+(lot/med).toFixed(1)+'x your usual size',
+        'Your median open position is '+med.toFixed(2)+' lots. This one is '+lot.toFixed(2)+
+        '. Oversized trades turn one bad read into a drawdown you have to trade back.']);
+    }
+    const RR=window.BWRiskRadar, m=RR&&RR.for?RR.for(sym):null;
+    if(m && m.score>=75){
+      rows.push(['t-bear','Act now', sym+' is open in a stand-down window',
+        'Risk Radar has '+sym+' at '+m.score+'. Conditions associated with erratic price behaviour - consider reducing or protecting this position.']);
+    }
+  });
+
+  if(rows.length){
+    box.innerHTML = rows.map((r,i)=>
+      '<div class="error-item"><div style="flex:1">'+
+      '<div class="etitle"><span class="err-n">'+(i+1)+'</span> '+esc(r[2])+
+      ' <span class="tag '+r[0]+'">'+r[1]+'</span></div>'+
+      '<div class="edesc">'+esc(r[3])+'</div></div></div>').join('');
+  }else if(!tr.length){
+    box.innerHTML='<div class="rr-empty">No open trades, and nothing flagged in today\'s activity.</div>';
+  }else{
+    box.innerHTML='<div class="rr-empty">Nothing flagged. All '+tr.length+' open trade'+
+      (tr.length===1?'':'s')+' have stops, sit within your usual size, and today\'s activity looks disciplined.</div>';
+  }
+  /* The card now reports what is on screen, numbered to match. */
+  const ec=$('errCount'); if(ec) ec.textContent=rows.length;
+}
+
+/* ── "NOW" RAIL ─────────────────────────────────────────────────── */
+function paintNow(){
+  const RR=window.BWRiskRadar;
+  const sym=normalisePair(typeof activePair!=='undefined'?activePair:'');
+  const m=RR&&RR.for?RR.for(sym):null;
+  const rs=$('nowRisk');
+  if(rs){
+    if(m){ const L=RRlevel(m.score); rs.textContent=L[0]+' · '+m.score; rs.style.color=L[1]; }
+    else { rs.textContent='—'; rs.style.color='var(--muted)'; }
+  }
+  const nr=$('nowNews');
+  if(nr){
+    const now=Date.now()/1000;
+    const next=((typeof state!=='undefined'&&state.news)||[])
+      .map(e=>({t:(+e.timestamp||0)-now, hi:/high/i.test(e.impact||'')}))
+      .filter(x=>x.t>0).sort((a,b)=>a.t-b.t)[0];
+    if(next){
+      const mins=Math.round(next.t/60);
+      nr.textContent = mins<60?mins+'m' : Math.floor(mins/60)+'h '+(mins%60)+'m';
+      nr.style.color = next.hi&&mins<60?'var(--red)':'var(--text)';
+    } else { nr.textContent='—'; nr.style.color='var(--muted)'; }
+  }
+  const ot=$('nowTrades');
+  if(ot) ot.textContent=((typeof state!=='undefined'&&state.openTrades)||[]).length;
+  const al=$('nowAlerts');
+  if(al){
+    const b=parseInt(($('cntBull')||{}).textContent||0)||0;
+    const r=parseInt(($('cntBear')||{}).textContent||0)||0;
+    const n=parseInt(($('cntNeut')||{}).textContent||0)||0;
+    al.textContent=b+r+n;
+  }
+}
+
+/* ── CHART VISIBILITY ────────────────────────────────────────────
+   Chart.js measures the canvas when it draws. A canvas inside a
+   hidden tab measures zero, so the chart comes back blank when the
+   tab is shown again — resize it once it is visible. The original
+   switchTab is left alone; this just listens on the buttons. */
+function nudgeChart(){
+  try{
+    if(typeof priceChartObj!=='undefined' && priceChartObj && priceChartObj.resize){
+      priceChartObj.resize();
+      priceChartObj.update('none');
+    }
+  }catch(e){}
+}
+document.querySelectorAll('.nav-btn').forEach(b=>{
+  b.addEventListener('click',()=>{ setTimeout(nudgeChart,60); });
+});
+/* A timeframe change swaps the RSI series — redraw so the previous-marker
+   resets instead of diffing H4 against H1. */
+document.querySelectorAll('.tf-tab').forEach(b=>{
+  b.addEventListener('click',()=>{ setTimeout(()=>{ drawRSI(); paintLevels(); nudgeChart(); },80); });
+});
+/* Switching pair while the Signal tab is open must redraw the chart.
+   applyCachedSymbolData() already does that; this only makes sure the
+   canvas is measured correctly if the tab was hidden a moment ago. */
+document.querySelectorAll('.pair-row').forEach(r=>{
+  r.addEventListener('click',()=>{ setTimeout(()=>{ nudgeChart(); drawRSI(); paintLevels(); paintWatchlist(); paintVerdict(); },80); });
+});
+
+/* ── ALERT FEED: react to the host's rebuild, not to a timer ──────
+   The host wipes and rebuilds #alertFeed wholesale on FULL_STATE (and
+   prepends on PATTERN_ALERT). Filtering only on the 4s tick meant that
+   between the host's rebuild and our next tick, rows the filter should
+   hide were visible and the badge counted them — the count showed the
+   right number, then changed. Observing the feed re-applies the filter
+   in the same frame the rows appear, so nothing is ever shown and then
+   taken away. */
+(function(){
+  const feed=$('alertFeed'); if(!feed||typeof MutationObserver==='undefined') return;
+  let queued=false;
+  const mo=new MutationObserver(()=>{
+    if(queued) return;
+    queued=true;
+    /* microtask, so a burst of prepends collapses into one pass */
+    Promise.resolve().then(()=>{
+      queued=false;
+      try{
+        const n=decorateAlerts();
+        const b=$('badgeAlerts');
+        if(b && b.textContent!==String(n)) b.textContent=n;
+      }catch(e){}
+    });
+  });
+  mo.observe(feed,{childList:true});
+})();
+
+/* ── loop ────────────────────────────────────────────────────────── */
+decorateWatchlist();
+function tick(){
+  try{ drawTape(); drawRSI(); paintLevels(); paintWatchlist(); paintNow(); paintVerdict();
+       paintBadges(); paintNews(); paintErrors(); paintMiniAlerts(); }
+  catch(e){ console.warn('[Skin]',e); }
+}
+tick();
+setInterval(tick,4000);
+setInterval(drawTape,30000);
+window.BWSkinTick=tick;
+window.BWSkinPaintWatchlist=function(){ try{ paintWatchlist(); }catch(e){} };
+window.BWSkinPaintErrors=function(){ try{ paintErrors(); }catch(e){} };
+window.setAlertFilter=setAlertFilter;
+/* news countdown ticks every second so the last hour reads live */
+setInterval(paintNews,1000);
+})();
+</script>
+<script>(function(){setTimeout(function(){
+  if(window.BWRiskRadar) return;
+  var a=document.getElementById('rr-advice'), s=document.getElementById('rr-score');
+  if(a) a.innerHTML='<span style="color:var(--red)">Risk Radar did not start.</span> '+
+    'The dashboard\u2019s own data never appeared, so there was nothing to score. Check the console.';
+  if(s) s.textContent='\u2014';
+},12000);})();</script>
+</body>
+</html>
