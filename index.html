@@ -173,7 +173,13 @@ body{background:var(--bg);color:var(--text);font-family:'Archivo',system-ui,-app
   /* Tracking was 1.3px at 9px — wide enough that words stopped reading
      as words. Slightly larger type with slightly less tracking is
      easier to read and looks more considered. */
-  margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;line-height:1.4}
+  /* space-between pushed the title hard left and the controls hard
+     right, leaving a wide gap between the timeframe tabs and the lock.
+     flex-start with an auto margin on the first control group keeps the
+     controls together as one cluster at the right. */
+  margin-bottom:16px;display:flex;justify-content:flex-start;align-items:center;gap:10px;line-height:1.4}
+.card-title > .tf-tabs{margin-left:auto}
+.card-title > .chart-lock{margin-left:4px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .metric-val{font-size:25px;font-weight:600;letter-spacing:-.8px;line-height:1.1}
@@ -606,7 +612,13 @@ body{background:var(--bg);color:var(--text);font-family:'Archivo',system-ui,-app
    as unstyled 13px text with no rhythm — part of why the newer panels
    read as cramped next to the older ones. */
 .ct{font-size:10px;font-weight:600;letter-spacing:.9px;color:var(--muted);text-transform:uppercase;
-  margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;line-height:1.4}
+  /* space-between pushed the title hard left and the controls hard
+     right, leaving a wide gap between the timeframe tabs and the lock.
+     flex-start with an auto margin on the first control group keeps the
+     controls together as one cluster at the right. */
+  margin-bottom:16px;display:flex;justify-content:flex-start;align-items:center;gap:10px;line-height:1.4}
+.card-title > .tf-tabs{margin-left:auto}
+.card-title > .chart-lock{margin-left:4px}
 .ct .r{text-transform:none;letter-spacing:0;font-weight:400;font-size:11px;color:var(--muted)}
 .r{margin-left:auto}
 .b-s{font-size:12.5px;line-height:1.7;color:var(--muted2);margin:0}
@@ -1504,8 +1516,12 @@ function updateAll(d){
    contrast number, and a matched ratio is not the point — the dark grid
    looked right before and my "improvement" made it heavy. Only day mode
    was ever broken, so only day mode changes. */
+/* Day mode draws a black grid; night mode now draws an ASH one — a real
+   grey line rather than white at 4%, which on a near-black panel was
+   effectively nothing. Same idea both ways: the grid should look like a
+   grid. */
 function gridColour(){ return (typeof BW_LIGHT==='function' && BW_LIGHT())
-  ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.04)'; }
+  ? 'rgba(0,0,0,0.28)' : '#3a3a42'; }
 function textColour(){ return (typeof BW_LIGHT==='function' && BW_LIGHT())
   ? 'rgba(20,20,24,0.55)' : 'rgba(255,255,255,0.35)'; }
 
@@ -2456,7 +2472,7 @@ function BW_LIGHT(){
    drawn at all — it measured as "present" in code and looked blank on
    the screen, which is the same failure as the frozen LL line earlier.
    0.12 is quiet and actually visible. */
-function CHART_GRID(){ return BW_LIGHT() ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.06)'; }
+function CHART_GRID(){ return BW_LIGHT() ? 'rgba(0,0,0,0.28)' : '#3a3a42'; }
 function CHART_INK(a){ return BW_LIGHT() ? 'rgba(24,24,28,'+(a==null?1:a)+')'
                                          : 'rgba(236,234,224,'+(a==null?1:a)+')'; }
 function CHART_MUT(){ return BW_LIGHT() ? '#8a8880' : '#72706a'; }
@@ -3139,7 +3155,7 @@ function sparkline(cv, data, color){
   /* 0.12 was still too faint against white. A grid should read as a
      grid — black at 28% is a clear grey line without competing with the
      price line drawn over it. */
-  c.strokeStyle = light ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.07)';
+  c.strokeStyle = light ? 'rgba(0,0,0,0.28)' : '#3a3a42';
   c.lineWidth = 2;
   /* four horizontal lines and six verticals — enough to read position
      without turning the panel into graph paper */
@@ -3153,7 +3169,7 @@ function sparkline(cv, data, color){
   }
   /* the 50 line is the one that matters, so it is drawn stronger than
      the rest rather than hiding among them */
-  c.strokeStyle = light ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.14)';
+  c.strokeStyle = light ? 'rgba(0,0,0,0.45)' : '#54545e';
   c.setLineDash([6,5]); c.lineWidth=2;
   c.beginPath(); c.moveTo(0,H*0.5); c.lineTo(W,H*0.5); c.stroke();
   c.setLineDash([]);
