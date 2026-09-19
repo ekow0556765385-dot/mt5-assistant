@@ -9184,7 +9184,8 @@ function volPercentile(cd, n){
      10% of the last 60" on the same screen. Compare closed against
      closed. */
   var w = cd.slice(-n-2, -2).map(function(b){return +b.v||0;});
-  var now = +cd[cd.length-2] ? (+cd[cd.length-2].v||0) : 0;
+  var prev = cd[cd.length-2];
+  var now = prev ? (+prev.v||0) : 0;   /* coercing the BAR to a number gave NaN */
   if(!w.length || !now) return null;
   var below = 0;
   for(var i=0;i<w.length;i++) if(w[i] < now) below++;
@@ -10168,6 +10169,83 @@ function cfRow(name, role, chip, body){
 }
 
 
+
+/* ══════════════════════════════════════════════════════════════════
+   PUBLISH THE COMBINED READ — window `bw-confluence-now`
+
+   Same channel and shape as `bw-risk-now` and the liquidity read the
+   Assistant already publishes, so anything reading those reads this
+   with no new plumbing.
+
+   WHY A SUMMARY AND NOT THE RAW ENGINES: the Trading Brain runs on a
+   different page and cannot see any of the seventeen engines in this
+   file. Shipping their raw output would make the Brain — and Haiku
+   behind it — form its own view, which is how two screens end up
+   describing one market differently. It gets the CONCLUSIONS instead,
+   in the words this tab already shows, so it can explain and connect
+   them but cannot contradict them.
+
+   Small by design: localStorage is shared and this is written every
+   cycle, so lists are capped and nothing is stored that the reader
+   could derive for itself. Per pair+timeframe, with the bar time
+   alongside the wall clock, because a reader must be able to tell a
+   stale read from a live one. */
+function publishConfluence(o, cd){
+  try{
+    if(!o || !o.ok) return;
+    var last = cd && cd.length ? cd[cd.length-1] : null;
+    var store = {};
+    try{ store = JSON.parse(localStorage.getItem('bw-confluence-now')||'{}') || {}; }catch(e){ store = {}; }
+    if(!store.reads || typeof store.reads !== 'object') store.reads = {};
+
+    var f = o.frame || {}, p = o.pres || {}, pm = o.perm || {}, tr = o.trust || {};
+    var key = pair + '|' + tf;
+
+    store.reads[key] = {
+      symbol: pair, timeframe: tf,
+      barT: last ? (+last.t||0) : 0,          /* the bar this read describes */
+      /* the headline, in the words on screen */
+      state: o.state, word: o.word, line: o.line,
+      /* the frame */
+      trend: f.dir || null, trendConf: f.conf!=null ? +f.conf.toFixed(2) : null,
+      labels: (f.last4||[]).join(' ') || null,
+      decides: f.decider ? {name:f.decider.name, price:+f.decider.p.toFixed(6),
+                            broken:!!f.broken} : null,
+      /* the structural event, which is what the Brain most needs */
+      pressure: p.known ? {state:p.state, score:p.score, pipsAway:+(p.pipsAway||0).toFixed(1),
+                           run:p.run, tests:p.tests} : null,
+      reversal: (o.aft && o.aft.known) ? {stage:o.aft.state, from:o.aft.oldDir, to:o.aft.newDir,
+                           level:+o.aft.level.toFixed(6), barsSince:o.aft.since,
+                           phase:(o.ph&&o.ph.known)?o.ph.phase:null,
+                           givenBackPct:(o.ph&&o.ph.known)?Math.round(o.ph.retracePct):null} : null,
+      /* the trigger and where it came from */
+      trigger: (o.trig && o.trig.any) ? {name:o.trig.lead.name, dir:o.trig.lead.dir,
+                           conf:o.trig.lead.conf, barsAgo:o.trig.barsAgo,
+                           source:o.trig.source, alerted:!!o.trig.lead.hasRaised} : null,
+      /* the directionless readings */
+      participation: {state:pm.state||null, pct:pm.volPct!=null?pm.volPct:null,
+                      pctile:pm.pctile!=null?pm.pctile:null, session:pm.sessions||null},
+      risk: tr.risk!=null ? tr.risk : null,
+      higher: (o.htf && o.htf.known) ? {tf:o.htf.label, dir:o.htf.dir, weight:o.htf.mult} : null,
+      support: o.support!=null ? +o.support.toFixed(2) : null,
+      /* the reasoning, capped */
+      supports: (o.supports||[]).slice(0,4),
+      against:  (o.contradictions||[]).slice(0,4),
+      weakens:  (o.weakens||[]).slice(0,3),
+      /* honesty the reader must carry through */
+      suspended: !!o.suspended,
+      feed: o.feed ? {ok:o.feed.ok!==false,
+                      gapBars:(o.feed.gap&&o.feed.gap.barsMissed)||0,
+                      missed:(o.feed.missed||[]).length} : null,
+      caveat: 'These readings sort evidence; on ten years of data the aligned state showed no ' +
+              'measured edge over conflicted for what price did next. Describe, do not predict.'
+    };
+    store.t = Date.now();
+    store.v = 1;
+    localStorage.setItem('bw-confluence-now', JSON.stringify(store));
+  }catch(e){ /* storage full or disabled — never let this break the tab */ }
+}
+
 /* ══════════════════════════════════════════════════════════════════
    THE CHART — modelled on the simulation prototype.
 
@@ -10349,6 +10427,9 @@ function renderConf(){
   try{ window.__cfLast = o; window.__cfIn = {raised:raised.length, missed:missed.length,
         missedFrom:missedFrom, gap:!!feedGap, alerts:(alerts||[]).length}; }catch(e){}
 
+  /* published for the Trading Brain and anything else that wants it */
+  publishConfluence(o, cd);
+
   const b=$('cConf'); if(b) b.textContent='—';
     return;
   }
@@ -10429,6 +10510,9 @@ function renderConf(){
   /* the last full reading, for debugging a live screen */
   try{ window.__cfLast = o; window.__cfIn = {raised:raised.length, missed:missed.length,
         missedFrom:missedFrom, gap:!!feedGap, alerts:(alerts||[]).length}; }catch(e){}
+
+  /* published for the Trading Brain and anything else that wants it */
+  publishConfluence(o, cd);
 
   const b=$('cConf');
   if(b) b.textContent = o.state==='broken'||o.state==='breaking' ? '!' :
