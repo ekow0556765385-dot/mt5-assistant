@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blackwood Arbiter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ════════════════════════════════════════════════════════════════
+   Tokens from blackwood_dashboard.html. Legacy aliases kept in BOTH
+   themes. Nothing here is display:none at a breakpoint — the rail
+   narrows and then stacks, per the standing rule for iframe modules.
+   ════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0d1117; --bg2:#151b23; --bg3:#1c232d; --panel:#131920;
+  --line:#232c37; --line2:#2d3846;
+  --text:#e6edf3; --text2:#9aa7b4; --text3:#6b7785;
+  --blue:#3b82f6; --blue-dim:#1d3a68;
+  --green:#22c55e; --red:#ef4444; --amber:#f5a524; --violet:#9a7fd4;
+  --accent:#3b82f6;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --r:10px;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+:root[data-theme="light"]{
+  --bg:#f6f8fa; --bg2:#ffffff; --bg3:#eef2f6; --panel:#ffffff;
+  --line:#dfe5ec; --line2:#cbd5e1;
+  --text:#111820; --text2:#57636f; --text3:#8b95a1; --blue-dim:#cfe0fb;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  overscroll-behavior-y:contain;overflow-x:hidden}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* header */
+.hdr{padding:16px 20px 0;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.hdr h1{font-size:19px}
+.hdr .sub{color:var(--text2);font-size:12.5px;margin-top:3px}
+.hdr-act{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.btn{background:var(--bg2);border:1px solid var(--line2);border-radius:8px;
+  padding:7px 13px;font-size:13px;font-weight:500;display:inline-flex;gap:7px;align-items:center}
+.btn:hover{border-color:var(--blue)}
+.btn:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.btn[disabled]{opacity:.5;cursor:default}
+
+/* nav */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);
+  border-bottom:1px solid var(--line);margin-top:13px;padding:0 20px;display:flex;gap:2px;
+  overflow-x:auto;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav-tab{background:none;border:0;padding:11px 13px;color:var(--text);font-weight:500;
+  white-space:nowrap;display:flex;gap:7px;align-items:center}
+.nav-tab .ico{width:15px;height:15px;background-color:var(--text3);flex:none}
+.nav-tab.active{font-weight:600;box-shadow:inset 0 -2px 0 var(--blue)}
+.nav-tab.active .ico{background-color:var(--blue)}
+.nav-ct{font-family:var(--mono);font-size:11px;background:var(--bg3);border-radius:20px;
+  padding:1px 7px;color:var(--text2)}
+.nav-tab.active .nav-ct{background:var(--blue-dim);color:var(--text)}
+.nav-tab.soon{color:var(--text3);cursor:default}
+
+/* layout */
+.wrap{display:flex;gap:16px;align-items:flex-start;padding:16px 20px 60px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.rail{width:296px;flex:none;display:flex;flex-direction:column;gap:12px;
+  max-height:calc(100vh - 180px);overflow-y:auto;overscroll-behavior:contain;contain:layout}
+@media(max-width:1400px){.rail{width:268px}}
+@media(max-width:1150px){.rail{width:242px}}
+@media(max-width:940px){.rail{width:214px}}
+@media(max-width:760px){.wrap{flex-direction:column;padding:14px}
+  .rail{width:100%;max-height:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.card-h{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;gap:10px;
+  align-items:center;min-height:26px}
+.card-h h3{font-size:13px}
+.card-h .sp{margin-left:auto}
+.card-b{padding:14px}
+.muted{color:var(--text2)} .dim{color:var(--text3)}
+.tiny{font-size:12px} .xtiny{font-size:11px}
+
+/* badges */
+.badge{display:inline-flex;align-items:center;gap:5px;line-height:1;font-size:11px;
+  font-weight:600;padding:4px 8px;border-radius:5px;background:var(--bg3);color:var(--text2);
+  border:1px solid var(--line2)}
+.badge.buy,.badge.ok{background:rgba(34,197,94,.13);color:#4ade80;border-color:rgba(34,197,94,.3)}
+.badge.sell,.badge.bad{background:rgba(239,68,68,.13);color:#f87171;border-color:rgba(239,68,68,.3)}
+.badge.warn{background:rgba(245,165,36,.13);color:#fbbf24;border-color:rgba(245,165,36,.3)}
+.badge.info{background:rgba(59,130,246,.13);color:#93c5fd;border-color:rgba(59,130,246,.3)}
+
+/* ── the action: the one thing read in two seconds ── */
+.act{position:relative;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start;
+  padding:15px 16px;border-radius:11px;border:1px solid;overflow:hidden}
+.act::before{content:'';position:absolute;inset:0 auto 0 0;width:3px}
+.act-word{font-size:17px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;line-height:1.15}
+.act-sub{font-size:10.5px;font-weight:600;letter-spacing:.06em;color:var(--text3);margin-top:4px}
+.act-why{font-size:13.5px;line-height:1.5}
+.act.hold{border-color:rgba(34,197,94,.32);background:linear-gradient(90deg,rgba(34,197,94,.10),transparent 60%)}
+.act.hold::before{background:var(--green)} .act.hold .act-word{color:#4ade80}
+.act.be{border-color:rgba(59,130,246,.32);background:linear-gradient(90deg,rgba(59,130,246,.10),transparent 60%)}
+.act.be::before{background:var(--blue)} .act.be .act-word{color:#93c5fd}
+.act.partial{border-color:rgba(245,165,36,.38);background:linear-gradient(90deg,rgba(245,165,36,.12),transparent 60%)}
+.act.partial::before{background:var(--amber)} .act.partial .act-word{color:#fbbf24}
+.act.cut{border-color:rgba(239,68,68,.42);background:linear-gradient(90deg,rgba(239,68,68,.13),transparent 60%)}
+.act.cut::before{background:var(--red)} .act.cut .act-word{color:#f87171}
+.act-pending{margin-top:8px;font-size:11.5px;color:var(--text3);display:flex;gap:7px;align-items:center}
+.act-pending i{display:block;height:3px;border-radius:2px;background:var(--line2);width:42px;position:relative;overflow:hidden}
+.act-pending i b{position:absolute;inset:0 auto 0 0;background:var(--amber);border-radius:2px}
+
+/* ── pillars: broken must be unmissable, standing must be quiet ── */
+.pillars{display:grid;gap:6px}
+.pill{display:grid;grid-template-columns:20px 1fr auto;gap:10px;align-items:start;
+  padding:9px 11px;border-radius:8px;background:var(--bg2);border:1px solid var(--line)}
+.pill .mk{width:17px;height:17px;border-radius:50%;display:grid;place-items:center;
+  font-size:10px;font-weight:700;margin-top:1px}
+.pill .nm{font-weight:500;font-size:13px}
+.pill .dt{font-size:12px;color:var(--text2);margin-top:2px;line-height:1.45}
+.pill .src{font-size:10px;color:var(--text3);font-family:var(--mono);white-space:nowrap;margin-top:3px}
+.pill.pass .mk{background:rgba(34,197,94,.16);color:#4ade80}
+.pill.warn .mk{background:rgba(245,165,36,.18);color:#fbbf24}
+.pill.fail .mk{background:rgba(239,68,68,.18);color:#f87171}
+.pill.unknown{opacity:.72} .pill.unknown .mk{background:var(--bg3);color:var(--text3)}
+.pill.pass{opacity:.86}
+.pill.broken{border-color:rgba(239,68,68,.45);background:rgba(239,68,68,.07);opacity:1}
+.pill.broken .nm{font-weight:600}
+.pill.weakened{border-color:rgba(245,165,36,.35);opacity:1}
+.chg{font-size:10px;font-weight:700;letter-spacing:.05em;padding:2px 6px;border-radius:4px;
+  text-transform:uppercase}
+.chg.broken{background:rgba(239,68,68,.16);color:#f87171}
+.chg.weakened{background:rgba(245,165,36,.16);color:#fbbf24}
+.chg.recovered{background:rgba(34,197,94,.14);color:#4ade80}
+
+/* position head */
+.thead{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 14px;
+  background:var(--bg2);border-bottom:1px solid var(--line)}
+.tpair{font-size:15px;font-weight:700;display:flex;gap:8px;align-items:center}
+.tmeta{font-family:var(--mono);font-size:11.5px;color:var(--text2);margin-top:3px}
+.tpl{margin-left:auto;text-align:right;font-family:var(--mono)}
+.tpl .v{font-size:17px;font-weight:600}
+.tpl .v.up{color:#4ade80} .tpl .v.dn{color:#f87171}
+.tpl .s{font-size:11px;color:var(--text3)}
+
+/* excursion */
+.exc-track{position:relative;height:28px;background:var(--bg3);border-radius:7px;
+  border:1px solid var(--line);overflow:hidden}
+.exc-mae{position:absolute;top:0;bottom:0;background:rgba(239,68,68,.17)}
+.exc-mfe{position:absolute;top:0;bottom:0;background:rgba(34,197,94,.17)}
+.exc-zero{position:absolute;top:0;bottom:0;width:1px;background:var(--line2)}
+.exc-now{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--text);border-radius:2px}
+.exc-lab{display:flex;justify-content:space-between;margin-top:6px;font-family:var(--mono);
+  font-size:11px;color:var(--text3)}
+
+/* score */
+.score{display:flex;gap:14px;align-items:center}
+.score .n{font-family:var(--mono);font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1}
+.score .of{font-size:12px;color:var(--text3)}
+.meter{height:6px;border-radius:4px;background:var(--bg3);overflow:hidden;margin-top:7px}
+.meter i{display:block;height:100%;border-radius:4px}
+.capnote{font-size:11.5px;color:#fbbf24;margin-top:7px;line-height:1.45}
+
+/* threats */
+.thr{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.thr:last-child{border-bottom:0}
+.thr .tk{width:3px;border-radius:2px;flex:none}
+.thr.red .tk{background:var(--red)} .thr.amb .tk{background:var(--amber)}
+.thr.blu .tk{background:var(--blue)} .thr.gre .tk{background:var(--green)}
+.thr .tt{font-weight:500;font-size:13px}
+.thr .tb{font-size:12px;color:var(--text2);margin-top:2px;line-height:1.45}
+.thr .tm{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px}
+
+.note{background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--blue);
+  border-radius:0 8px 8px 0;padding:11px 13px;font-size:12.5px;line-height:1.5;color:var(--text2)}
+.note b{color:var(--text)}
+.note.warn{border-left-color:var(--amber)}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.kv:last-child{border-bottom:0}
+.kv .k{color:var(--text2)} .kv .v{font-family:var(--mono)}
+.empty{text-align:center;padding:34px 18px}
+.empty .big{font-size:15px;font-weight:600}
+.empty .sm{font-size:13px;color:var(--text2);margin-top:6px;max-width:460px;margin-inline:auto;line-height:1.55}
+.disc{font-size:11.5px;color:var(--text3);line-height:1.5;border-left:2px solid var(--line2);padding-left:10px}
+
+/* hunting */
+.scan{display:grid;grid-template-columns:92px 1fr 40px;gap:12px;align-items:center;
+  padding:10px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--line);
+  text-align:left;width:100%;font:inherit;color:inherit}
+button.scan:hover{border-color:var(--line2)}
+button.scan.sel{border-color:var(--blue);box-shadow:inset 3px 0 0 var(--blue)}
+.scan .p{font-weight:600}
+.scan .bar{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.scan .bar i{display:block;height:100%;border-radius:4px}
+.scan .sc{font-family:var(--mono);text-align:right;font-weight:600}
+.scan .ms{grid-column:1 / -1;font-size:11.5px;color:var(--text2);margin-top:-4px}
+.grid14{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+@media(max-width:900px){.grid14{grid-template-columns:1fr}}
+.tier{font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--text3);text-transform:uppercase;margin-left:6px}
+.verdict{padding:18px 16px;border-radius:11px;border:1px solid var(--line);background:var(--bg2)}
+.verdict .big{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.verdict .sm{font-size:13px;color:var(--text2);margin-top:5px;line-height:1.55;max-width:620px}
+.verdict.go{border-color:rgba(34,197,94,.35);background:linear-gradient(90deg,rgba(34,197,94,.09),transparent 60%)}
+.page{display:none}.page.on{display:flex;flex-direction:column;gap:14px}
+
+/* ledger */
+.led{position:relative;padding-left:20px}
+.led::before{content:'';position:absolute;left:5px;top:6px;bottom:6px;width:1px;background:var(--line2)}
+.lrow{position:relative;padding:10px 0;border-bottom:1px solid var(--line)}
+.lrow:last-child{border-bottom:0}
+.lrow::before{content:'';position:absolute;left:-18px;top:15px;width:9px;height:9px;border-radius:50%;
+  background:var(--bg);border:2px solid var(--line2)}
+.lrow.good::before{border-color:var(--green)} .lrow.expensive::before{border-color:var(--amber)}
+.lrow.ours::before{border-color:var(--red)} .lrow.luck::before{border-color:var(--text3)}
+.lrow.open::before{border-color:var(--blue)}
+.lt{font-family:var(--mono);font-size:11px;color:var(--text3)}
+.lsaid{font-size:13px;margin-top:3px}
+.ldid{font-size:12px;color:var(--text2);margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:620px){.quad{grid-template-columns:1fr}}
+.q{border:1px solid var(--line);border-radius:9px;padding:12px;background:var(--bg2)}
+.q .qn{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.02em}
+.q .qt{font-size:12.5px;font-weight:600;margin-top:2px}
+.q .qd{font-size:11.5px;color:var(--text2);margin-top:3px;line-height:1.4}
+.q.good .qn{color:#4ade80} .q.expensive .qn{color:#fbbf24} .q.ours .qn{color:#f87171} .q.luck .qn{color:var(--text2)}
+
+/* rail */
+.rl{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.rl h4{margin:0 0 9px;font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.03em}
+.frow{display:flex;align-items:center;gap:8px;height:24px;font-size:12px}
+.frow .fn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow .fv{font-family:var(--mono);font-size:11px;color:var(--text2);width:92px;text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--text3)}
+.dot.g{background:var(--green)} .dot.a{background:var(--amber)} .dot.r{background:var(--red)}
+
+.ico{display:inline-block;background-color:currentColor;-webkit-mask-repeat:no-repeat;
+  mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;
+  -webkit-mask-size:contain;mask-size:contain}
+.spin{width:13px;height:13px;border:2px solid var(--line2);border-top-color:var(--blue);
+  border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+.flash{animation:fl 1s ease-out}
+@keyframes fl{0%{background:rgba(59,130,246,.18)}100%{background:transparent}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <h1>Arbiter</h1>
+    <div class="sub" id="sub">Starting up…</div>
+  </div>
+  <div class="hdr-act">
+    <button class="btn" id="btnRefresh">Re-read everything</button>
+  </div>
+</div>
+
+<nav class="nav" id="nav">
+  <button class="nav-tab active" data-p="now"><span class="ico" data-i="pulse"></span>Now<span class="nav-ct" id="ctNow">–</span></button>
+  <button class="nav-tab" data-p="hunt"><span class="ico" data-i="target"></span>Hunting<span class="nav-ct" id="ctHunt">–</span></button>
+  <button class="nav-tab" data-p="calls"><span class="ico" data-i="list"></span>Today's calls<span class="nav-ct" id="ctCalls">–</span></button>
+  <button class="nav-tab soon" disabled title="Arrives in phase 7">Weekly review</button>
+</nav>
+
+<div class="wrap">
+  <div class="main">
+    <section class="page on" id="p-now"><div id="main">
+      <div class="card"><div class="card-b"><div class="empty">
+        <div class="big"><span class="spin"></span> Reading your account…</div>
+        <div class="sm">Arbiter is collecting what every module can see.</div>
+      </div></div></div>
+    </div></section>
+    <section class="page" id="p-calls"><div id="calls">
+      <div class="card"><div class="card-b"><div class="empty"><div class="big">No calls yet today.</div></div></div></div>
+    </div></section>
+    <section class="page" id="p-hunt"><div id="hunt">
+      <div class="card"><div class="card-b"><div class="empty">
+        <div class="big"><span class="spin"></span> Scanning your watchlist…</div>
+      </div></div></div>
+    </div></section>
+  </div>
+
+  <aside class="rail">
+    <div class="rl">
+      <h4>What it is reading</h4>
+      <div id="feeds"></div>
+    </div>
+    <div class="rl">
+      <h4>Habits open right now</h4>
+      <div id="episodes" class="tiny muted">–</div>
+    </div>
+    <div class="rl">
+      <h4>Honest limits</h4>
+      <div class="tiny muted" style="line-height:1.55">
+        Readings are as fresh as the EA send interval plus the bridge — typically 1 to 5 seconds
+        behind price. A decision that must happen inside a second belongs in the EA, not here.
+        Blackwood does not place trades or tell you to take one.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- the shared feed switcher every Blackwood module loads: it wraps fetch so
+     every read carries the active terminal. Must come BEFORE anything fetches. -->
+<script src="/bw-source.js"></script>
+<script src="/arbiter-engine.js"></script>
+<script src="/arbiter-feeds.js"></script>
+<script>
+(function(){
+'use strict';
+var E = window.BWArbiterEngine, F = window.BWArbiterFeeds;
+/* 5 seconds — about the rate the EA itself posts, so faster would only
+   re-read identical numbers. The anti-flicker rule is defined in TIME, not
+   cycles: a change must hold 40s to escalate and 60s to relax, whatever
+   the scan speed. At 5s that is 8 and 12 cycles. Counting raw cycles would
+   have made the protection four times weaker the moment the scan sped up. */
+var REFRESH_MS = 5000;
+var ESCALATE_MS = 40000, RELAX_MS = 60000;
+var stabiliser = E.createStabiliser({
+  up:   Math.max(2, Math.ceil(ESCALATE_MS / REFRESH_MS)),
+  down: Math.max(3, Math.ceil(RELAX_MS / REFRESH_MS))
+});
+var entryCases = {};          // ticket -> frozen pillars (see freezeStore)
+var FROZEN_KEY = 'bw-arbiter-entry-cases';
+
+/* Keyed by ACCOUNT + ticket, never ticket alone: MT5 ticket numbers are not
+   unique across accounts (trade_journal's own unique constraint says so), so
+   a new trade on another account could otherwise inherit a dead trade's
+   frozen entry case and be judged against the wrong history.
+   The entry case must be frozen at the moment a position first appears,
+   or the daily review becomes hindsight fiction. Held here per ticket.
+   NOTE: this is a browser copy and therefore only as good as the first
+   time this tab saw the trade. Moving it server-side is Phase 5, where
+   the call ledger lives. */
+try { entryCases = JSON.parse(localStorage.getItem(FROZEN_KEY) || '{}') || {}; } catch(e){ entryCases = {}; }
+function saveFrozen(){ try{ localStorage.setItem(FROZEN_KEY, JSON.stringify(entryCases)); }catch(e){} }
+function caseKey(acct, ticket){ return String(acct||'unknown') + ':' + String(ticket); }
+
+/* Forget the frozen case of anything no longer open. Runs on EVERY cycle,
+   including the one where the last position closes — an early return here
+   is what left dead cases behind. */
+function forgetClosed(acct, trades){
+  var live = {};
+  (trades||[]).forEach(function(t){ live[caseKey(acct, t.ticket)] = 1; });
+  var changed = false;
+  Object.keys(entryCases).forEach(function(k){
+    if(live[k]) return;
+    // only clear keys belonging to the account currently reporting; another
+    // account's open trades are not ours to forget while it is not beating
+    if(String(k).indexOf(String(acct||'unknown') + ':') !== 0) return;
+    delete entryCases[k]; stabiliser.forget(k); changed = true;
+  });
+  if(changed) saveFrozen();
+}
+
+var ICONS = { pulse:'M3 12h4l3 8 4-16 3 8h4',
+  list:'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+  target:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01' };
+Object.keys(ICONS).forEach(function(k){
+  var d='url("data:image/svg+xml;utf8,'+encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="'+ICONS[k]+'"/></svg>')+'")';
+  Array.prototype.forEach.call(document.querySelectorAll('.ico[data-i="'+k+'"]'), function(el){
+    el.style.webkitMaskImage=d; el.style.maskImage=d;
+  });
+});
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function el(html){ var d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstChild; }
+/* Only touch the DOM when the content actually changed. At a 5s scan a
+   blind innerHTML rebuild would jump the scroll position and flash every
+   card several times a minute — the repaint-churn bug already fixed twice
+   in the Assistant. Rule: anything on a timer compares before it writes. */
+var painted = {};
+function paint(id, html){
+  if(painted[id] === html) return false;
+  painted[id] = html;
+  document.getElementById(id).innerHTML = html;
+  return true;
+}
+function fmtPips(v,dp){ return v==null?'–':(v>=0?'+':'')+v.toFixed(dp==null?1:dp); }
+function ago(ms){ var s=Math.round(ms/1000);
+  return s<60?s+'s':s<3600?Math.round(s/60)+'m':Math.round(s/3600)+'h'; }
+
+var MK = { pass:'✓', warn:'!', fail:'✕', unknown:'·' };
+
+function pillarRow(p){
+  var cls = p.change==='broken' ? 'broken' : p.change==='weakened' ? 'weakened' : '';
+  var tag = (p.change && p.change!=='same')
+    ? '<span class="chg '+p.change+'">'+p.change+'</span>' : '';
+  return '<div class="pill '+p.now+' '+cls+'">'+
+    '<span class="mk">'+MK[p.now]+'</span>'+
+    '<div><div class="nm">'+esc(p.label)+'</div>'+
+    '<div class="dt">'+esc(p.detail)+'</div></div>'+
+    '<div style="text-align:right">'+tag+
+      '<div class="src">'+esc(p.source||'')+'</div></div></div>';
+}
+
+function conditionRow(c){
+  return '<div class="pill '+c.state+'">'+
+    '<span class="mk">'+MK[c.state]+'</span>'+
+    '<div><div class="nm">'+esc(c.label)+'</div>'+
+    '<div class="dt">'+esc(c.detail)+'</div></div>'+
+    '<div class="src">'+esc(c.source||'')+'</div></div>';
+}
+
+function excursionBlock(ex, stopPips){
+  if(!ex || (ex.mfePips==null && ex.maePips==null)) return '';
+  var mfe = ex.mfePips||0, mae = ex.maePips||0, now = ex.nowPips;
+  var span = Math.max(mfe, mae, Math.abs(now||0), 1);
+  var zero = 50, unit = 46/span;                 // percent of the track per pip
+  var left = zero - mae*unit, wMae = mae*unit, wMfe = mfe*unit;
+  var nowX = zero + (now||0)*unit;
+  var give = ex.givebackShare;
+  var line = '';
+  if(give!=null && give>0.01) line = 'Given back '+Math.round(give*100)+'% of its best.';
+  if(ex.stopUsedShare!=null) line += (line?' ':'')+'Used '+Math.round(ex.stopUsedShare*100)+'% of the distance to the stop.';
+  return '<div><div class="card-h" style="border:0;padding:0 0 9px"><h3>Where it has been</h3></div>'+
+    '<div class="exc-track">'+
+      '<div class="exc-mae" style="left:'+left+'%;width:'+wMae+'%"></div>'+
+      '<div class="exc-mfe" style="left:'+zero+'%;width:'+wMfe+'%"></div>'+
+      '<div class="exc-zero" style="left:'+zero+'%"></div>'+
+      '<div class="exc-now" style="left:'+Math.max(0,Math.min(100,nowX))+'%"></div>'+
+    '</div>'+
+    '<div class="exc-lab"><span>worst '+fmtPips(-mae)+'</span><span>now '+fmtPips(now)+'</span>'+
+      '<span>best '+fmtPips(mfe)+'</span></div>'+
+    (line?'<div class="tiny muted" style="margin-top:8px">'+esc(line)+'</div>':'')+'</div>';
+}
+
+function threatRows(j){
+  var rows = [];
+  (j.counterSignals||[]).forEach(function(c){
+    var tone = c.kind==='pattern' ? 'red' : c.severity==='broken' ? 'red' : c.severity==='in_reach' ? 'amb' : 'blu';
+    rows.push('<div class="thr '+tone+'"><div class="tk"></div><div>'+
+      '<div class="tt">'+esc(c.name||'Counter signal')+'</div>'+
+      '<div class="tb">'+esc(c.detail)+'</div>'+
+      '<div class="tm">'+(c.kind==='pattern'?'pattern alerts':'formations')+'</div></div></div>');
+  });
+  ['radar','news','session','spread','correlation','reach'].forEach(function(id){
+    var c = j.conditions.find(function(x){ return x.id===id; });
+    if(!c || c.state==='unknown') return;
+    if(c.state==='pass' && id!=='radar') return;          // quiet when there is nothing to say
+    var tone = c.state==='fail' ? 'red' : c.state==='warn' ? 'amb' : 'gre';
+    rows.push('<div class="thr '+tone+'"><div class="tk"></div><div>'+
+      '<div class="tt">'+esc(c.label)+'</div>'+
+      '<div class="tb">'+esc(c.detail)+'</div>'+
+      '<div class="tm">'+esc(c.source||'')+'</div></div></div>');
+  });
+  return rows.join('') || '<div class="tiny muted">Nothing is working against this trade right now.</div>';
+}
+
+function scoreBlock(j){
+  if(j.score==null){
+    return '<div class="note warn"><b>No score.</b> '+esc(j.verdictText||'Not enough is reaching Arbiter to judge this.')+'</div>';
+  }
+  var col = j.score>=70?'var(--green)':j.score>=45?'var(--amber)':'var(--red)';
+  var cap = j.gateCapped
+    ? '<div class="capnote">Capped at '+j.gateCap+' — '+esc(j.gatesFailed.join(' and '))+
+      ' '+(j.gatesFailed.length>1?'are':'is')+' failing. It would otherwise read '+j.rawScore+'.</div>' : '';
+  var disc = (!j.gateCapped && j.radarDiscount>0)
+    ? '<div class="capnote">Pulled '+j.radarDiscount+' toward the middle by Risk Radar — the evidence is less reliable while it is flagged.</div>' : '';
+  return '<div class="score"><div><div class="n" style="color:'+col+'">'+j.score+
+    '</div><div class="of">evidence agreement</div></div>'+
+    '<div style="flex:1"><div class="meter"><i style="width:'+j.score+'%;background:'+col+'"></i></div>'+
+    cap+disc+'</div></div>';
+}
+
+function positionCard(res){
+  var p = res.position, j = res.judgement, w = res.world;
+  var settled = j.settled;
+  var dirBadge = p.side==='buy' ? '<span class="badge buy">LONG</span>' : '<span class="badge sell">SHORT</span>';
+  var pl = p.profit;
+  var age = p.openTime ? ago(Date.now() - p.openTime*1000) : '–';
+  var brokenCount = j.pillars.filter(function(x){return x.change==='broken';}).length;
+  var standing = j.pillars.filter(function(x){return x.now==='pass';}).length;
+
+  var pend = settled.pending
+    ? '<div class="act-pending"><i><b style="width:'+Math.round(settled.held/(settled.held+settled.needs)*100)+'%"></b></i>'+
+      'Moving toward '+esc(settled.pending.toUpperCase())+' — held '+settled.held+' of '+(settled.held+settled.needs)+
+      ' cycles. Advice is not shown until it settles.</div>' : '';
+
+  var html =
+  '<div class="card" data-ticket="'+esc(p.ticket)+'">'+
+    '<div class="thead"><div>'+
+      '<div class="tpair">'+esc(w.symbol)+' '+dirBadge+'</div>'+
+      '<div class="tmeta">'+(p.volume!=null?p.volume+' lots · ':'')+
+        'in from '+(p.openPrice!=null?p.openPrice:'–')+
+        (p.sl?' · stop '+p.sl:' · no stop')+
+        (p.tp?' · target '+p.tp:' · no target')+' · '+age+'</div>'+
+    '</div>'+
+    '<div class="tpl"><div class="v '+(pl>=0?'up':'dn')+'">'+(pl==null?'–':(pl>=0?'+':'')+pl.toFixed(2))+'</div>'+
+      '<div class="s">'+fmtPips(p.floatingPips)+' pips</div></div></div>'+
+    '<div class="card-b" style="display:flex;flex-direction:column;gap:14px">'+
+
+      '<div class="act '+settled.action.key+'">'+
+        '<div><div class="act-word">'+esc(settled.action.label)+'</div>'+
+          '<div class="act-sub">ARBITER SAYS</div></div>'+
+        '<div><div class="act-why">'+esc(settled.action.reason)+'</div>'+pend+'</div>'+
+      '</div>'+
+
+      '<div><div class="card-h" style="border:0;padding:0 0 9px"><h3>The case for this trade</h3>'+
+        '<span class="sp badge '+(brokenCount?'bad':'ok')+'">'+
+          (brokenCount? brokenCount+' of '+j.pillars.length+' broken' : standing+' of '+j.pillars.length+' standing')+
+        '</span></div>'+
+        '<div class="pillars">'+j.pillars.map(pillarRow).join('')+'</div>'+
+        (res.frozenAt ? '<div class="disc" style="margin-top:10px">Entry case frozen '+
+          ago(Date.now()-res.frozenAt)+' ago, when Arbiter first saw this trade. It is not re-derived.</div>'
+          : '<div class="disc" style="margin-top:10px">This trade was already open when Arbiter first saw it, so there is no frozen entry case to compare against — the pillars show what is true now.</div>')+
+      '</div>'+
+
+      excursionBlock(j.excursion, p.stopPips)+
+
+      '<div>'+scoreBlock(j)+'</div>'+
+
+      '<div><div class="card-h" style="border:0;padding:0 0 4px"><h3>What is working against it</h3></div>'+
+        threatRows(j)+'</div>'+
+
+      (j.transitions && j.transitions.length
+        ? '<div class="note"><b>What would change this call:</b><br>'+
+          j.transitions.map(function(t){ return esc(t.text); }).join('<br>')+'</div>' : '')+
+    '</div>'+
+  '</div>';
+  return html;
+}
+
+function exposureCard(list){
+  if(list.length<2) return '';
+  var risk = list.reduce(function(a,r){ return a + (r.raw.riskPct||0); },0);
+  var syms = list.map(function(r){ return r.world.symbol + ' ' + (r.position.side==='buy'?'long':'short'); });
+  return '<div class="card"><div class="card-h"><h3>Exposure right now</h3>'+
+    '<span class="sp badge '+(risk>2?'warn':'')+'">'+list.length+' positions</span></div>'+
+    '<div class="card-b">'+
+      '<div class="kv"><span class="k">Open risk if every stop is hit</span><span class="v">'+
+        (risk>0? risk.toFixed(2)+'% of account' : 'not reported')+'</span></div>'+
+      '<div class="kv"><span class="k">Positions</span><span class="v">'+esc(syms.join(' · '))+'</span></div>'+
+    '</div></div>';
+}
+
+function railFeeds(w, status){
+  var rows = [];
+  function row(name, ok, val){
+    rows.push('<div class="frow"><span class="dot '+(ok==null?'':ok?'g':'r')+'"></span>'+
+      '<span class="fn">'+esc(name)+'</span><span class="fv">'+esc(val)+'</span></div>');
+  }
+  if(!w){ paint('feeds','<div class="tiny muted">Nothing yet.</div>'); return; }
+  row('Price', w.price!=null, w.price!=null? String(w.price):'none');
+  row('Structure', !!w.structure, w.structure? (w.provenance.structure==='channel'?'engine':'own read') : 'none');
+  row('SMC zones', !!w.zones, w.zones? w.zones.length+' live':'none');
+  row('Patterns', !!w.patterns, w.patterns? w.patterns.length+'':'none');
+  row('Risk Radar', !!w.radar, w.radar? String(w.radar.score):'not open');
+  row('Liquidity', !!w.session, w.session&&w.session.depth!=null? Math.round(w.session.depth*100)+'%':'–');
+  row('Calendar', !!w.news, (w.news||[]).length+' ahead');
+  row('Spread baseline', w.medianSpread!=null, w.medianSpread!=null? w.medianSpread.toFixed(1):(w.sources.spreadSamples+'/20'));
+  row('Your record', !!(w.edge&&w.edge.sample!=null), w.edge&&w.edge.sample!=null? w.edge.sample+' trades':'–');
+  paint('feeds', rows.join(''));
+
+  var eps = (status && status.openEpisodes) || [];
+  paint('episodes', eps.length
+    ? eps.map(function(e){
+        return '<div class="frow"><span class="dot '+(e.severity==='high'?'r':'a')+'"></span>'+
+          '<span class="fn">'+esc(e.type.replace(/_/g,' '))+'</span>'+
+          '<span class="fv">'+e.open_for_minutes+'m</span></div>';
+      }).join('')
+    : '<span class="dim">None open.</span>');
+}
+
+/* ═══ HUNTING ═══════════════════════════════════════════════════════
+   Every watchlist pair judged by the same engine. Leads with the honest
+   verdict — usually "nothing here is worth taking" — because a module
+   that always has something to say trains the trader to ignore it. It
+   never raises a marginal setup to keep anyone busy. */
+var WORTH = 70;
+var selected = null, lastScan = [];
+
+function missingLine(j){
+  if(j.score==null) return (j.verdict && j.verdict.text) || 'Not enough data to judge.';
+  if(j.gatesFailed.length){
+    var g = j.conditions.find(function(c){ return c.id===j.gatesFailed[0]; });
+    return 'Missing '+g.label.toLowerCase()+'. '+g.detail;
+  }
+  var f = j.conditions.find(function(c){ return c.state==='fail'; })
+       || j.conditions.find(function(c){ return c.state==='warn'; });
+  return f ? f.label+': '+f.detail : 'Every readable condition agrees.';
+}
+
+function scanRow(r){
+  var j = r.j, sc = j.score;
+  var col = sc==null?'var(--line2)':sc>=WORTH?'var(--green)':sc>=45?'var(--amber)':'var(--red)';
+  return '<button class="scan'+(selected===r.sym?' sel':'')+'" data-sym="'+esc(r.sym)+'">'+
+    '<span class="p">'+esc(r.sym)+' <span class="dim xtiny">'+(j.direction==='bull'?'long':'short')+'</span></span>'+
+    '<span class="bar"><i style="width:'+(sc||0)+'%;background:'+col+'"></i></span>'+
+    '<span class="sc">'+(sc==null?'–':sc)+'</span>'+
+    '<span class="ms">'+esc(missingLine(j))+'</span></button>';
+}
+
+function candidateCard(r){
+  var j = r.j;
+  var head = j.score==null ? 'no score' : j.counts.pass+' pass · '+j.counts.warn+' warn · '+j.counts.fail+' fail'+
+    (j.counts.unknown? ' · '+j.counts.unknown+' unknown':'');
+  var rows = j.conditions.map(function(c,i){
+    return '<div class="pill '+c.state+'"><span class="mk">'+MK[c.state]+'</span>'+
+      '<div><div class="nm">'+(i+1)+' · '+esc(c.label)+'<span class="tier">'+c.tier+'</span></div>'+
+      '<div class="dt">'+esc(c.detail)+'</div></div><div class="src">'+esc(c.source||'')+'</div></div>';
+  }).join('');
+  var wait = j.waitingFor.filter(function(w){ return j.gatesFailed.indexOf(w.id)>=0; });
+  return '<div class="card"><div class="card-h"><h3>'+esc(r.sym)+' — '+
+      (j.direction==='bull'?'long':'short')+' case, all fourteen conditions</h3>'+
+      '<span class="sp badge '+(j.counts.fail?'warn':'ok')+'">'+head+'</span></div>'+
+    '<div class="card-b">'+
+      '<div style="margin-bottom:12px">'+scoreBlock(j)+'</div>'+
+      '<div class="grid14">'+rows+'</div>'+
+      (wait.length ? '<div class="note" style="margin-top:12px"><b>What would make this worth taking:</b> '+
+        wait.map(function(w){ return esc(w.label.toLowerCase()); }).join(', ')+
+        '. Those are things to wait for, not things to predict.</div>' : '')+
+      '<div class="disc" style="margin-top:10px">Room to target and reachability need a planned target, so they read '+
+        'unknown until you are in a trade. Arbiter will not invent one.</div>'+
+    '</div></div>';
+}
+
+function sinceLastTrade(state){
+  var closed = (state && state.closedTrades) || [];
+  var last = closed.map(function(t){ return { t:+t.time||0, p:+t.profit||0, s:t.symbol }; })
+    .filter(function(x){ return x.t>0; }).sort(function(a,b){ return b.t-a.t; })[0];
+  if(!last) return '';
+  return '<div class="card"><div class="card-h"><h3>Since your last trade closed</h3></div><div class="card-b">'+
+    '<div class="kv"><span class="k">Flat for</span><span class="v">'+ago(Date.now()-last.t*1000)+'</span></div>'+
+    '<div class="kv"><span class="k">Last result</span><span class="v" style="color:'+(last.p>=0?'#4ade80':'#f87171')+'">'+
+      esc(last.s)+' '+(last.p>=0?'+':'')+last.p.toFixed(2)+'</span></div>'+
+    ledgerLines()+
+    '</div></div>';
+}
+
+function ledgerLines(){
+  var d = callsCache.data;
+  if(!d || !d.calls) return '<div class="disc" style="margin-top:10px">Counting today\'s calls…</div>';
+  var takes = d.calls.filter(function(c){ return c.kind==='take'; });
+  var followed = takes.filter(function(c){ return c.adherence==='followed'; }).length;
+  var tookSkips = d.calls.filter(function(c){ return c.kind==='skip' && c.adherence==='ignored'; });
+  return '<div class="kv"><span class="k">Setups Arbiter rated 70+ today</span><span class="v">'+takes.length+'</span></div>'+
+    '<div class="kv"><span class="k">You took</span><span class="v">'+followed+' of them</span></div>'+
+    '<div class="kv"><span class="k">You took instead</span><span class="v">'+(tookSkips.length
+      ? tookSkips.length+' rated '+tookSkips.map(function(c){ return c.score; }).join(' and ') : 'nothing below 70')+'</span></div>';
+}
+
+async function scan(shared){
+  var wl = (shared.state && shared.state.watchlist) || [];
+  var out = await Promise.all(wl.map(async function(w){
+    try{
+      var world = await F.buildWorld(w.symbol, 'H1', { shared: shared });
+      // direction is implied by structure; the trader's own record needs it,
+      // so judge once to learn it, attach the edge, then judge for real
+      var j0 = E.judgeSetup(world);
+      world.edge = F._internals.edgeFrom(world._journal, world.symbol, j0.direction, world._sessionName);
+      return { sym: world.symbol, world: world, j: E.judgeSetup(world, { direction: j0.direction }) };
+    }catch(e){ console.warn('[ARBITER] scan', w.symbol, e); return null; }
+  }));
+  out = out.filter(Boolean).sort(function(a,b){ return (b.j.score==null?-1:b.j.score) - (a.j.score==null?-1:a.j.score); });
+  lastScan = out;
+  return out;
+}
+
+function renderHunting(list, state, target){
+  if(!list.length){
+    paint(target, '<div class="card"><div class="card-b"><div class="empty"><div class="big">No watchlist yet.</div>'+
+      '<div class="sm">Arbiter scans the pairs your EA reports. None have arrived.</div></div></div></div>');
+    return;
+  }
+  var best = list[0];
+  if(!selected || !list.some(function(r){ return r.sym===selected; })) selected = best.sym;
+  var sel = list.find(function(r){ return r.sym===selected; });
+  var go = best.j.score!=null && best.j.score>=WORTH;
+  var headline = go
+    ? '<div class="verdict go"><div class="big">'+esc(best.sym)+' is worth a closer look.</div>'+
+      '<div class="sm">Score '+best.j.score+'. '+esc(best.j.verdict.text)+' The decision is still yours — this describes the evidence, it does not place anything.</div></div>'
+    : '<div class="verdict"><div class="big">Nothing here is worth taking right now.</div>'+
+      '<div class="sm">'+(best.j.score!=null
+        ? 'The closest is '+esc(best.sym)+' at '+best.j.score+'. '+esc(missingLine(best.j))
+        : 'Not enough is reaching Arbiter to judge any pair yet.')+
+      ' Blackwood will not raise a marginal setup to keep you busy.</div></div>';
+  var html = headline +
+    '<div class="card"><div class="card-h"><h3>What the scan sees</h3><span class="sp tiny dim">H1</span></div>'+
+      '<div class="card-b" style="display:flex;flex-direction:column;gap:7px">'+list.map(scanRow).join('')+'</div></div>'+
+    candidateCard(sel) + sinceLastTrade(state);
+  paint(target, html);
+  document.getElementById('ctHunt').textContent = list.filter(function(r){ return r.j.score!=null && r.j.score>=WORTH; }).length;
+}
+
+document.addEventListener('click', function(e){
+  var b = e.target.closest && e.target.closest('button.scan');
+  if(!b) return;
+  selected = b.getAttribute('data-sym');
+  var st = window.__arbLastState || {};
+  ['main','hunt'].forEach(function(id){
+    if(document.getElementById(id).querySelector('button.scan')) renderHunting(lastScan, st, id);
+  });
+});
+
+document.getElementById('nav').addEventListener('click', function(e){
+  var t = e.target.closest('.nav-tab'); if(!t || t.disabled) return;
+  Array.prototype.forEach.call(document.querySelectorAll('.nav-tab'), function(b){ b.classList.toggle('active', b===t); });
+  var p = t.getAttribute('data-p');
+  Array.prototype.forEach.call(document.querySelectorAll('.page'), function(s){ s.classList.toggle('on', s.id==='p-'+p); });
+});
+
+/* ═══ THE LEDGER ═════════════════════════════════════════════════════
+   The page PROPOSES calls. The server decides what is recorded: it stamps
+   the price and ATR itself, refuses duplicates, and grades everything on
+   the EA heartbeat — so outcomes are judged even with this tab closed.
+   Calls are only MADE while Arbiter is open somewhere; that is the one
+   limit of doing the judging in the browser. */
+var proposed = {};                 // key -> ms until which we will not re-post
+var liveShown = {};                // ticket -> the action last shown
+var callsCache = { at: 0, data: null };
+var WINDOW_MS = 20 * 60 * 1000;
+
+function withSource(url){
+  var src = window.bwActiveSource && window.bwActiveSource();
+  return src ? url + (url.indexOf('?')<0?'?':'&') + 'source=' + encodeURIComponent(src) : url;
+}
+function snapshotOf(j){
+  return { score: j.score, rawScore: j.rawScore, gatesFailed: j.gatesFailed,
+    verdict: j.verdict && j.verdict.key,
+    conditions: j.conditions.map(function(c){ return { id:c.id, state:c.state, detail:c.detail, source:c.source }; }) };
+}
+async function propose(key, body){
+  if(proposed[key] && proposed[key] > Date.now()) return;
+  proposed[key] = Date.now() + WINDOW_MS;
+  try{
+    var r = await fetch(withSource('/api/arbiter/call'), { method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    var out = r.ok ? await r.json() : null;
+    // a refusal for want of data should not lock the pair out for 20 min
+    if(!r.ok) proposed[key] = Date.now() + 60000;
+    if(out && out.ok && !out.duplicate) callsCache.at = 0;
+  }catch(e){ proposed[key] = Date.now() + 60000; }
+}
+/* Assan's rules: a TAKE at 70+; a SKIP only for a real setup — every gate
+   passing but under 70. A gate failure is "not a setup" and is never
+   graded, so it is never proposed. */
+function proposeFromScan(list){
+  list.forEach(function(r){
+    var j = r.j;
+    if(j.score == null) return;
+    var kind = j.score >= WORTH ? 'take' : (!j.gatesFailed.length ? 'skip' : null);
+    if(!kind) return;
+    propose(kind+':'+r.sym+':'+j.direction, { kind:kind, symbol:r.world.rawSymbol || r.sym,
+      direction:j.direction, score:j.score, rawScore:j.rawScore, snapshot:snapshotOf(j) });
+  });
+}
+/* Live calls: recorded whenever the SHOWN action changes, and at first sight
+   if it is anything other than hold. Hold at entry is the default, not a call. */
+function proposeLive(key, res){
+  var a = res.judgement.settled.action.key, prev = liveShown[key];
+  liveShown[key] = a;
+  if(prev === a) return;
+  if(prev === undefined && a === 'hold') return;
+  var p = res.position;
+  propose('live:'+key+':'+a, { kind:'live', symbol:p.rawSymbol || p.symbol, direction:res.judgement.direction,
+    ticket:p.ticket, action:a, score:res.judgement.score,
+    snapshot:{ volume:p.volume, openPrice:p.openPrice, sl:p.sl,
+               pillars:res.judgement.pillars.map(function(x){ return { id:x.id, now:x.now, change:x.change }; }) } });
+}
+
+var BOX = { good:['Right, you followed','ok'], expensive:['Right, you ignored it','warn'],
+            ours:['Wrong, you followed','bad'], luck:['Wrong, you ignored it','info'] };
+var ADH = { followed:'ok', ignored:'warn', deviated:'bad' };
+function callRow(c){
+  var t = new Date(c.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  var said = c.kind==='take' ? 'Rated the '+(c.direction==='bull'?'long':'short')+' setup '+c.score+' — worth taking.'
+    : c.kind==='skip' ? 'Rated the '+(c.direction==='bull'?'long':'short')+' setup '+c.score+' — a real setup, but not worth it.'
+    : 'On your position #'+c.ticket+': '+String(c.action||'').toUpperCase().replace('BE','MOVE TO BREAK-EVEN')+'.';
+  var windowOpen = !c.adherence && Date.parse(c.window_ends_at) > Date.now();
+  var did = c.adherence
+    ? '<span class="badge '+(ADH[c.adherence]||'')+'">'+c.adherence+'</span>'+
+      (c.matched_ticket?'<span class="dim">#'+esc(c.matched_ticket)+'</span>':'')
+    : windowOpen ? '<span class="badge info">window open · '+Math.max(0,Math.round((Date.parse(c.window_ends_at)-Date.now())/60000))+'m left</span>'
+    : '<span class="badge">deciding</span>';
+  var out = c.outcome==='not_graded' ? '<span class="dim">not graded — no rule for live calls yet</span>'
+    : c.outcome ? '<span class="badge '+(c.outcome==='ran'?'ok':c.outcome==='failed'?'bad':'')+'">'+c.outcome+'</span>'
+    : '<span class="dim">outcome by '+new Date(c.horizon_ends_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})+'</span>';
+  var box = c.box ? '<span class="badge '+BOX[c.box][1]+'">'+BOX[c.box][0]+'</span>' : '';
+  return '<div class="lrow '+(c.box||(c.resolved_at?'':'open'))+'"><div class="lt">'+t+' · '+esc(c.symbol)+' · '+c.kind+'</div>'+
+    '<div class="lsaid">'+esc(said)+'</div><div class="ldid">'+did+out+box+'</div></div>';
+}
+function renderCalls(d){
+  if(!d || !d.calls){ return; }
+  var q = d.quad || {};
+  var n = d.calls.length;
+  document.getElementById('ctCalls').textContent = n;
+  var graded = (q.good||0)+(q.expensive||0)+(q.ours||0)+(q.luck||0);
+  var quad = '<div class="card"><div class="card-h"><h3>Is it you, or is it Blackwood?</h3>'+
+    '<span class="sp badge info">'+graded+' graded · '+d.pending+' still running</span></div><div class="card-b">'+
+    '<div class="quad">'+
+      '<div class="q good"><div class="qn">'+(q.good||0)+'</div><div class="qt">Blackwood right, you followed</div><div class="qd">The system working as intended.</div></div>'+
+      '<div class="q expensive"><div class="qn">'+(q.expensive||0)+'</div><div class="qt">Blackwood right, you ignored</div><div class="qd">The expensive box — avoidable without changing the software.</div></div>'+
+      '<div class="q ours"><div class="qn">'+(q.ours||0)+'</div><div class="qt">Blackwood wrong, you followed</div><div class="qd">Our problem. This box has to stay small.</div></div>'+
+      '<div class="q luck"><div class="qn">'+(q.luck||0)+'</div><div class="qt">Blackwood wrong, you ignored</div><div class="qd">Luck — recorded, never credited.</div></div>'+
+    '</div>'+
+    (graded < 10 ? '<div class="disc" style="margin-top:12px">'+graded+' graded call'+(graded===1?'':'s')+
+      ' is not enough to say anything about you or about Blackwood. The grid starts meaning something once it has dozens.</div>' : '')+
+    '</div></div>';
+  var list = n ? '<div class="card"><div class="card-h"><h3>Everything Arbiter said today</h3></div><div class="card-b"><div class="led">'+
+      d.calls.map(callRow).join('')+'</div>'+
+      '<div class="disc" style="margin-top:12px">Every call stores what Arbiter saw at that moment. Nothing here is re-derived later, '+
+      'so it cannot be quietly improved by hindsight. A call is graded by whether price moved one ATR its way before one ATR against, within four hours.</div></div></div>'
+    : '<div class="card"><div class="card-b"><div class="empty"><div class="big">No calls yet today.</div>'+
+      '<div class="sm">Arbiter records a call when a setup reaches 70, or when a real setup falls short. Most of the time the right number of calls is small.</div></div></div></div>';
+  paint('calls', quad + list);
+}
+async function loadCalls(){
+  if(callsCache.data && Date.now() - callsCache.at < 60000) return callsCache.data;
+  var d = await fetch('/api/arbiter/calls?days=1',{credentials:'same-origin',cache:'no-store'})
+    .then(function(r){ return r.ok? r.json():null; }).catch(function(){ return null; });
+  if(d) callsCache = { at: Date.now(), data: d };
+  return d;
+}
+
+/* ── the cycle ──────────────────────────────────────────────────── */
+var busy = false, lastStatus = null, lastWorld = null;
+async function cycle(){
+  if(busy) return; busy = true;
+  var btn = document.getElementById('btnRefresh');
+  btn.disabled = true;
+  try{
+    var shared = await F.fetchShared('H1');
+    var state = shared.state;
+    window.__arbLastState = state;
+    var trades = (state && state.openTrades) || [];
+    document.getElementById('ctNow').textContent = trades.length;
+
+    var acct = (state && state.accountInfo && (state.accountInfo.login || state.accountInfo.account)) || null;
+    forgetClosed(acct, trades);
+
+    // The scan runs every cycle: it feeds the Hunting tab always, and it IS
+    // the Now tab when nothing is open (state A in the spec).
+    var list = await scan(shared);
+    proposeFromScan(list);
+    renderCalls(await loadCalls());
+    renderHunting(list, state, 'hunt');
+    if(list.length) lastWorld = list[0].world;
+
+    if(!trades.length){
+      renderHunting(list, state, 'main');
+      railFeeds(lastWorld, shared.status);
+      document.getElementById('sub').textContent = 'No open positions · scanning '+list.length+
+        ' pair'+(list.length===1?'':'s')+' · '+new Date().toLocaleTimeString();
+      return;
+    }
+
+    var out = [];
+    for(var i=0;i<trades.length;i++){
+      var t = trades[i];
+      var built = await F.buildPositionWorld(t, { shared: shared });
+      var key = caseKey(acct, t.ticket);
+      if(!entryCases[key]){
+        entryCases[key] = { at: Date.now(), case: E.freezeEntryCase(built.world, built.position) };
+        saveFrozen();
+      }
+      built.position.entryCase = entryCases[key].case;
+      var j = E.judgePosition(built.world, built.position);
+      j.settled = stabiliser.settle(key, j.action);
+      j.verdictText = j.score==null ? 'Not enough is reaching Arbiter to judge this trade.' : null;
+      var res = { world: built.world, position: built.position, judgement: j,
+                  frozenAt: entryCases[key].at, raw: t };
+      proposeLive(key, res);
+      out.push(res);
+      lastWorld = built.world; lastStatus = built.world.arbiter;
+    }
+
+    paint('main', exposureCard(out) + out.map(positionCard).join(''));
+    railFeeds(lastWorld, lastStatus);
+    document.getElementById('sub').textContent =
+      trades.length+' open position'+(trades.length===1?'':'s')+' · judged '+new Date().toLocaleTimeString();
+  }catch(e){
+    console.warn('[ARBITER]', e);
+    document.getElementById('sub').textContent = 'Could not complete a read — retrying.';
+  }finally{
+    busy = false; btn.disabled = false;
+  }
+}
+
+document.getElementById('btnRefresh').addEventListener('click', function(){
+  F._internals.resetCaches(); cycle();            // "re-read everything" means everything
+});
+/* The shell keeps every module's iframe alive in the background. A hidden
+   Arbiter scanning at 5s would load the server for a screen nobody sees,
+   so it pauses while hidden and re-reads the moment it is shown again. */
+function visible(){ return !document.hidden; }
+document.addEventListener('visibilitychange', function(){ if(visible()) cycle(); });
+if(window.bwSourceReady && window.bwSourceReady.then) window.bwSourceReady.then(cycle);
+else cycle();
+setInterval(function(){ if(visible()) cycle(); }, REFRESH_MS);
+window.BWArbiterPage = { cycle: cycle, stabiliser: stabiliser };
+})();
+</script>
+</body>
+</html>
