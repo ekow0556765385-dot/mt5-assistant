@@ -1,0 +1,2289 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blackwood Arbiter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ════════════════════════════════════════════════════════════════
+   Tokens from blackwood_dashboard.html. Legacy aliases kept in BOTH
+   themes. Nothing here is display:none at a breakpoint — the rail
+   narrows and then stacks, per the standing rule for iframe modules.
+   ════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0d1117; --bg2:#151b23; --bg3:#1c232d; --panel:#131920;
+  --line:#232c37; --line2:#2d3846;
+  --text:#e6edf3; --text2:#9aa7b4; --text3:#6b7785;
+  --blue:#3b82f6; --blue-dim:#1d3a68;
+  --green:#22c55e; --red:#ef4444; --amber:#f5a524; --violet:#9a7fd4;
+  --accent:#3b82f6;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --r:10px;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+:root[data-theme="light"]{
+  --bg:#f6f8fa; --bg2:#ffffff; --bg3:#eef2f6; --panel:#ffffff;
+  --line:#dfe5ec; --line2:#cbd5e1;
+  --text:#111820; --text2:#57636f; --text3:#8b95a1; --blue-dim:#cfe0fb;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  overscroll-behavior-y:contain;overflow-x:hidden}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}
+  html{scroll-behavior:auto}}
+
+/* ── scrollbars ──────────────────────────────────────────────────
+   Thin, rounded, and out of the way: the browser default is a wide grey
+   trough that looks pasted on top of the page. Firefox gets the standard
+   properties, WebKit and Blink the pseudo-elements; both follow the theme,
+   and the thumb only darkens when the pointer is over it. */
+html{scroll-behavior:smooth}
+*{scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line2);border:3px solid transparent;background-clip:content-box;border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3);border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-corner{background:transparent}
+/* Sideways-scrolling tables: momentum on touch, and smooth jumps. NO edge
+   fade — CSS cannot tell whether a table actually overflows, so a fade
+   would grey out the last 26px of a table that fits perfectly, with no
+   hover on a phone to reveal it. */
+.tbl-wrap{-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+
+/* header */
+.hdr{padding:16px 20px 0;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.hdr h1{font-size:19px}
+.hdr .sub{color:var(--text2);font-size:12.5px;margin-top:3px}
+.hdr-act{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.btn{background:var(--bg2);border:1px solid var(--line2);border-radius:8px;
+  padding:7px 13px;font-size:13px;font-weight:500;display:inline-flex;gap:7px;align-items:center}
+.btn:hover{border-color:var(--blue)}
+.btn:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.btn[disabled]{opacity:.5;cursor:default}
+
+/* nav */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);
+  border-bottom:1px solid var(--line);margin-top:13px;padding:0 20px;display:flex;gap:2px;
+  overflow-x:auto;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav-tab{background:none;border:0;padding:11px 13px;color:var(--text);font-weight:500;
+  white-space:nowrap;display:flex;gap:7px;align-items:center}
+.nav-tab .ico{width:15px;height:15px;background-color:var(--text3);flex:none}
+.nav-tab.active{font-weight:600;box-shadow:inset 0 -2px 0 var(--blue)}
+.nav-tab.active .ico{background-color:var(--blue)}
+.nav-ct{font-family:var(--mono);font-size:11px;background:var(--bg3);border-radius:20px;
+  padding:1px 7px;color:var(--text2)}
+.nav-tab.active .nav-ct{background:var(--blue-dim);color:var(--text)}
+.nav-tab.soon{color:var(--text3);cursor:default}
+
+/* layout */
+.wrap{display:flex;gap:16px;align-items:flex-start;padding:16px 20px 60px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.rail{width:296px;flex:none;display:flex;flex-direction:column;gap:12px;contain:layout}
+/* No height cap and no inner scroll box: the rail flows down the page. A
+   capped rail buried everything below the fold inside its own scrollbar
+   while empty space sat underneath it. */
+@media(max-width:1400px){.rail{width:268px}}
+@media(max-width:1150px){.rail{width:242px}}
+@media(max-width:940px){.rail{width:214px}}
+@media(max-width:760px){.wrap{flex-direction:column;padding:14px}
+  .rail{width:100%;max-height:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.card-h{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;gap:10px;
+  align-items:center;min-height:26px}
+.card-h h3{font-size:13px}
+.card-h .sp{margin-left:auto}
+.card-b{padding:14px}
+.muted{color:var(--text2)} .dim{color:var(--text3)}
+.tiny{font-size:12px} .xtiny{font-size:11px}
+
+/* badges */
+.badge{display:inline-flex;align-items:center;gap:5px;line-height:1;font-size:11px;
+  font-weight:600;padding:4px 8px;border-radius:5px;background:var(--bg3);color:var(--text2);
+  border:1px solid var(--line2)}
+.badge.buy,.badge.ok{background:rgba(34,197,94,.13);color:#4ade80;border-color:rgba(34,197,94,.3)}
+.badge.sell,.badge.bad{background:rgba(239,68,68,.13);color:#f87171;border-color:rgba(239,68,68,.3)}
+.badge.warn{background:rgba(245,165,36,.13);color:#fbbf24;border-color:rgba(245,165,36,.3)}
+.badge.info{background:rgba(59,130,246,.13);color:#93c5fd;border-color:rgba(59,130,246,.3)}
+
+/* ── the action: the one thing read in two seconds ── */
+.act{position:relative;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start;
+  padding:15px 16px;border-radius:11px;border:1px solid;overflow:hidden}
+.act::before{content:'';position:absolute;inset:0 auto 0 0;width:3px}
+.act-word{font-size:17px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;line-height:1.15}
+.act-sub{font-size:10.5px;font-weight:600;letter-spacing:.06em;color:var(--text3);margin-top:4px}
+.act-why{font-size:13.5px;line-height:1.5}
+.act.hold{border-color:rgba(34,197,94,.32);background:linear-gradient(90deg,rgba(34,197,94,.10),transparent 60%)}
+.act.hold::before{background:var(--green)} .act.hold .act-word{color:#4ade80}
+.act.be{border-color:rgba(59,130,246,.32);background:linear-gradient(90deg,rgba(59,130,246,.10),transparent 60%)}
+.act.be::before{background:var(--blue)} .act.be .act-word{color:#93c5fd}
+.act.partial{border-color:rgba(245,165,36,.38);background:linear-gradient(90deg,rgba(245,165,36,.12),transparent 60%)}
+.act.partial::before{background:var(--amber)} .act.partial .act-word{color:#fbbf24}
+.act.cut{border-color:rgba(239,68,68,.42);background:linear-gradient(90deg,rgba(239,68,68,.13),transparent 60%)}
+.act.cut::before{background:var(--red)} .act.cut .act-word{color:#f87171}
+.act-pending{margin-top:8px;font-size:11.5px;color:var(--text3);display:flex;gap:7px;align-items:center}
+.act-pending i{display:block;height:3px;border-radius:2px;background:var(--line2);width:42px;position:relative;overflow:hidden}
+.act-pending i b{position:absolute;inset:0 auto 0 0;background:var(--amber);border-radius:2px}
+
+/* ── pillars: broken must be unmissable, standing must be quiet ── */
+.pillars{display:grid;gap:6px}
+.pill{display:grid;grid-template-columns:20px 1fr auto;gap:10px;align-items:start;
+  padding:9px 11px;border-radius:8px;background:var(--bg2);border:1px solid var(--line)}
+.pill .mk{width:17px;height:17px;border-radius:50%;display:grid;place-items:center;
+  font-size:10px;font-weight:700;margin-top:1px}
+.pill .nm{font-weight:500;font-size:13px}
+.pill .dt{font-size:12px;color:var(--text2);margin-top:2px;line-height:1.45}
+.pill .src{font-size:10px;color:var(--text3);font-family:var(--mono);white-space:nowrap;margin-top:3px}
+.pill.pass .mk{background:rgba(34,197,94,.16);color:#4ade80}
+.pill.warn .mk{background:rgba(245,165,36,.18);color:#fbbf24}
+.pill.fail .mk{background:rgba(239,68,68,.18);color:#f87171}
+.pill.unknown{opacity:.72} .pill.unknown .mk{background:var(--bg3);color:var(--text3)}
+.pill.pass{opacity:.86}
+.pill.broken{border-color:rgba(239,68,68,.45);background:rgba(239,68,68,.07);opacity:1}
+.pill.broken .nm{font-weight:600}
+.pill.weakened{border-color:rgba(245,165,36,.35);opacity:1}
+.chg{font-size:10px;font-weight:700;letter-spacing:.05em;padding:2px 6px;border-radius:4px;
+  text-transform:uppercase}
+.chg.broken{background:rgba(239,68,68,.16);color:#f87171}
+.chg.weakened{background:rgba(245,165,36,.16);color:#fbbf24}
+.chg.recovered{background:rgba(34,197,94,.14);color:#4ade80}
+
+/* position head */
+.thead{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 14px;
+  background:var(--bg2);border-bottom:1px solid var(--line)}
+.tpair{font-size:15px;font-weight:700;display:flex;gap:8px;align-items:center}
+.tmeta{font-family:var(--mono);font-size:11.5px;color:var(--text2);margin-top:3px}
+.tpl{margin-left:auto;text-align:right;font-family:var(--mono)}
+.tpl .v{font-size:17px;font-weight:600}
+.tpl .v.up{color:#4ade80} .tpl .v.dn{color:#f87171}
+.tpl .s{font-size:11px;color:var(--text3)}
+
+/* excursion */
+.exc-track{position:relative;height:28px;background:var(--bg3);border-radius:7px;
+  border:1px solid var(--line);overflow:hidden}
+.exc-mae{position:absolute;top:0;bottom:0;background:rgba(239,68,68,.17)}
+.exc-mfe{position:absolute;top:0;bottom:0;background:rgba(34,197,94,.17)}
+.exc-zero{position:absolute;top:0;bottom:0;width:1px;background:var(--line2)}
+.exc-now{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--text);border-radius:2px}
+.exc-lab{display:flex;justify-content:space-between;margin-top:6px;font-family:var(--mono);
+  font-size:11px;color:var(--text3)}
+
+/* score */
+.score{display:flex;gap:14px;align-items:center}
+.score .n{font-family:var(--mono);font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1}
+.score .of{font-size:12px;color:var(--text3)}
+.meter{height:6px;border-radius:4px;background:var(--bg3);overflow:hidden;margin-top:7px}
+.meter i{display:block;height:100%;border-radius:4px}
+.capnote{font-size:11.5px;color:#fbbf24;margin-top:7px;line-height:1.45}
+
+/* threats */
+.thr{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.thr:last-child{border-bottom:0}
+.thr .tk{width:3px;border-radius:2px;flex:none}
+.thr.red .tk{background:var(--red)} .thr.amb .tk{background:var(--amber)}
+.thr.blu .tk{background:var(--blue)} .thr.gre .tk{background:var(--green)}
+.thr .tt{font-weight:500;font-size:13px}
+.thr .tb{font-size:12px;color:var(--text2);margin-top:2px;line-height:1.45}
+.thr .tm{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px}
+
+.note{background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--blue);
+  border-radius:0 8px 8px 0;padding:11px 13px;font-size:12.5px;line-height:1.5;color:var(--text2)}
+.note b{color:var(--text)}
+.note.warn{border-left-color:var(--amber)}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.kv:last-child{border-bottom:0}
+.kv .k{color:var(--text2)} .kv .v{font-family:var(--mono)}
+.empty{text-align:center;padding:34px 18px}
+.empty .big{font-size:15px;font-weight:600}
+.empty .sm{font-size:13px;color:var(--text2);margin-top:6px;max-width:460px;margin-inline:auto;line-height:1.55}
+.disc{font-size:11.5px;color:var(--text3);line-height:1.5;border-left:2px solid var(--line2);padding-left:10px}
+
+/* hunting */
+.scan{display:grid;grid-template-columns:92px 1fr 40px;gap:12px;align-items:center;
+  padding:10px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--line);
+  text-align:left;width:100%;font:inherit;color:inherit}
+button.scan:hover{border-color:var(--line2)}
+button.scan.sel{border-color:var(--blue);box-shadow:inset 3px 0 0 var(--blue)}
+.scan .p{font-weight:600}
+.scan .bar{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.scan .bar i{display:block;height:100%;border-radius:4px}
+.scan .sc{font-family:var(--mono);text-align:right;font-weight:600}
+.scan .ms{grid-column:1 / -1;font-size:11.5px;color:var(--text2);margin-top:-4px}
+.grid14{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+@media(max-width:900px){.grid14{grid-template-columns:1fr}}
+.tier{font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--text3);text-transform:uppercase;margin-left:6px}
+.verdict{padding:18px 16px;border-radius:11px;border:1px solid var(--line);background:var(--bg2)}
+.verdict .big{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.verdict .sm{font-size:13px;color:var(--text2);margin-top:5px;line-height:1.55;max-width:620px}
+.verdict.go{border-color:rgba(34,197,94,.35);background:linear-gradient(90deg,rgba(34,197,94,.09),transparent 60%)}
+.page{display:none}.page.on{display:flex;flex-direction:column;gap:14px}
+
+/* ledger */
+.led{position:relative;padding-left:20px}
+.led::before{content:'';position:absolute;left:5px;top:6px;bottom:6px;width:1px;background:var(--line2)}
+.lrow{position:relative;padding:10px 0;border-bottom:1px solid var(--line)}
+.lrow:last-child{border-bottom:0}
+.lrow::before{content:'';position:absolute;left:-18px;top:15px;width:9px;height:9px;border-radius:50%;
+  background:var(--bg);border:2px solid var(--line2)}
+.lrow.good::before{border-color:var(--green)} .lrow.expensive::before{border-color:var(--amber)}
+.lrow.ours::before{border-color:var(--red)} .lrow.luck::before{border-color:var(--text3)}
+.lrow.open::before{border-color:var(--blue)}
+.lt{font-family:var(--mono);font-size:11px;color:var(--text3)}
+.lsaid{font-size:13px;margin-top:3px}
+.ldid{font-size:12px;color:var(--text2);margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:620px){.quad{grid-template-columns:1fr}}
+.q{border:1px solid var(--line);border-radius:9px;padding:12px;background:var(--bg2)}
+.q .qn{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.02em}
+.q .qt{font-size:12.5px;font-weight:600;margin-top:2px}
+.q .qd{font-size:11.5px;color:var(--text2);margin-top:3px;line-height:1.4}
+.q.good .qn{color:#4ade80} .q.expensive .qn{color:#fbbf24} .q.ours .qn{color:#f87171} .q.luck .qn{color:var(--text2)}
+
+/* pressure */
+.act-num{font-family:var(--mono);font-weight:600;opacity:.85}
+.press{display:flex;flex-direction:column;gap:5px;margin-top:9px}
+.press .pr{display:grid;grid-template-columns:34px 1fr;gap:9px;align-items:start;font-size:12px}
+.press .pp{font-family:var(--mono);font-weight:600;color:var(--text2);text-align:right}
+.press .pl{color:var(--text)} .press .pd{color:var(--text3);font-size:11.5px}
+.notp{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-radius:8px;
+  border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.07);font-size:12.5px;line-height:1.5}
+.notp b{color:#f87171}
+
+/* habits */
+.hab{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--line)}
+.hab:last-child{border-bottom:0}
+.hab .hn{font-weight:600;font-size:13px;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.hab .hd{font-size:12px;color:var(--text2);margin-top:3px;line-height:1.5}
+.hab .hr{text-align:right;font-family:var(--mono);white-space:nowrap}
+.hab .hr .hv{font-size:16px;font-weight:600}
+.hab .hr .hs{font-size:10.5px;color:var(--text3)}
+.trend{font-family:var(--mono);font-size:10.5px;padding:2px 6px;border-radius:4px;background:var(--bg3);color:var(--text2)}
+.trend.worse{background:rgba(239,68,68,.13);color:#f87171}
+.trend.better,.trend.clean{background:rgba(34,197,94,.13);color:#4ade80}
+.habflag{display:flex;gap:9px;align-items:center;padding:9px 12px;border-radius:8px;font-size:12.5px;
+  border:1px solid rgba(245,165,36,.35);background:rgba(245,165,36,.07)}
+.habflag b{color:#fbbf24}
+
+/* reports */
+.rep{font-size:13.5px;line-height:1.65}
+.rep p{margin:0 0 11px}
+.rep h4{margin:18px 0 7px;font-size:13px;font-weight:600}
+.rep h4:first-child{margin-top:0}
+.rep ul{margin:0 0 11px;padding-left:18px}
+.rep li{margin-bottom:5px}
+.days{width:100%;border-collapse:collapse;min-width:620px;table-layout:fixed}
+.days th,.days td{padding:8px 10px;text-align:left;font-size:12.5px;border-bottom:1px solid var(--line);vertical-align:middle}
+.days th{font-size:11px;color:var(--text3);font-weight:600;vertical-align:bottom}
+.days td.n{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.days tr.worst td{background:rgba(239,68,68,.06)}
+
+/* settings */
+.auto{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--bg2)}
+.auto + .auto{margin-top:10px}
+.auto.on{border-color:rgba(34,197,94,.35)}
+.auto .ah{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.auto .at{font-weight:600;font-size:14px}
+.auto .as{font-size:12.5px;color:var(--text2);margin-top:4px;line-height:1.5}
+.consent{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:11px 12px;border-radius:8px;
+  background:var(--panel);border:1px solid var(--line2);font-size:12.5px;line-height:1.55;cursor:pointer}
+.consent input{margin-top:3px;flex:none;width:16px;height:16px;accent-color:var(--blue)}
+.lastrun{font-size:11.5px;color:var(--text3);margin-top:9px}
+
+/* progress */
+.verd{padding:16px;border-radius:11px;border:1px solid var(--line);background:var(--bg2)}
+.verd .vw{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.verd .vb{font-size:13px;line-height:1.55;margin-top:5px;color:var(--text2)}
+.verd.better{border-color:rgba(34,197,94,.35);background:linear-gradient(90deg,rgba(34,197,94,.09),transparent 60%)}
+.verd.better .vw{color:#4ade80}
+.verd.worse{border-color:rgba(239,68,68,.35);background:linear-gradient(90deg,rgba(239,68,68,.09),transparent 60%)}
+.verd.worse .vw{color:#f87171}
+.met{display:grid;grid-template-columns:1fr 150px 118px;gap:14px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.met:last-child{border-bottom:0}
+@media(max-width:620px){.met{grid-template-columns:1fr 110px}.met .mv{grid-column:1 / -1}}
+.met .ml{font-weight:600;font-size:13px}
+.met .mv{font-family:var(--mono);font-size:12px;text-align:right}
+.spk{width:100%;height:34px;display:block}
+.mile{display:flex;gap:9px;align-items:center;padding:7px 0;font-size:12.5px;border-bottom:1px solid var(--line)}
+.mile:last-child{border-bottom:0}
+.mile .mi{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700;flex:none;
+  background:rgba(34,197,94,.18);color:#4ade80}
+.mile .mi.wait{background:var(--bg3);color:var(--text3)}
+.bands{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:end;height:150px;margin-top:6px}
+.bands .b{display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:5px;text-align:center}
+.bands .bar{border-radius:4px 4px 0 0;background:var(--blue);min-height:2px}
+.bands .bar.thin{background:var(--line2)}
+.bands .bl{font-family:var(--mono);font-size:10.5px;color:var(--text3)}
+.bands .bv{font-family:var(--mono);font-size:11.5px;font-weight:600}
+
+/* accounts */
+.acct{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border-radius:8px;background:var(--bg2);
+  border:1px solid var(--line);border-left:3px solid var(--violet);font-size:12.5px;line-height:1.5}
+.acct + .acct{margin-top:8px}
+.acct .ad{font-family:var(--mono);font-size:11px;color:var(--text3);white-space:nowrap;padding-top:1px}
+
+/* the rail's timeframe switch */
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden;margin:2px 0 8px}
+.seg button{background:var(--bg2);border:0;border-right:1px solid var(--line2);padding:4px 12px;font-size:11.5px;
+  font-family:var(--mono);color:var(--text2)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--blue-dim);color:var(--text);font-weight:600}
+
+/* the rail's pair picker, when several positions are open */
+.pick{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px}
+.pick button{background:var(--bg2);border:1px solid var(--line2);border-radius:6px;padding:4px 8px;font-size:11.5px;
+  display:inline-flex;gap:5px;align-items:center}
+.pick button.on{border-color:var(--blue);box-shadow:inset 0 -2px 0 var(--blue)}
+.pick button b{font-family:var(--mono);font-weight:600}
+
+/* rail */
+.rl{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.rl h4{margin:0 0 9px;font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.03em}
+.frow{display:flex;align-items:center;gap:8px;height:24px;font-size:12px}
+.frow .fn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow .fv{font-family:var(--mono);font-size:11px;color:var(--text2);width:92px;text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--text3)}
+.dot.g{background:var(--green)} .dot.a{background:var(--amber)} .dot.r{background:var(--red)}
+
+.ico{display:inline-block;background-color:currentColor;-webkit-mask-repeat:no-repeat;
+  mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;
+  -webkit-mask-size:contain;mask-size:contain}
+.spin{width:13px;height:13px;border:2px solid var(--line2);border-top-color:var(--blue);
+  border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+.flash{animation:fl 1s ease-out}
+@keyframes fl{0%{background:rgba(59,130,246,.18)}100%{background:transparent}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <h1>Arbiter</h1>
+    <div class="sub" id="sub">Starting up…</div>
+  </div>
+  <div class="hdr-act">
+    <button class="btn" id="btnRefresh">Re-read everything</button>
+  </div>
+</div>
+
+<nav class="nav" id="nav">
+  <button class="nav-tab active" data-p="now"><span class="ico" data-i="pulse"></span>Now<span class="nav-ct" id="ctNow">–</span></button>
+  <button class="nav-tab" data-p="hunt"><span class="ico" data-i="target"></span>Hunting<span class="nav-ct" id="ctHunt">–</span></button>
+  <button class="nav-tab" data-p="calls"><span class="ico" data-i="list"></span>Today's calls<span class="nav-ct" id="ctCalls">–</span></button>
+  <button class="nav-tab" data-p="habits"><span class="ico" data-i="habit"></span>Habits<span class="nav-ct" id="ctHabits">–</span></button>
+  <button class="nav-tab" data-p="daily"><span class="ico" data-i="report"></span>Daily summary</button>
+  <button class="nav-tab" data-p="weekly"><span class="ico" data-i="chart"></span>Weekly review</button>
+  <button class="nav-tab" data-p="progress"><span class="ico" data-i="trend"></span>Progress</button>
+  <button class="nav-tab" data-p="calibration"><span class="ico" data-i="scale"></span>Is it honest?</button>
+  <button class="nav-tab" data-p="settings"><span class="ico" data-i="gear"></span>Settings</button>
+</nav>
+
+<div class="wrap">
+  <div class="main">
+    <section class="page on" id="p-now"><div id="main">
+      <div class="card"><div class="card-b"><div class="empty">
+        <div class="big"><span class="spin"></span> Reading your account…</div>
+        <div class="sm">Arbiter is collecting what every module can see.</div>
+      </div></div></div>
+    </div></section>
+    <section class="page" id="p-calls"><div id="calls">
+      <div class="card"><div class="card-b"><div class="empty"><div class="big">No calls yet today.</div></div></div></div>
+    </div></section>
+    <section class="page" id="p-habits"><div id="habits">
+      <div class="card"><div class="card-b"><div class="empty"><div class="big"><span class="spin"></span> Reading your habits…</div></div></div></div>
+    </div></section>
+    <section class="page" id="p-daily"><div id="daily"></div><div id="dailyReport"></div></section>
+    <section class="page" id="p-weekly"><div id="weekly"></div><div id="weeklyReport"></div></section>
+    <section class="page" id="p-settings"><div id="settings">
+      <div class="card"><div class="card-b"><div class="empty"><div class="big"><span class="spin"></span> Reading your settings…</div></div></div></div>
+    </div></section>
+    <section class="page" id="p-progress"><div id="progress"></div></section>
+    <section class="page" id="p-calibration"><div id="calibration"></div></section>
+    <section class="page" id="p-hunt"><div id="hunt">
+      <div class="card"><div class="card-b"><div class="empty">
+        <div class="big"><span class="spin"></span> Scanning your watchlist…</div>
+      </div></div></div>
+    </div></section>
+  </div>
+
+  <aside class="rail">
+    <div class="rl"><h4>Reading — your whole account</h4><div id="acctfeeds"></div></div>
+    <div class="rl"><h4 id="pairHead">Reading — this pair</h4>
+      <div class="seg" id="railTF" role="tablist" aria-label="Timeframe">
+        <button data-rtf="M15">M15</button><button data-rtf="H1" class="on">H1</button><button data-rtf="H4">H4</button></div>
+      <div id="pairWhy" class="xtiny dim" style="margin:0 0 8px;line-height:1.45"></div>
+      <div id="pairPick"></div><div id="feeds"></div></div>
+    <div class="rl"><h4>Habits open right now</h4><div id="episodes" class="tiny muted">–</div></div>
+    <div class="rl"><h4>Its own record</h4><div id="record"></div></div>
+    <div class="rl"><h4>Claude budget</h4><div id="budget"></div>
+      <div class="tiny dim" style="margin-top:8px;line-height:1.5">Live judgement is computed on your machine and costs nothing.
+        Claude is only used for the written reports.</div></div>
+    <div class="rl"><h4>The long record</h4><div id="longrec"></div>
+      <div class="tiny dim" style="margin-top:8px;line-height:1.5">Kept against you, not against an account. Changing broker or
+        starting a new account does not reset it.</div></div>
+    <div class="rl"><h4>Honest limits</h4>
+      <div class="tiny muted" style="line-height:1.55">
+        Readings can be up to about 15 seconds behind price: the EA sends every 5 seconds, the file
+        bridge checks every 3, and Arbiter re-reads every 5. A decision that must happen inside a
+        second belongs in the EA, not here. Blackwood does not place trades or tell you to take one.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- the shared feed switcher every Blackwood module loads: it wraps fetch so
+     every read carries the active terminal. Must come BEFORE anything fetches. -->
+<script src="/bw-source.js"></script>
+<!-- the Pattern Detector's own retracement engine: Arbiter runs the same
+     assessment rather than reporting "no retracement reading" -->
+<script src="/retracement.js"></script>
+<script src="/arbiter-engine.js"></script>
+<script src="/arbiter-feeds.js"></script>
+<script>
+(function(){
+'use strict';
+var E = window.BWArbiterEngine, F = window.BWArbiterFeeds;
+/* 5 seconds — about the rate the EA itself posts, so faster would only
+   re-read identical numbers. The anti-flicker rule is defined in TIME, not
+   cycles: a change must hold 40s to escalate and 60s to relax, whatever
+   the scan speed. At 5s that is 8 and 12 cycles. Counting raw cycles would
+   have made the protection four times weaker the moment the scan sped up. */
+var REFRESH_MS = 5000;
+var ESCALATE_MS = 40000, RELAX_MS = 60000;
+var stabiliser = E.createStabiliser({
+  up:   Math.max(2, Math.ceil(ESCALATE_MS / REFRESH_MS)),
+  down: Math.max(3, Math.ceil(RELAX_MS / REFRESH_MS))
+});
+var entryCases = {};          // ticket -> frozen pillars (see freezeStore)
+var FROZEN_KEY = 'bw-arbiter-entry-cases';
+
+/* Keyed by ACCOUNT + ticket, never ticket alone: MT5 ticket numbers are not
+   unique across accounts (trade_journal's own unique constraint says so), so
+   a new trade on another account could otherwise inherit a dead trade's
+   frozen entry case and be judged against the wrong history.
+   The entry case must be frozen at the moment a position first appears,
+   or the daily review becomes hindsight fiction. Held here per ticket.
+   NOTE: this is a browser copy and therefore only as good as the first
+   time this tab saw the trade. Moving it server-side is Phase 5, where
+   the call ledger lives. */
+try { entryCases = JSON.parse(localStorage.getItem(FROZEN_KEY) || '{}') || {}; } catch(e){ entryCases = {}; }
+function saveFrozen(){ try{ localStorage.setItem(FROZEN_KEY, JSON.stringify(entryCases)); }catch(e){} }
+function caseKey(acct, ticket){ return String(acct||'unknown') + ':' + String(ticket); }
+
+/* Forget the frozen case of anything no longer open. Runs on EVERY cycle,
+   including the one where the last position closes — an early return here
+   is what left dead cases behind. */
+function forgetClosed(acct, trades){
+  var live = {};
+  (trades||[]).forEach(function(t){ live[caseKey(acct, t.ticket)] = 1; });
+  var changed = false;
+  Object.keys(entryCases).forEach(function(k){
+    if(live[k]) return;
+    // only clear keys belonging to the account currently reporting; another
+    // account's open trades are not ours to forget while it is not beating
+    if(String(k).indexOf(String(acct||'unknown') + ':') !== 0) return;
+    delete entryCases[k]; stabiliser.forget(k); changed = true;
+  });
+  if(changed) saveFrozen();
+}
+
+var ICONS = { pulse:'M3 12h4l3 8 4-16 3 8h4',
+  list:'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+  habit:'M12 8v4l3 3M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
+  report:'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 15h6M9 11h3',
+  chart:'M3 3v18h18M7 15l4-5 3 3 5-7',
+  gear:'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.5 19l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 5 7.5l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H10a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V10a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z',
+  trend:'M3 17l6-6 4 4 8-8M14 7h7v7',
+  scale:'M12 3v18M7 21h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z',
+  target:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01' };
+Object.keys(ICONS).forEach(function(k){
+  var d='url("data:image/svg+xml;utf8,'+encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="'+ICONS[k]+'"/></svg>')+'")';
+  Array.prototype.forEach.call(document.querySelectorAll('.ico[data-i="'+k+'"]'), function(el){
+    el.style.webkitMaskImage=d; el.style.maskImage=d;
+  });
+});
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function el(html){ var d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstChild; }
+/* Only touch the DOM when the content actually changed. At a 5s scan a
+   blind innerHTML rebuild would jump the scroll position and flash every
+   card several times a minute — the repaint-churn bug already fixed twice
+   in the Assistant. Rule: anything on a timer compares before it writes. */
+var painted = {};
+function paint(id, html){
+  if(painted[id] === html) return false;
+  painted[id] = html;
+  document.getElementById(id).innerHTML = html;
+  return true;
+}
+function fmtPips(v,dp){ return v==null?'–':(v>=0?'+':'')+v.toFixed(dp==null?1:dp); }
+function ago(ms){ var s=Math.round(ms/1000);
+  return s<60?s+'s':s<3600?Math.round(s/60)+'m':Math.round(s/3600)+'h'; }
+
+var MK = { pass:'✓', warn:'!', fail:'✕', unknown:'·' };
+
+function pillarRow(p){
+  var cls = p.change==='broken' ? 'broken' : p.change==='weakened' ? 'weakened' : '';
+  var tag = (p.change && p.change!=='same')
+    ? '<span class="chg '+p.change+'">'+p.change+'</span>' : '';
+  return '<div class="pill '+p.now+' '+cls+'">'+
+    '<span class="mk">'+MK[p.now]+'</span>'+
+    '<div><div class="nm">'+esc(p.label)+'</div>'+
+    '<div class="dt">'+esc(p.detail)+'</div></div>'+
+    '<div style="text-align:right">'+tag+
+      '<div class="src">'+esc(p.source||'')+'</div></div></div>';
+}
+
+function conditionRow(c){
+  return '<div class="pill '+c.state+'">'+
+    '<span class="mk">'+MK[c.state]+'</span>'+
+    '<div><div class="nm">'+esc(c.label)+'</div>'+
+    '<div class="dt">'+esc(c.detail)+'</div></div>'+
+    '<div class="src">'+esc(c.source||'')+'</div></div>';
+}
+
+function excursionBlock(ex, stopPips){
+  if(!ex || (ex.mfePips==null && ex.maePips==null)) return '';
+  var mfe = ex.mfePips||0, mae = ex.maePips||0, now = ex.nowPips;
+  var span = Math.max(mfe, mae, Math.abs(now||0), 1);
+  var zero = 50, unit = 46/span;                 // percent of the track per pip
+  var left = zero - mae*unit, wMae = mae*unit, wMfe = mfe*unit;
+  var nowX = zero + (now||0)*unit;
+  var give = ex.givebackShare;
+  var line = '';
+  if(give!=null && give>0.01) line = 'Given back '+Math.round(give*100)+'% of its best.';
+  if(ex.stopUsedShare!=null) line += (line?' ':'')+'Used '+Math.round(ex.stopUsedShare*100)+'% of the distance to the stop.';
+  return '<div><div class="card-h" style="border:0;padding:0 0 9px"><h3>Where it has been</h3></div>'+
+    '<div class="exc-track">'+
+      '<div class="exc-mae" style="left:'+left+'%;width:'+wMae+'%"></div>'+
+      '<div class="exc-mfe" style="left:'+zero+'%;width:'+wMfe+'%"></div>'+
+      '<div class="exc-zero" style="left:'+zero+'%"></div>'+
+      '<div class="exc-now" style="left:'+Math.max(0,Math.min(100,nowX))+'%"></div>'+
+    '</div>'+
+    '<div class="exc-lab"><span>worst '+fmtPips(-mae)+'</span><span>now '+fmtPips(now)+'</span>'+
+      '<span>best '+fmtPips(mfe)+'</span></div>'+
+    (line?'<div class="tiny muted" style="margin-top:8px">'+esc(line)+'</div>':'')+'</div>';
+}
+
+function threatRows(j){
+  var rows = [];
+  (j.counterSignals||[]).forEach(function(c){
+    var tone = c.kind==='pattern' ? 'red' : c.severity==='broken' ? 'red' : c.severity==='in_reach' ? 'amb' : 'blu';
+    rows.push('<div class="thr '+tone+'"><div class="tk"></div><div>'+
+      '<div class="tt">'+esc(c.name||'Counter signal')+'</div>'+
+      '<div class="tb">'+esc(c.detail)+'</div>'+
+      '<div class="tm">'+(c.kind==='pattern'?'pattern alerts':'formations')+'</div></div></div>');
+  });
+  ['radar','news','session','spread','correlation','reach'].forEach(function(id){
+    var c = j.conditions.find(function(x){ return x.id===id; });
+    if(!c || c.state==='unknown') return;
+    if(c.state==='pass' && id!=='radar') return;          // quiet when there is nothing to say
+    var tone = c.state==='fail' ? 'red' : c.state==='warn' ? 'amb' : 'gre';
+    rows.push('<div class="thr '+tone+'"><div class="tk"></div><div>'+
+      '<div class="tt">'+esc(c.label)+'</div>'+
+      '<div class="tb">'+esc(c.detail)+'</div>'+
+      '<div class="tm">'+esc(c.source||'')+'</div></div></div>');
+  });
+  return rows.join('') || '<div class="tiny muted">Nothing is working against this trade right now.</div>';
+}
+
+function scoreBlock(j){
+  if(j.score==null){
+    return '<div class="note warn"><b>No score.</b> '+esc(j.verdictText||'Not enough is reaching Arbiter to judge this.')+'</div>';
+  }
+  var col = j.score>=70?'var(--green)':j.score>=45?'var(--amber)':'var(--red)';
+  var cap = j.gateCapped
+    ? '<div class="capnote">Capped at '+j.gateCap+' — '+esc(j.gatesFailed.join(' and '))+
+      ' '+(j.gatesFailed.length>1?'are':'is')+' failing. It would otherwise read '+j.rawScore+'.</div>' : '';
+  var disc = (!j.gateCapped && j.radarDiscount>0)
+    ? '<div class="capnote">Pulled '+j.radarDiscount+' toward the middle by Risk Radar — the evidence is less reliable while it is flagged.</div>' : '';
+  return '<div class="score"><div><div class="n" style="color:'+col+'">'+j.score+
+    '</div><div class="of">evidence agreement</div></div>'+
+    '<div style="flex:1"><div class="meter"><i style="width:'+j.score+'%;background:'+col+'"></i></div>'+
+    cap+disc+'</div></div>';
+}
+
+function positionCard(res){
+  var p = res.position, j = res.judgement, w = res.world;
+  var settled = j.settled;
+  var dirBadge = p.side==='buy' ? '<span class="badge buy">LONG</span>' : '<span class="badge sell">SHORT</span>';
+  var pl = p.profit;
+  var age = p.openTime ? ago(Date.now() - p.openTime*1000) : '–';
+  var brokenCount = j.pillars.filter(function(x){return x.change==='broken';}).length;
+  var standing = j.pillars.filter(function(x){return x.now==='pass';}).length;
+
+  var pend = settled.pending
+    ? '<div class="act-pending"><i><b style="width:'+Math.round(settled.held/(settled.held+settled.needs)*100)+'%"></b></i>'+
+      'Moving toward '+esc(settled.pending.toUpperCase())+' — held '+settled.held+' of '+(settled.held+settled.needs)+
+      ' cycles. Advice is not shown until it settles.</div>' : '';
+
+  var html =
+  '<div class="card" data-ticket="'+esc(p.ticket)+'">'+
+    '<div class="thead"><div>'+
+      '<div class="tpair">'+esc(w.symbol)+' '+dirBadge+'</div>'+
+      '<div class="tmeta">'+(p.volume!=null?p.volume+' lots · ':'')+
+        'in from '+(p.openPrice!=null?p.openPrice:'–')+
+        (p.sl?' · stop '+p.sl:' · no stop')+
+        (p.tp?' · target '+p.tp:' · no target')+' · '+age+'</div>'+
+    '</div>'+
+    '<div class="tpl"><div class="v '+(pl>=0?'up':'dn')+'">'+(pl==null?'–':(pl>=0?'+':'')+pl.toFixed(2))+'</div>'+
+      '<div class="s">'+fmtPips(p.floatingPips)+' pips</div></div></div>'+
+    '<div class="card-b" style="display:flex;flex-direction:column;gap:14px">'+
+
+      '<div class="act '+settled.action.key+'">'+
+        '<div><div class="act-word">'+esc(settled.action.label)+
+          (settled.action.pressure!=null?' <span class="act-num">· '+settled.action.pressure+'</span>':'')+'</div>'+
+          '<div class="act-sub">PRESSURE '+(settled.action.pressure!=null?settled.action.pressure+' / 100':'–')+'</div></div>'+
+        '<div><div class="act-why">'+esc(settled.action.reason)+'</div>'+
+          pressureList(settled.action)+pend+'</div>'+
+      '</div>'+
+      noTpNotice(j)+
+      habitFlag(p, w.arbiter)+
+
+      '<div><div class="card-h" style="border:0;padding:0 0 9px"><h3>The case for this trade</h3>'+
+        '<span class="sp badge '+(brokenCount?'bad':'ok')+'">'+
+          (brokenCount? brokenCount+' of '+j.pillars.length+' broken' : standing+' of '+j.pillars.length+' standing')+
+        '</span></div>'+
+        '<div class="pillars">'+j.pillars.map(pillarRow).join('')+'</div>'+
+        (res.frozenAt ? '<div class="disc" style="margin-top:10px">Entry case frozen '+
+          ago(Date.now()-res.frozenAt)+' ago, when Arbiter first saw this trade. It is not re-derived.</div>'
+          : '<div class="disc" style="margin-top:10px">This trade was already open when Arbiter first saw it, so there is no frozen entry case to compare against — the pillars show what is true now.</div>')+
+      '</div>'+
+
+      excursionBlock(j.excursion, p.stopPips)+
+
+      '<div>'+scoreBlock(j)+'</div>'+
+
+      '<div><div class="card-h" style="border:0;padding:0 0 4px"><h3>What is working against it</h3></div>'+
+        threatRows(j)+'</div>'+
+
+      (j.transitions && j.transitions.length
+        ? '<div class="note"><b>What would change this call:</b><br>'+
+          j.transitions.map(function(t){ return esc(t.text); }).join('<br>')+'</div>' : '')+
+    '</div>'+
+  '</div>';
+  return html;
+}
+
+/* The factors behind the number — like Risk Radar's breakdown, so a
+   trader can see WHY it is 82 and not just that it is. */
+function pressureList(a){
+  if(!a || !a.top || !a.top.length) return '';
+  return '<div class="press">'+a.top.map(function(f){
+    return '<div class="pr"><span class="pp">+'+f.points+'</span><div><div class="pl">'+esc(f.label)+'</div>'+
+      (f.detail?'<div class="pd">'+esc(f.detail)+'</div>':'')+'</div></div>';
+  }).join('')+'</div>';
+}
+/* Assan: most of the live model depends on the take profit. Without one,
+   Arbiter measures against an implied target and says so, prominently. */
+function noTpNotice(j){
+  if(!j.target || !j.target.implied) return '';
+  return '<div class="notp"><div><b>No take profit set on this trade.</b> Most of Arbiter\'s judgement — '+
+    'when to take partial, when to hold, when cutting a winner is worth it — is measured against your target. '+
+    'Until you set one it is using an '+esc(j.target.why.replace(/^implied — /,'implied target: '))+
+    '. Set a TP in MT5 and these readings sharpen.</div></div>';
+}
+
+/* For the shell's red dot on Arbiter's sidebar entry, so the trader sees
+   it from any module. Same shape as the SMC panel's bw-smc-alert. */
+function publishAttention(out){
+  var cut = out.filter(function(r){ return r.judgement.settled.action.key==='cut'; })[0];
+  var notp = out.filter(function(r){ return r.judgement.target && r.judgement.target.implied; });
+  var a = cut ? { urgent:true, text: cut.world.symbol+' — CUT · '+cut.judgement.settled.action.pressure }
+        : notp.length ? { urgent:true, text: notp.length+' trade'+(notp.length===1?'':'s')+' with no take profit set' }
+        : null;
+  try{
+    if(a){
+      /* The timestamp changes only when the MESSAGE changes. The shell
+         lights a dot only for events newer than the last time the trader
+         opened this module; stamping every 5s cycle would relight a dot
+         for something already seen, seconds after they left. */
+      var prev = null; try{ prev = JSON.parse(localStorage.getItem('bw-arbiter-now')||'null'); }catch(e){}
+      a.t = (prev && prev.text === a.text && prev.t) ? prev.t : Date.now();
+      localStorage.setItem('bw-arbiter-now', JSON.stringify(a));
+    }
+    else localStorage.removeItem('bw-arbiter-now');
+  }catch(e){}
+}
+
+/* ═══ EXPOSURE ══════════════════════════════════════════════════════
+   Two positions are not two bets when they move together. The correlation
+   is MEASURED from the closes Arbiter already has — never assumed from the
+   pair names — and the window is named, because it is hours of H1 candles,
+   not sixty days of daily data. */
+function pearson(a, b){
+  var n = Math.min(a.length, b.length);
+  if(n < 30) return null;
+  var x = [], y = [];
+  for(var i = a.length - n + 1; i < a.length; i++) x.push(Math.log(a[i] / a[i-1]));
+  for(var j = b.length - n + 1; j < b.length; j++) y.push(Math.log(b[j] / b[j-1]));
+  var m = Math.min(x.length, y.length); x = x.slice(-m); y = y.slice(-m);
+  var mx = x.reduce(function(p,q){return p+q;},0)/m, my = y.reduce(function(p,q){return p+q;},0)/m;
+  var sxy = 0, sxx = 0, syy = 0;
+  for(var k = 0; k < m; k++){ var dx = x[k]-mx, dy = y[k]-my; sxy += dx*dy; sxx += dx*dx; syy += dy*dy; }
+  if(!sxx || !syy) return null;
+  return { r: sxy / Math.sqrt(sxx * syy), bars: m };
+}
+function exposureCard(list){
+  if(list.length < 2) return '';
+  var risk = list.reduce(function(a,r){ return a + (r.raw.riskPct||0); },0);
+  var floating = list.reduce(function(a,r){ return a + (r.position.profit||0); },0);
+  var stopMoney = list.reduce(function(a,r){
+    var p = r.position, pr = r.raw;
+    if(p.stopPips == null || pr.profit == null || p.floatingPips == null || !p.floatingPips) return a;
+    var perPip = Math.abs(pr.profit / p.floatingPips);        // from the EA's own floating P/L
+    return a + perPip * p.stopPips;
+  }, 0);
+  var bal = list[0] && list[0].world.accountInfo ? (list[0].world.accountInfo.balance || null) : null;
+
+  // every pair of positions, measured
+  var pairs = [];
+  for(var i=0;i<list.length;i++) for(var j=i+1;j<list.length;j++){
+    var A = list[i], B = list[j];
+    var c = pearson(A.world.closes||[], B.world.closes||[]);
+    if(!c) continue;
+    var sameWay = (A.position.side === B.position.side) ? c.r : -c.r;   // + = the two TRADES move together
+    pairs.push({ a:A, b:B, r:c.r, bars:c.bars, together:sameWay });
+  }
+  var strong = pairs.filter(function(p){ return Math.abs(p.together) >= 0.5; })
+    .sort(function(x,y){ return Math.abs(y.together) - Math.abs(x.together); });
+  var top = strong[0];
+  var line = '';
+  if(top){
+    var dirOf = function(r){ return r.position.side === 'buy' ? 'long' : 'short'; };
+    line = esc(top.a.world.symbol+' '+dirOf(top.a)+' and '+top.b.world.symbol+' '+dirOf(top.b))+' are '+
+      Math.abs(top.r).toFixed(2)+' '+(top.r < 0 ? 'inversely ' : '')+'correlated over the last '+top.bars+
+      ' '+(top.a.world.timeframe||'H1')+' candles — as '+(top.together > 0 ? 'ONE idea' : 'opposite ideas');
+  }
+  var note = top
+    ? (top.together > 0
+        ? '<b>These are not '+list.length+' independent bets.</b> '+esc(top.a.world.symbol)+' and '+esc(top.b.world.symbol)+
+          ' have been moving together, so both win or both lose on the same move. Your real exposure to one idea is larger than the '+
+          (risk>0? risk.toFixed(2)+'% the stops suggest' : 'sum of the stops suggests')+
+          '. Blackwood is not telling you to close one — it is telling you what you are actually holding.'
+        : '<b>These two partly cancel.</b> '+esc(top.a.world.symbol)+' and '+esc(top.b.world.symbol)+
+          ' have been moving opposite ways, so a move that hurts one tends to help the other. Your real exposure is smaller than the '+
+          (risk>0? risk.toFixed(2)+'% the stops suggest' : 'sum of the stops suggests')+'.')
+    : 'Correlation needs at least 30 candles for both pairs — not enough yet to say whether these move together.';
+
+  return '<div class="card"><div class="card-h"><h3>Exposure right now</h3>'+
+      '<span class="sp badge '+(top && top.together > 0 ? 'warn' : '')+'">'+list.length+' positions'+
+      (top ? ', one dollar view' : '')+'</span></div>'+
+    '<div class="card-b">'+
+      '<div class="kv"><span class="k">Open risk if every stop is hit</span><span class="v">'+
+        (stopMoney ? money(-Math.abs(stopMoney)) : 'not reported')+
+        (risk>0 ? ' · '+risk.toFixed(2)+'% of balance' : '')+'</span></div>'+
+      '<div class="kv"><span class="k">Floating</span><span class="v" style="color:'+(floating>=0?'#4ade80':'#f87171')+'">'+
+        money(floating)+'</span></div>'+
+      (line ? '<div class="kv"><span class="k">Correlation</span><span class="v" style="text-align:right;max-width:60%">'+line+'</span></div>' : '')+
+      '<div class="note" style="margin-top:12px">'+note+'</div>'+
+      (bal ? '' : '<div class="disc" style="margin-top:8px">The percentage comes from the risk your EA reports per position.</div>')+
+    '</div></div>';
+}
+
+
+/* ═══ THE RAIL ═══════════════════════════════════════════════════════
+   Every row reads something real. A row with nothing real behind it says
+   so, rather than showing a number — the prototype's "Formations 2 leads",
+   "Journal 2 unfilled" and "On demand 3 left" were illustrations; nothing
+   produces those, so they are not invented here. */
+var creditsCache = { at: 0, data: null }, sourcesCache = { at: 0, data: null };
+async function loadQuick(cache, url, ms){
+  if(cache.data && Date.now() - cache.at < ms) return cache.data;
+  var d = await fetch(url,{credentials:'same-origin',cache:'no-store'})
+    .then(function(r){ return r.ok? r.json():null; }).catch(function(){ return null; });
+  if(d){ cache.data = d; cache.at = Date.now(); }
+  return d;
+}
+function ago2(ms){ var s = Math.max(0, Math.round(ms/1000));
+  return s<60 ? s+'s' : s<3600 ? Math.round(s/60)+'m' : Math.round(s/3600)+'h'; }
+function row(name, state, val){
+  // state: true = reading, false = problem, null = nothing to read yet
+  return '<div class="frow"><span class="dot '+(state===true?'g':state===false?'r':'')+'"></span>'+
+    '<span class="fn">'+esc(name)+'</span><span class="fv">'+esc(val)+'</span></div>';
+}
+/* ═══ WHICH PAIR THE RAIL DESCRIBES ═══════════════════════════════════
+   Every open position and every watchlist pair is JUDGED every cycle; the
+   rail only DISPLAYS one pair's inputs at a time, and always says which
+   and why. It follows what the trader is looking at:
+     - positions open (and not on the Hunting tab): the position they
+       clicked, else the one under the MOST pressure — the one most likely
+       to need them. Several positions get a picker.
+     - Hunting, or flat: the pair they clicked in the scan, else the top score.
+   Before this, the rail showed the top scan pair while flat (even when
+   another was selected) and, with trades open, whichever position MT5
+   happened to list last — arbitrary, and never labelled. */
+var focus = { position: null, huntPicked: false };
+/* The ACTIONS are judged on H1. The rail can SHOW either timeframe for the
+   pair on display, and always shows whether H1 and H4 agree on structure. */
+var railTF = 'H1';
+var tfWorlds = {};            // 'SYMBOL|TF' -> { at, world, judgement }
+async function readTF(subj, tf, shared){
+  if(!subj || !subj.world) return null;
+  var k = subj.world.symbol + '|' + tf;
+  try{
+    var w = await F.buildWorld(subj.world.rawSymbol || subj.world.symbol, tf,
+      { shared: { state: shared.state, status: shared.status, journal: shared.journal }, direction: subj.judgement && subj.judgement.direction });
+    tfWorlds[k] = { at: Date.now(), world: w,
+      judgement: E.judgeSetup(w, { direction: subj.judgement && subj.judgement.direction }) };
+  }catch(e){ /* keep the last good read */ }
+  return tfWorlds[k] || null;
+}
+function regimeWord(w){
+  var r = w && w.structure && w.structure.regime;
+  return r ? (/up/.test(r) ? 'up' : /down/.test(r) ? 'down' : 'range') : null;
+}
+var lastPositions = [], lastRailCtx = null;
+function activePage(){
+  var t = document.querySelector('.nav-tab.active');
+  return t ? t.getAttribute('data-p') : 'now';
+}
+function pressureOf(r){
+  var a = r.judgement && r.judgement.settled && r.judgement.settled.action;
+  return a && a.pressure != null ? a.pressure : (r.judgement && r.judgement.pressure ? r.judgement.pressure.score : 0);
+}
+function railSubject(){
+  var page = activePage();
+  if(page !== 'hunt' && lastPositions.length){
+    var picked = lastPositions.filter(function(r){ return r.position.ticket === focus.position; })[0];
+    var top = lastPositions.slice().sort(function(x, y){ return pressureOf(y) - pressureOf(x); })[0];
+    var r = picked || top;
+    return { mode: 'position', world: r.world, judgement: r.judgement, ticket: r.position.ticket,
+      side: r.position.side,
+      why: picked ? 'the position you picked'
+         : lastPositions.length > 1 ? 'your position under the most pressure — pick another below'
+         : 'your open position' };
+  }
+  if(lastScan.length){
+    var sel = lastScan.filter(function(x){ return x.sym === selected; })[0];
+    var s0 = sel || lastScan[0];
+    return { mode: 'scan', world: s0.world, judgement: s0.j,
+      why: (sel && focus.huntPicked) ? 'the pair you picked in Hunting' : 'the highest score in the scan — click any pair in Hunting to read it instead' };
+  }
+  return null;
+}
+/* A pair's two currencies, so the calendar row only counts releases that can move it. */
+function currenciesOf(sym){ sym = String(sym||'').toUpperCase(); return [sym.slice(0,3), sym.slice(3,6)]; }
+
+function renderRail(ctx){
+  lastRailCtx = ctx;
+  var st = ctx.state || {}, today = new Date().toISOString().slice(0,10);
+  var subj = railSubject(), w = subj ? subj.world : null;
+  var h1World = w, tfRead = null;
+  if(subj && railTF !== 'H1'){
+    tfRead = tfWorlds[subj.world.symbol + '|' + railTF] || null;
+    w = tfRead ? tfRead.world : null;
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('#railTF button'), function(b){
+    b.classList.toggle('on', b.getAttribute('data-rtf') === railTF); });
+
+  // ── the whole account ──────────────────────────────────────────
+  var A = [];
+  var src = ctx.sources && ctx.sources.sources || [];
+  var active = ctx.sources && ctx.sources.active;
+  var me = src.filter(function(x){ return x.sourceId === active; })[0] || src[0];
+  var age = me && me.lastSeen ? Date.now() - me.lastSeen : null;   // the EA's own last report
+  var n = (st.openTrades||[]).length;
+  A.push(row('Open positions', age==null ? null : age < 60000, n + (age==null ? '' : ' · ' + ago2(age))));
+  var alerts = (st.patternAlerts||[]).filter(function(a){ return String(a.time||'').slice(0,10) === today; }).length;
+  A.push(row('Pattern alerts', true, alerts+' today, all pairs'));
+  var rr = null; try{ rr = JSON.parse(localStorage.getItem('bw-risk-now')||'null'); }catch(e){}
+  var worst = null;
+  if(rr && rr.t && Date.now() - rr.t < 300000 && rr.pairs) Object.keys(rr.pairs).forEach(function(k){
+    var sc = rr.pairs[k] && rr.pairs[k].score; if(sc!=null && (!worst || sc > worst.s)) worst = { k:k, s:sc }; });
+  A.push(row('Risk Radar, worst', worst ? worst.s < 50 : null, worst ? worst.k.slice(0,6)+' '+worst.s : 'not open'));
+  var liveEps = ((ctx.status && ctx.status.openEpisodes) || []).length;
+  var todayEps = ctx.habits && ctx.habits.types ? ctx.habits.types.reduce(function(a,h){ return a + h.today.count; }, 0) : null;
+  A.push(row('Trade errors', liveEps ? false : true, liveEps+' live'+(todayEps==null?'':' · '+todayEps+' today')));
+  var jn = ctx.journal && ctx.journal.entries ? ctx.journal.entries.length : null;
+  A.push(row('Journal', jn==null ? null : true, jn==null ? 'not read' : jn+' trades on file'));
+  paint('acctfeeds', A.join(''));
+
+  // ── this pair: named, with the reason it is the one shown ─────
+  var shownSym = subj ? subj.world.symbol : null;
+  document.getElementById('pairHead').textContent = shownSym ? 'Reading — '+shownSym+' · '+railTF : 'Reading — this pair';
+  paint('pairWhy', subj ? esc('Showing '+subj.why+'. Every '+(subj.mode==='position'?'open position':'pair')+' is judged every cycle; only the display follows one.'+
+    (railTF !== 'H1' ? ' Actions and scores are judged on H1 — this is the '+railTF+' view of the same pair.' : '')) : '');
+  // several positions: a picker, each with its pressure
+  paint('pairPick', (subj && subj.mode==='position' && lastPositions.length > 1)
+    ? '<div class="pick">'+lastPositions.map(function(r){
+        return '<button data-focus="'+esc(r.position.ticket)+'" class="'+(r.position.ticket===subj.ticket?'on':'')+'">'+
+          esc(r.world.symbol)+' '+(r.position.side==='buy'?'long':'short')+' <b>'+pressureOf(r)+'</b></button>';
+      }).join('')+'</div>' : '');
+  if(!w){ paint('feeds', '<div class="tiny muted">'+(subj && railTF!=='H1' ? 'Reading '+railTF+'…' : 'Nothing to read yet.')+'</div>'); return renderRailRest(ctx); }
+
+  var f = [];
+  var j = tfRead ? tfRead.judgement : subj.judgement;
+  // do the two timeframes agree on structure? shown on either view
+  var h4 = tfWorlds[shownSym + '|H4'];
+  var r1 = regimeWord(h1World), r4 = h4 ? regimeWord(h4.world) : null;
+  f.push(row('H1 vs H4', (r1 && r4) ? (r1 === r4 && r1 !== 'range') : null,
+    !(r1 && r4) ? (h4 ? 'structure unknown' : 'reading H4…')
+      : r1 === r4 ? (r1 === 'range' ? 'both ranging' : 'agree — both '+r1)
+      : 'disagree — H1 '+r1+', H4 '+r4));
+  if(j && j.conditions){
+    var known = j.conditions.filter(function(c){ return c.state !== 'unknown'; }).length;
+    f.push(row('Evidence', known >= 10 ? true : known >= 7 ? null : false, known+' of '+j.conditions.length+' conditions readable'));
+  }
+  // structure: only the timeframes read for THIS pair
+  var conf = null; try{ conf = JSON.parse(localStorage.getItem('bw-confluence-now')||'null'); }catch(e){}
+  var tfs = {};
+  if(conf && conf.t && Date.now() - conf.t < 300000 && conf.reads) Object.keys(conf.reads).forEach(function(k){
+    var p = k.split('|'); if(String(p[0]).toUpperCase().replace(/[^A-Z]/g,'').slice(0,6) === w.symbol && p[1]) tfs[p[1]] = 1; });
+  f.push(row('Structure', w.structure ? true : null,
+    w.structure ? (w.provenance && w.provenance.structure==='channel' ? (Object.keys(tfs).sort().join('+')||'engine') : 'own read H1') : 'none'));
+  var zones = w.zones ? w.zones.filter(function(z){ return !z.spent; }).length : null;
+  f.push(row('SMC zones', zones==null ? null : true,
+    zones!=null ? zones+' live' : (railTF==='H1'||railTF==='H4') ? 'none' : 'not built for '+railTF));
+  var pats = w.patterns || null;
+  var livePats = pats ? pats.filter(function(p){ var a = p.barsAgo!=null?p.barsAgo:p.bar_index; return a!=null && a<=2; }).length : 0;
+  f.push(row('Patterns', pats ? true : null, pats ? pats.length+' · '+livePats+' live' : 'none'));
+  var fm = w.formations;
+  var fmLive = fm ? fm.filter(function(x){ return x.completion != null && x.completion >= 0.5; }).length : 0;
+  f.push(row('Formations', fm ? true : null, fm ? fm.length+' · '+fmLive+' in play' : 'chart tab not open'));
+  f.push(row('Risk Radar', w.radar && w.radar.score!=null ? w.radar.score < 50 : null,
+    w.radar && w.radar.score!=null ? String(w.radar.score) : 'not open'));
+  // the retracement engine's score is not published by any module yet
+  f.push(row('Retracement', null, 'not published yet'));
+  var sess = w.session || {};
+  f.push(row('Liquidity', sess.cls ? (sess.cls==='healthy' ? true : (sess.cls==='thin'||sess.cls==='drought') ? false : null)
+      : (sess.depth!=null ? sess.depth >= 0.4 : null),
+    sess.cls ? String(sess.state||sess.cls)+(sess.score!=null?' '+sess.score:'')
+      : (sess.depth!=null ? Math.round(sess.depth*100)+'%' : 'not read')));
+  // calendar: only releases on THIS pair's two currencies
+  var ccy = currenciesOf(w.symbol);
+  var nextHigh = (w.news || []).filter(function(e){ return e.impact==='high' && e.minutesAway >= 0 &&
+      (!e.country || ccy.indexOf(String(e.country).toUpperCase()) >= 0); })
+    .sort(function(a,b){ return a.minutesAway - b.minutesAway; })[0];
+  f.push(row('Calendar, '+ccy.join('/'), nextHigh ? nextHigh.minutesAway > 60 : null,
+    nextHigh ? (nextHigh.minutesAway < 60 ? Math.round(nextHigh.minutesAway)+'m' : Math.floor(nextHigh.minutesAway/60)+'h '+Math.round(nextHigh.minutesAway%60)+'m') : 'none ahead'));
+  f.push(row('Spread baseline', w.medianSpread!=null ? true : null,
+    w.medianSpread!=null ? w.medianSpread.toFixed(1) : (w.sources ? w.sources.spreadSamples+'/20 samples' : '–')));
+  paint('feeds', f.join(''));
+  renderRailRest(ctx);
+}
+
+function renderRailRest(ctx){
+
+  // kept from the shipped rail: each open episode, with how long it has been true
+  var eps = (ctx.status && ctx.status.openEpisodes) || [];
+  paint('episodes', eps.length
+    ? eps.map(function(e){ return '<div class="frow"><span class="dot '+(e.severity==='high'?'r':'a')+'"></span>'+
+        '<span class="fn">'+esc(String(e.type).replace(/_/g,' '))+'</span><span class="fv">'+e.open_for_minutes+'m</span></div>'; }).join('')
+    : '<span class="dim">None open.</span>');
+
+  // ── its own record ─────────────────────────────────────────────
+  var rec = [];
+  var prog = ctx.progress, thisWeek = prog && prog.rows ? prog.rows[prog.rows.length-1] : null;
+  rec.push(row('This week', thisWeek && thisWeek.graded ? thisWeek.right/thisWeek.graded >= 0.5 : null,
+    thisWeek && thisWeek.graded ? thisWeek.right+' / '+thisWeek.graded+' right' : 'nothing graded yet'));
+  var cal = ctx.calibration && ctx.calibration.scoreVerdict;
+  rec.push(row('Calibration', cal ? (cal.key==='honest' ? true : cal.key==='inverted' ? false : null) : null,
+    cal ? ({ honest:'honest', inverted:'not honest yet', too_early:'too early' })[cal.key] : '–'));
+  var calls = ctx.calls && ctx.calls.calls || [];
+  rec.push(row('Calls today', calls.length ? true : null, String(calls.length)));
+  var unact = calls.filter(function(c){ return c.kind==='live' && c.action!=='hold' &&
+    (c.adherence==='ignored' || (!c.adherence && Date.parse(c.window_ends_at) > Date.now())); }).length;
+  rec.push(row('Unactioned', unact ? false : true, String(unact)));
+  paint('record', rec.join(''));
+
+  // ── Claude budget: the REAL balance, not an invented allowance ──
+  var cr = ctx.credits, b = [];
+  var dailyDone = ctx.daily && ctx.daily.report, weeklyDone = ctx.weekly && ctx.weekly.report;
+  b.push(row('Daily review', dailyDone ? true : null, dailyDone ? 'written today' : '1 a day · not yet'));
+  b.push(row('Weekly review', weeklyDone ? true : null, weeklyDone ? 'written this week' : '1 a week · not yet'));
+  b.push(row('Credits', cr ? (cr.unlimited || cr.balance > 0) : null,
+    !cr ? '–' : cr.unlimited ? 'unlimited' : '$'+Number(cr.balance).toFixed(2)+(cr.monthly?' of $'+Number(cr.monthly).toFixed(2):'')));
+  var auto = ctx.settings && ctx.settings.settings;
+  b.push(row('Automatic', auto ? !!(auto.auto_daily || auto.auto_weekly) : null,
+    !auto ? '–' : (auto.auto_daily && auto.auto_weekly ? 'daily + weekly' : auto.auto_daily ? 'daily' : auto.auto_weekly ? 'weekly' : 'off')));
+  paint('budget', b.join(''));
+
+  // ── the long record ────────────────────────────────────────────
+  var l = [];
+  var dirWord = prog && prog.verdict ? ({ better:'improving', worse:'slipping', flat:'flat', too_early:'too early' })[prog.verdict.key] : null;
+  l.push(row('History', prog ? true : null, prog ? prog.activeWeeks+' week'+(prog.activeWeeks===1?'':'s') : '–'));
+  l.push(row('Accounts', prog ? true : null, prog ? prog.accountCount+' · unbroken' : '–'));
+  l.push(row('Trades on file', prog ? true : null, prog ? String(prog.tradesOnFile) : '–'));
+  l.push(row('Direction', prog && prog.verdict ? (prog.verdict.key==='better' ? true : prog.verdict.key==='worse' ? false : null) : null,
+    dirWord || '–'));
+  paint('longrec', l.join(''));
+}
+
+/* ═══ HUNTING ═══════════════════════════════════════════════════════
+   Every watchlist pair judged by the same engine. Leads with the honest
+   verdict — usually "nothing here is worth taking" — because a module
+   that always has something to say trains the trader to ignore it. It
+   never raises a marginal setup to keep anyone busy. */
+var WORTH = 70;
+var selected = null, lastScan = [];
+
+function missingLine(j){
+  if(j.score==null) return (j.verdict && j.verdict.text) || 'Not enough data to judge.';
+  if(j.gatesFailed.length){
+    var g = j.conditions.find(function(c){ return c.id===j.gatesFailed[0]; });
+    return 'Missing '+g.label.toLowerCase()+'. '+g.detail;
+  }
+  var f = j.conditions.find(function(c){ return c.state==='fail'; })
+       || j.conditions.find(function(c){ return c.state==='warn'; });
+  return f ? f.label+': '+f.detail : 'Every readable condition agrees.';
+}
+
+function scanRow(r){
+  var j = r.j, sc = j.score;
+  var col = sc==null?'var(--line2)':sc>=WORTH?'var(--green)':sc>=45?'var(--amber)':'var(--red)';
+  return '<button class="scan'+(selected===r.sym?' sel':'')+'" data-sym="'+esc(r.sym)+'">'+
+    '<span class="p">'+esc(r.sym)+' <span class="dim xtiny">'+(j.direction==='bull'?'long':'short')+'</span></span>'+
+    '<span class="bar"><i style="width:'+(sc||0)+'%;background:'+col+'"></i></span>'+
+    '<span class="sc">'+(sc==null?'–':sc)+'</span>'+
+    '<span class="ms">'+esc(missingLine(j))+'</span></button>';
+}
+
+/* The Assistant's Pattern Alerts tab, beside the Pattern Detector's live
+   tab. Only the live tab was shown here, so a trigger that fired as an
+   alert was invisible while hunting. */
+function alertsWindow(r){
+  var a = (r.world && r.world.alerts) || [];
+  if(!a.length) return '<div class="disc" style="margin-top:10px">No pattern alerts on '+esc(r.sym)+' right now. '+
+    'Both the Pattern Detector\'s live tab and the Assistant\'s Pattern Alerts tab are read here.</div>';
+  var fresh = a.filter(function(x){ return x.barsAgo != null && x.barsAgo <= 2; });
+  return '<div style="margin-top:12px"><div class="ml" style="margin-bottom:6px">Pattern alerts '+
+      '<span class="badge '+(fresh.length?'ok':'')+'">'+a.length+' on this pair · '+fresh.length+' still fresh</span></div>'+
+    a.slice(0,6).map(function(x){
+      var dir = String(x.direction||'').toLowerCase();
+      return '<div class="frow"><span class="dot '+(x.barsAgo<=2?'g':'')+'"></span>'+
+        '<span class="fn">'+esc(x.name||'Pattern')+' <span class="dim">'+esc(x.timeframe||'')+' · '+
+          (dir.indexOf('bull')>=0?'long':dir.indexOf('bear')>=0?'short':esc(dir))+'</span></span>'+
+        '<span class="fv">'+(x.confidence!=null?x.confidence+'%':'')+' · '+
+          (x.barsAgo>=99?'old':x.barsAgo+' bar'+(x.barsAgo===1?'':'s')+' ago')+'</span></div>';
+    }).join('')+'</div>';
+}
+
+function candidateCard(r){
+  var j = r.j;
+  var head = j.score==null ? 'no score' : j.counts.pass+' pass · '+j.counts.warn+' warn · '+j.counts.fail+' fail'+
+    (j.counts.unknown? ' · '+j.counts.unknown+' unknown':'');
+  var rows = j.conditions.map(function(c,i){
+    return '<div class="pill '+c.state+'"><span class="mk">'+MK[c.state]+'</span>'+
+      '<div><div class="nm">'+(i+1)+' · '+esc(c.label)+'<span class="tier">'+c.tier+'</span></div>'+
+      '<div class="dt">'+esc(c.detail)+'</div></div><div class="src">'+esc(c.source||'')+'</div></div>';
+  }).join('');
+  var wait = j.waitingFor.filter(function(w){ return j.gatesFailed.indexOf(w.id)>=0; });
+  return '<div class="card"><div class="card-h"><h3>'+esc(r.sym)+' — '+
+      (j.direction==='bull'?'long':'short')+' case, all fourteen conditions</h3>'+
+      '<span class="sp badge '+(j.counts.fail?'warn':'ok')+'">'+head+'</span></div>'+
+    '<div class="card-b">'+
+      '<div style="margin-bottom:12px">'+scoreBlock(j)+'</div>'+
+      '<div class="grid14">'+rows+'</div>'+
+      alertsWindow(r)+
+      (wait.length ? '<div class="note" style="margin-top:12px"><b>What would make this worth taking:</b> '+
+        wait.map(function(w){ return esc(w.label.toLowerCase()); }).join(', ')+
+        '. Those are things to wait for, not things to predict.</div>' : '')+
+      (j.target && j.target.implied ? '<div class="disc" style="margin-top:10px">You have no take profit yet, so room to target and '+
+        'reachability are measured against an <b>implied</b> target — '+esc(j.target.why||'the nearest opposing zone')+
+        '. It is a yardstick, not a prediction, and it is replaced by your own target the moment you set one.</div>'
+        : '<div class="disc" style="margin-top:10px">Room to target and reachability need something to measure against. With no take '+
+          'profit and nothing to imply one from, they read unknown — Arbiter will not invent one.</div>')+
+    '</div></div>';
+}
+
+function sinceLastTrade(state){
+  var closed = (state && state.closedTrades) || [];
+  var last = closed.map(function(t){ return { t:+t.time||0, p:+t.profit||0, s:t.symbol }; })
+    .filter(function(x){ return x.t>0; }).sort(function(a,b){ return b.t-a.t; })[0];
+  if(!last) return '';
+  return '<div class="card"><div class="card-h"><h3>Since your last trade closed</h3></div><div class="card-b">'+
+    '<div class="kv"><span class="k">Flat for</span><span class="v">'+ago(Date.now()-last.t*1000)+'</span></div>'+
+    '<div class="kv"><span class="k">Last result</span><span class="v" style="color:'+(last.p>=0?'#4ade80':'#f87171')+'">'+
+      esc(last.s)+' '+(last.p>=0?'+':'')+last.p.toFixed(2)+'</span></div>'+
+    ledgerLines()+
+    '</div></div>';
+}
+
+function ledgerLines(){
+  var d = callsCache.data;
+  if(!d || !d.calls) return '<div class="disc" style="margin-top:10px">Counting today\'s calls…</div>';
+  var takes = d.calls.filter(function(c){ return c.kind==='take'; });
+  var followed = takes.filter(function(c){ return c.adherence==='followed'; }).length;
+  var tookSkips = d.calls.filter(function(c){ return c.kind==='skip' && c.adherence==='ignored'; });
+  return '<div class="kv"><span class="k">Setups Arbiter rated 70+ today</span><span class="v">'+takes.length+'</span></div>'+
+    '<div class="kv"><span class="k">You took</span><span class="v">'+followed+' of them</span></div>'+
+    '<div class="kv"><span class="k">You took instead</span><span class="v">'+(tookSkips.length
+      ? tookSkips.length+' rated '+tookSkips.map(function(c){ return c.score; }).join(' and ') : 'nothing below 70')+'</span></div>';
+}
+
+async function scan(shared){
+  var wl = (shared.state && shared.state.watchlist) || [];
+  var out = await Promise.all(wl.map(async function(w){
+    try{
+      var world = await F.buildWorld(w.symbol, 'H1', { shared: shared });
+      // direction is implied by structure; the trader's own record needs it,
+      // so judge once to learn it, attach the edge, then judge for real
+      var j0 = E.judgeSetup(world);
+      world.edge = F._internals.edgeFrom(world._journal, world.symbol, j0.direction, world._sessionName);
+      return { sym: world.symbol, world: world, j: E.judgeSetup(world, { direction: j0.direction }) };
+    }catch(e){ console.warn('[ARBITER] scan', w.symbol, e); return null; }
+  }));
+  out = out.filter(Boolean).sort(function(a,b){ return (b.j.score==null?-1:b.j.score) - (a.j.score==null?-1:a.j.score); });
+  lastScan = out;
+  return out;
+}
+
+function renderHunting(list, state, target){
+  if(!list.length){
+    paint(target, '<div class="card"><div class="card-b"><div class="empty"><div class="big">No watchlist yet.</div>'+
+      '<div class="sm">Arbiter scans the pairs your EA reports. None have arrived.</div></div></div></div>');
+    return;
+  }
+  var best = list[0];
+  if(!selected || !list.some(function(r){ return r.sym===selected; })) selected = best.sym;
+  var sel = list.find(function(r){ return r.sym===selected; });
+  var go = best.j.score!=null && best.j.score>=WORTH;
+  var headline = go
+    ? '<div class="verdict go"><div class="big">'+esc(best.sym)+' is worth a closer look.</div>'+
+      '<div class="sm">Score '+best.j.score+'. '+esc(best.j.verdict.text)+' The decision is still yours — this describes the evidence, it does not place anything.</div></div>'
+    : '<div class="verdict"><div class="big">Nothing here is worth taking right now.</div>'+
+      '<div class="sm">'+(best.j.score!=null
+        ? 'The closest is '+esc(best.sym)+' at '+best.j.score+'. '+esc(missingLine(best.j))
+        : 'Not enough is reaching Arbiter to judge any pair yet.')+
+      ' Blackwood will not raise a marginal setup to keep you busy.</div></div>';
+  var html = headline +
+    '<div class="card"><div class="card-h"><h3>What the scan sees</h3><span class="sp tiny dim">H1</span></div>'+
+      '<div class="card-b" style="display:flex;flex-direction:column;gap:7px">'+list.map(scanRow).join('')+'</div></div>'+
+    candidateCard(sel) + sinceLastTrade(state);
+  paint(target, html);
+  document.getElementById('ctHunt').textContent = list.filter(function(r){ return r.j.score!=null && r.j.score>=WORTH; }).length;
+}
+
+document.addEventListener('click', function(e){
+  var b = e.target.closest && e.target.closest('button.scan');
+  if(!b) return;
+  selected = b.getAttribute('data-sym');
+  focus.huntPicked = true;
+  if(lastRailCtx){ renderRail(lastRailCtx);
+    readTF(railSubject(), 'H4', lastRailCtx).then(function(){ renderRail(lastRailCtx); }); }
+  var st = window.__arbLastState || {};
+  ['main','hunt'].forEach(function(id){
+    if(document.getElementById(id).querySelector('button.scan')) renderHunting(lastScan, st, id);
+  });
+});
+
+document.addEventListener('click', function(e){
+  var b = e.target.closest && e.target.closest('[data-rtf]');
+  if(!b) return;
+  railTF = b.getAttribute('data-rtf');
+  if(!lastRailCtx) return;
+  renderRail(lastRailCtx);
+  var subj = railSubject();
+  if(subj && railTF !== 'H1' && !tfWorlds[subj.world.symbol + '|' + railTF])
+    readTF(subj, railTF, { state: lastRailCtx.state, status: lastRailCtx.status, journal: lastRailCtx.journal })
+      .then(function(){ renderRail(lastRailCtx); });
+});
+
+/* clicking a position card, or a pair in the rail's picker, focuses it */
+document.addEventListener('click', function(e){
+  var t = e.target.closest && (e.target.closest('[data-focus]') || e.target.closest('#main .card[data-ticket]'));
+  if(!t || (e.target.closest('button') && !e.target.closest('[data-focus]'))) return;
+  focus.position = t.getAttribute('data-focus') || t.getAttribute('data-ticket');
+  if(lastRailCtx){ renderRail(lastRailCtx);
+    readTF(railSubject(), 'H4', lastRailCtx).then(function(){ renderRail(lastRailCtx); }); }
+});
+document.getElementById('nav').addEventListener('click', function(){
+  // the page decides which pair the rail follows, so re-read it on every tab change
+  setTimeout(function(){ if(lastRailCtx) renderRail(lastRailCtx); }, 0);
+});
+document.getElementById('nav').addEventListener('click', function(e){
+  var t = e.target.closest('.nav-tab'); if(!t || t.disabled) return;
+  Array.prototype.forEach.call(document.querySelectorAll('.nav-tab'), function(b){ b.classList.toggle('active', b===t); });
+  var p = t.getAttribute('data-p');
+  Array.prototype.forEach.call(document.querySelectorAll('.page'), function(s){ s.classList.toggle('on', s.id==='p-'+p); });
+});
+
+/* ═══ THE LEDGER ═════════════════════════════════════════════════════
+   The page PROPOSES calls. The server decides what is recorded: it stamps
+   the price and ATR itself, refuses duplicates, and grades everything on
+   the EA heartbeat — so outcomes are judged even with this tab closed.
+   Calls are only MADE while Arbiter is open somewhere; that is the one
+   limit of doing the judging in the browser. */
+var proposed = {};                 // key -> ms until which we will not re-post
+var liveShown = {};                // ticket -> the action last shown
+var callsCache = { at: 0, data: null };
+var WINDOW_MS = 20 * 60 * 1000;
+
+function withSource(url){
+  var src = window.bwActiveSource && window.bwActiveSource();
+  return src ? url + (url.indexOf('?')<0?'?':'&') + 'source=' + encodeURIComponent(src) : url;
+}
+function snapshotOf(j){
+  return { score: j.score, rawScore: j.rawScore, gatesFailed: j.gatesFailed,
+    verdict: j.verdict && j.verdict.key,
+    conditions: j.conditions.map(function(c){ return { id:c.id, state:c.state, detail:c.detail, source:c.source }; }) };
+}
+async function propose(key, body){
+  if(proposed[key] && proposed[key] > Date.now()) return;
+  proposed[key] = Date.now() + WINDOW_MS;
+  try{
+    var r = await fetch(withSource('/api/arbiter/call'), { method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    var out = r.ok ? await r.json() : null;
+    // a refusal for want of data should not lock the pair out for 20 min
+    if(!r.ok) proposed[key] = Date.now() + 60000;
+    if(out && out.ok && !out.duplicate) callsCache.at = 0;
+  }catch(e){ proposed[key] = Date.now() + 60000; }
+}
+/* Assan's rules: a TAKE at 70+; a SKIP only for a real setup — every gate
+   passing but under 70. A gate failure is "not a setup" and is never
+   graded, so it is never proposed. */
+function proposeFromScan(list){
+  list.forEach(function(r){
+    var j = r.j;
+    if(j.score == null) return;
+    var kind = j.score >= WORTH ? 'take' : (!j.gatesFailed.length ? 'skip' : null);
+    if(!kind) return;
+    propose(kind+':'+r.sym+':'+j.direction, { kind:kind, symbol:r.world.rawSymbol || r.sym,
+      direction:j.direction, score:j.score, rawScore:j.rawScore, snapshot:snapshotOf(j) });
+  });
+}
+/* Live calls: recorded whenever the SHOWN action changes, and at first sight
+   if it is anything other than hold. Hold at entry is the default, not a call. */
+function proposeLive(key, res){
+  var a = res.judgement.settled.action.key, prev = liveShown[key];
+  liveShown[key] = a;
+  if(prev === a) return;
+  if(prev === undefined && a === 'hold') return;
+  var p = res.position;
+  propose('live:'+key+':'+a, { kind:'live', symbol:p.rawSymbol || p.symbol, direction:res.judgement.direction,
+    ticket:p.ticket, action:a, score:res.judgement.settled.action.pressure,
+    snapshot:{ volume:p.volume, openPrice:p.openPrice, sl:p.sl,
+               pillars:res.judgement.pillars.map(function(x){ return { id:x.id, now:x.now, change:x.change }; }),
+               pressure:res.judgement.pressure, impliedTarget:!!(res.judgement.target&&res.judgement.target.implied) } });
+}
+
+var BOX = { good:['Right, you followed','ok'], expensive:['Right, you ignored it','warn'],
+            ours:['Wrong, you followed','bad'], luck:['Wrong, you ignored it','info'] };
+/* A live call is never "right" or "wrong" — Arbiter cannot know the future.
+   Once its trade has closed, what FOLLOWING it was worth is measured in R
+   (server-stamped price at the call vs how the trade finished). */
+function fmtR(x){ return (x>0?'+':x<0?'−':'')+Math.abs(x).toFixed(2).replace(/\.?0+$/,'')+'R'; }
+function liveGrade(c){
+  var w = c.worth || { state: 'open' };
+  var p = c.score!=null ? '<span class="dim">pressure '+c.score+'</span>' : '';
+  if(w.state === 'open' || w.state === 'n/a') return p+'<span class="dim">graded when the trade closes</span>';
+  if(w.state === 'no_stop') return p+'<span class="dim">no stop on the trade — cannot be measured in R</span>';
+  var v = w.worthR, followed = c.adherence === 'followed';
+  var txt = v === 0 ? 'following it made no difference'
+    : followed ? (v > 0 ? 'you followed — it was worth '+fmtR(v) : 'you followed — it cost '+fmtR(v))
+    : (v > 0 ? 'you held on — following would have been worth '+fmtR(v) : 'you held on — following would have cost '+fmtR(v));
+  return p+'<span class="badge '+(v>0?'ok':v<0?'bad':'')+'">'+esc(txt)+'</span>';
+}
+
+var ADH = { followed:'ok', ignored:'warn', deviated:'bad', not_traded:'' };
+var ADH_WORD = { followed:'followed', ignored:'ignored', deviated:'deviated',
+                 not_traded:'you did not trade this pair — not counted in the grid' };
+function callRow(c){
+  var t = new Date(c.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  var said = c.kind==='take' ? 'Rated the '+(c.direction==='bull'?'long':'short')+' setup '+c.score+' — worth taking.'
+    : c.kind==='skip' ? 'Rated the '+(c.direction==='bull'?'long':'short')+' setup '+c.score+' — a real setup, but not worth it.'
+    : 'On your position #'+c.ticket+': '+String(c.action||'').toUpperCase().replace('BE','MOVE TO BREAK-EVEN')+'.';
+  var windowOpen = !c.adherence && Date.parse(c.window_ends_at) > Date.now();
+  var did = c.adherence
+    ? '<span class="badge '+(ADH[c.adherence]||'')+'">'+esc(ADH_WORD[c.adherence]||c.adherence)+'</span>'+
+      (c.matched_ticket?'<span class="dim">#'+esc(c.matched_ticket)+'</span>':'')
+    : windowOpen ? '<span class="badge info">window open · '+Math.max(0,Math.round((Date.parse(c.window_ends_at)-Date.now())/60000))+'m left</span>'
+    : '<span class="badge">deciding</span>';
+  var out = c.kind==='live' ? liveGrade(c)
+    : c.outcome ? '<span class="badge '+(c.outcome==='ran'?'ok':c.outcome==='failed'?'bad':'')+'">'+c.outcome+'</span>'
+    : '<span class="dim">outcome by '+new Date(c.horizon_ends_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})+'</span>';
+  var box = c.box ? '<span class="badge '+BOX[c.box][1]+'">'+BOX[c.box][0]+'</span>'
+    : (c.adherence==='not_traded' && c.correct!=null) ? '<span class="dim">Arbiter was '+(c.correct?'right':'wrong')+'</span>' : '';
+  return '<div class="lrow '+(c.box||(c.resolved_at?'':'open'))+'"><div class="lt">'+t+' · '+esc(c.symbol)+' · '+c.kind+'</div>'+
+    '<div class="lsaid">'+esc(said)+'</div><div class="ldid">'+did+out+box+'</div></div>';
+}
+/* The prototype's second view: every call as one line — what it said, what
+   you did, whether Arbiter was right, and where it landed. Built from the
+   stored calls only. Live calls are never graded right/wrong (the pressure
+   design), and a gate failure is never a call, so neither is invented here. */
+function scoreTable(calls){
+  var said = function(c){
+    if(c.kind==='take') return 'Take it';
+    if(c.kind==='skip') return 'Skip it';
+    return ({ hold:'Hold', be:'Move to break-even', partial:'Take partial', cut:'Cut' })[c.action] || String(c.action||'');
+  };
+  var you = function(c){
+    if(!c.adherence) return Date.parse(c.window_ends_at) > Date.now() ? '<span class="badge info">deciding</span>' : '<span class="dim">–</span>';
+    return ({ followed:'<span class="badge ok">Followed</span>', ignored:'<span class="badge warn">Ignored</span>',
+      deviated:'<span class="badge bad">Deviated</span>', not_traded:'<span class="dim">Not traded</span>' })[c.adherence] || esc(c.adherence);
+  };
+  var outcome = function(c){
+    if(c.kind==='live'){
+      var w = c.worth || { state: 'open' };
+      if(w.state === 'graded') return '<span class="badge '+(w.worthR>0?'ok':w.worthR<0?'bad':'')+'">'+fmtR(w.worthR)+'</span>';
+      return '<span class="dim">'+(w.state==='no_stop' ? 'no stop' : 'trade open')+'</span>';
+    }
+    if(c.outcome==='unclear') return '<span class="dim">unclear</span>';
+    if(c.correct===true)  return '<span class="badge ok">Right</span>';
+    if(c.correct===false) return '<span class="badge bad">Wrong</span>';
+    return '<span class="badge">Open</span>';
+  };
+  // named exactly as the grid above names its four boxes
+  var GRID = { good:'Blackwood right, you followed', expensive:'Blackwood right, you ignored',
+               ours:'Blackwood wrong, you followed', luck:'Blackwood wrong, you ignored' };
+  var box = function(c){
+    if(c.box) return esc(GRID[c.box] || c.box);
+    if(c.adherence==='not_traded') return '<span class="dim">not counted</span>';
+    return '<span class="dim">–</span>';
+  };
+  var rows = calls.slice().sort(function(a,b){ return Date.parse(a.created_at) - Date.parse(b.created_at); }).map(function(c){
+    return '<tr><td class="n">'+new Date(c.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})+'</td>'+
+      '<td>'+esc(c.symbol)+'</td><td>'+esc(said(c))+'</td>'+
+      '<td class="n">'+(c.score==null?'–':c.score)+'</td><td>'+you(c)+'</td><td>'+outcome(c)+'</td><td>'+box(c)+'</td></tr>';
+  }).join('');
+  return '<div class="card"><div class="card-h"><h3>How the calls scored</h3></div><div class="card-b">'+
+    '<div class="tbl-wrap"><table class="days" style="min-width:680px"><thead><tr>'+
+      '<th style="width:64px">Time</th><th style="width:84px">Pair</th><th style="width:150px">What it said</th>'+
+      '<th style="width:62px">Score</th><th style="width:104px">You</th><th style="width:90px">Outcome</th><th>Box</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="disc" style="margin-top:12px">Every row stores the full input snapshot from the moment the call was made. '+
+      'Nothing in this table is re-derived later, so it cannot be quietly improved by hindsight. A live call — hold, break-even, '+
+      'partial, cut — is never marked right or wrong; once its trade closes, its outcome is what following it was worth in R, '+
+      'measured from the price at the moment of the call. Positive means following was better.</div>'+
+    '</div></div>';
+}
+
+/* the same second grid, built from the calls Today's calls already has */
+function untradedGrid(calls){
+  var u = calls.filter(function(c){ return c.kind !== 'live' && c.adherence === 'not_traded'; });
+  if(!u.length) return '';
+  var g = u.filter(function(c){ return c.correct != null; });
+  return untradedCard({ calls: { untraded: {
+    takeRight: g.filter(function(c){ return c.kind==='take' && c.correct; }).length,
+    takeWrong: g.filter(function(c){ return c.kind==='take' && !c.correct; }).length,
+    skipRight: g.filter(function(c){ return c.kind==='skip' && c.correct; }).length,
+    skipWrong: g.filter(function(c){ return c.kind==='skip' && !c.correct; }).length,
+    total: u.length } } });
+}
+
+function renderCalls(d){
+  if(!d || !d.calls){ return; }
+  var q = d.quad || {};
+  var n = d.calls.length;
+  document.getElementById('ctCalls').textContent = n;
+  var graded = (q.good||0)+(q.expensive||0)+(q.ours||0)+(q.luck||0);
+  var untraded = d.calls.filter(function(c){ return c.adherence==='not_traded'; }).length;
+  var liveG = d.calls.filter(function(c){ return c.kind==='live' && c.worth && c.worth.state==='graded'; });
+  var liveSum = liveG.reduce(function(a,c){ return a + c.worth.worthR; }, 0);
+  var quad = '<div class="card"><div class="card-h"><h3>Is it you, or is it Blackwood?</h3>'+
+    '<span class="sp badge info">'+graded+' on pairs you traded · '+d.pending+' still running</span></div><div class="card-b">'+
+    '<div class="quad">'+
+      '<div class="q good"><div class="qn">'+(q.good||0)+'</div><div class="qt">Blackwood right, you followed</div><div class="qd">The system working as intended.</div></div>'+
+      '<div class="q expensive"><div class="qn">'+(q.expensive||0)+'</div><div class="qt">Blackwood right, you ignored</div><div class="qd">The expensive box — avoidable without changing the software.</div></div>'+
+      '<div class="q ours"><div class="qn">'+(q.ours||0)+'</div><div class="qt">Blackwood wrong, you followed</div><div class="qd">Our problem. This box has to stay small.</div></div>'+
+      '<div class="q luck"><div class="qn">'+(q.luck||0)+'</div><div class="qt">Blackwood wrong, you ignored</div><div class="qd">Luck — recorded, never credited.</div></div>'+
+    '</div>'+
+    '<div class="disc" style="margin-top:12px">Only calls on pairs you actually traded are counted here — which pairs you trade is your choice. '+
+      'That includes Arbiter\'s advice on your open positions: once a trade closes, each hold, break-even, partial or cut call is boxed by '+
+      'whether following it was worth something or would have cost you. '+
+      'Everything Arbiter suggested is still listed below, and whether it was right on the pairs you left alone counts toward its own accuracy '+
+      'in "Is it honest?".'+(untraded ? ' '+untraded+' call'+(untraded===1?' was':'s were')+' on pairs you did not trade.' : '')+'</div>'+
+    (liveG.length ? '<div class="note" style="margin-top:10px"><b>Live advice today:</b> '+liveG.length+' call'+(liveG.length===1?'':'s')+
+      ' on trades that have closed. Following all of it would have been worth '+fmtR(Math.round(liveSum*100)/100)+' in total.</div>' : '')+
+    (graded < 10 ? '<div class="disc" style="margin-top:8px">'+graded+' graded call'+(graded===1?'':'s')+
+      ' is not enough to say anything about you or about Blackwood. The grid starts meaning something once it has dozens.</div>' : '')+
+    '</div></div>';
+  var list = n ? '<div class="card"><div class="card-h"><h3>Everything Arbiter said today</h3></div><div class="card-b"><div class="led">'+
+      d.calls.map(callRow).join('')+'</div>'+
+      '<div class="disc" style="margin-top:12px">Every call stores what Arbiter saw at that moment. Nothing here is re-derived later, '+
+      'so it cannot be quietly improved by hindsight. A call is graded by whether price moved one ATR its way before one ATR against, within four hours.</div></div></div>'
+    : '<div class="card"><div class="card-b"><div class="empty"><div class="big">No calls yet today.</div>'+
+      '<div class="sm">Arbiter records a call when a setup reaches 70, or when a real setup falls short. Most of the time the right number of calls is small.</div></div></div></div>';
+  paint('calls', quad + untradedGrid(d.calls) + list + (n ? scoreTable(d.calls) : ''));
+}
+async function loadCalls(){
+  if(callsCache.data && Date.now() - callsCache.at < 60000) return callsCache.data;
+  var d = await fetch('/api/arbiter/calls?days=1',{credentials:'same-origin',cache:'no-store'})
+    .then(function(r){ return r.ok? r.json():null; }).catch(function(){ return null; });
+  if(d) callsCache = { at: Date.now(), data: d };
+  return d;
+}
+
+/* ═══ HABITS ═════════════════════════════════════════════════════════
+   Trade Errors, as HOW you traded rather than WHAT you traded. Every row
+   is measured against the trader's own last 20 days, never an absolute
+   standard, and nothing is called a habit until it recurs. */
+var habitsCache = { at: 0, data: null };
+async function loadHabits(){
+  if(habitsCache.data && Date.now() - habitsCache.at < 60000) return habitsCache.data;
+  var d = await fetch('/api/arbiter/habits',{credentials:'same-origin',cache:'no-store'})
+    .then(function(r){ return r.ok? r.json():null; }).catch(function(){ return null; });
+  if(d) habitsCache = { at: Date.now(), data: d };
+  return d;
+}
+function mins(m){ m = Math.round(m||0); return m<60 ? m+'m' : Math.floor(m/60)+'h '+(m%60)+'m'; }
+var TREND = { worse:'worse than your usual', better:'better than your usual', usual:'about your usual',
+              clean:'clean — and usually is', too_early:'too early to compare' };
+
+function habitRow(h){
+  var t = h.today, b = h.baseline;
+  var parts = [];
+  if(t.count){
+    parts.push(h.counted ? t.count+' today'
+      : t.count+' today, '+mins(t.minutes)+' in total, longest '+mins(t.longest)+
+        (t.fixed? ', '+t.fixed+' put right':'')+(t.open? ', '+t.open+' still open':''));
+    var w = h.worstToday && h.worstToday.context && h.worstToday.context.first;
+    if(w && w.detail) parts.push(w.detail);
+  } else parts.push('None today.');
+  if(b) parts.push('Your usual: '+(h.counted ? b.perDay+' a day' : mins(b.minutesPerDay)+' a day')+
+    ' over the last '+b.days+' days.');
+  var L = h.worstToday && h.worstToday.context ? h.worstToday.context.link : null;
+  if(L){
+    if(L.riskX && L.riskX >= 1.5)
+      parts.push('That position risked '+L.riskPct+'% — '+L.riskX+'x your median of '+L.medianRiskPct+'%'+
+        (L.volume!=null ? ' ('+L.volume+' lots against your usual '+L.medianLots+')' : '')+'.');
+    if(h.type==='revenge' && L.call)
+      parts.push('Arbiter had rated that setup '+L.call.score+'.');
+    if(L.resultPips!=null || L.resultPL!=null)
+      parts.push('It closed '+(L.resultPips!=null ? (L.resultPips>=0?'+':'')+L.resultPips+' pips' : '')+
+        (L.resultPL!=null ? (L.resultPips!=null?' (':'')+(L.resultPL>=0?'+':'')+L.resultPL.toFixed(2)+(L.resultPips!=null?')':'') : '')+'.');
+  }
+  if(h.meanFixMinutes!=null && h.type==='no_sl')
+    parts.push('When you do put a stop on, it takes you '+mins(h.meanFixMinutes)+' on average.');
+  var big = h.counted ? t.count : mins(t.minutes);
+  var sub = h.counted ? 'today' : 'exposed today';
+  return '<div class="hab"><div>'+
+    '<div class="hn">'+esc(h.label)+
+      (h.habit?'<span class="badge bad">a habit — '+h.last7.count+' times on '+h.last7.days+' days this week</span>':'')+
+      '<span class="trend '+h.trend+'">'+TREND[h.trend]+'</span></div>'+
+    '<div class="hd">'+esc(parts.join(' '))+'</div></div>'+
+    '<div class="hr"><div class="hv">'+big+'</div><div class="hs">'+sub+'</div></div></div>';
+}
+function renderHabits(d){
+  if(!d || !d.types) return;
+  var today = d.types.filter(function(h){ return h.today.count; });
+  /* A clean day on something you USUALLY do is the most worth saying —
+     including (especially) one that is a habit this week. So a clean habit
+     goes under "did well", not under "habits". */
+  var good = d.types.filter(function(h){ return d.goodToday.indexOf(h.type)>=0; });
+  var habitsOnly = d.types.filter(function(h){ return !h.today.count && h.habit && d.goodToday.indexOf(h.type)<0; });
+  document.getElementById('ctHabits').textContent = today.length;
+  var head = '<div class="card"><div class="card-h"><h3>How you traded, not what you traded</h3>'+
+    '<span class="sp badge '+(today.length?'warn':'ok')+'">'+(today.length? today.length+' raised today':'clean so far')+'</span></div>'+
+    '<div class="card-b">'+
+    (d.tooEarly ? '<div class="note" style="margin-bottom:12px"><b>Too early to compare.</b> Arbiter has '+d.historyDays+
+      ' day'+(d.historyDays===1?'':'s')+' of your history. It needs 5 before it will say anything is better or worse than your usual, '+
+      'so a first bad day is not read as a trend.</div>' : '')+
+    (today.length ? today.map(habitRow).join('') :
+      '<div class="tiny muted">Nothing the Trade Errors tab watches for has happened today.</div>')+
+    '</div></div>';
+  var hab = habitsOnly.length ? '<div class="card"><div class="card-h"><h3>Habits, even on a quiet day</h3></div><div class="card-b">'+
+    habitsOnly.map(habitRow).join('')+'</div></div>' : '';
+  var gd = good.length ? '<div class="card"><div class="card-h"><h3>What you did well today</h3></div><div class="card-b">'+
+    good.map(function(h){ return '<div class="hab"><div><div class="hn">'+esc(h.label)+
+      '<span class="trend clean">clean today</span></div><div class="hd">'+
+      (h.habit ? 'This is normally a habit for you — '+h.last7.count+' times this week. ' : '')+'You usually have '+
+      (h.counted? h.baseline.perDay+' a day' : mins(h.baseline.minutesPerDay)+' of this a day')+
+      '. Not today.</div></div><div class="hr"><div class="hv">0</div><div class="hs">today</div></div></div>'; }).join('')+
+    '</div></div>' : '';
+  var foot = '<div class="disc">One episode is an episode. Arbiter only calls something a habit when it comes back — '+
+    'three or more times, on at least two different days, in a week. Durations stop at the last moment the condition was '+
+    'actually seen, so an EA that went offline cannot inflate them.</div>';
+  paint('habits', head + hab + gd + foot);
+}
+
+/* On a live card: a habit that is open on THIS trade right now. */
+function habitFlag(p, status){
+  var eps = ((status && status.openEpisodes) || []).filter(function(e){ return String(e.ticket) === String(p.ticket); });
+  if(!eps.length) return '';
+  return eps.map(function(e){
+    return '<div class="habflag"><div><b>'+esc(({no_sl:'No stop loss',oversize:'Oversized position',
+      revenge:'Revenge entry',cooldown_breach:'Entered inside the 30-minute cooldown',own_rule:'Over your own risk rule'})[e.type]
+      || e.type.replace(/_/g,' '))+'</b> on this trade — open for '+mins(e.open_for_minutes)+'. Recorded as a habit episode.</div></div>';
+  }).join('');
+}
+
+/* ═══ REPORTS ════════════════════════════════════════════════════════
+   The numbers are free and always shown. Only the WRITTEN review costs,
+   and only when the trader asks: once per day, once per week, and asking
+   again returns the stored one without a second charge. */
+var reportCache = { daily: { at: 0, data: null }, weekly: { at: 0, data: null } };
+async function loadReport(kind){
+  var c = reportCache[kind];
+  if(c.data && Date.now() - c.at < 60000) return c.data;
+  var d = await fetch('/api/arbiter/report/'+kind,{credentials:'same-origin',cache:'no-store'})
+    .then(function(r){ return r.ok? r.json():null; }).catch(function(){ return null; });
+  if(d) reportCache[kind] = { at: Date.now(), data: d };
+  return d;
+}
+
+/* Claude's text, rendered SAFELY: everything is escaped first, then only
+   headings, bullets and paragraphs are rebuilt. A report can never inject
+   markup into the dashboard. */
+function mdSafe(md){
+  var out = [], list = null;
+  String(md||'').split(/\n/).forEach(function(raw){
+    var line = raw.trim();
+    if(/^#{1,4}\s+/.test(line)){ if(list){ out.push('<ul>'+list.join('')+'</ul>'); list=null; }
+      out.push('<h4>'+esc(line.replace(/^#{1,4}\s+/,''))+'</h4>'); return; }
+    if(/^[-*]\s+/.test(line)){ (list = list || []).push('<li>'+esc(line.replace(/^[-*]\s+/,''))+'</li>'); return; }
+    if(list){ out.push('<ul>'+list.join('')+'</ul>'); list=null; }
+    if(line) out.push('<p>'+esc(line)+'</p>');
+  });
+  if(list) out.push('<ul>'+list.join('')+'</ul>');
+  return out.join('');
+}
+function money(x){ return x==null ? '–' : (x<0?'-':'+')+Math.abs(x).toFixed(2); }
+
+/* The pairs the trader left alone: there is no "you" to judge, so it is
+   what Arbiter SAID against what the market DID. Kept apart from the grid
+   above on purpose — which pairs to trade is the trader's choice. */
+function untradedCard(f){
+  var u = f.calls.untraded;
+  if(!u || !u.total) return '';
+  var graded = u.takeRight + u.takeWrong + u.skipRight + u.skipWrong;
+  var cell = function(n, t, d, good){ return '<div class="q '+(good?'good':'ours')+'"><div class="qn">'+n+'</div>'+
+    '<div class="qt">'+esc(t)+'</div><div class="qd">'+esc(d)+'</div></div>'; };
+  return '<div class="card"><div class="card-h"><h3>On the pairs you did not trade</h3>'+
+      '<span class="sp badge">'+u.total+' call'+(u.total===1?'':'s')+' · '+graded+' graded</span></div><div class="card-b">'+
+    '<div class="quad">'+
+      cell(u.takeRight, 'Said take it — it ran', 'Arbiter was right about a setup you left alone.', true)+
+      cell(u.takeWrong, 'Said take it — it did not', 'Arbiter was wrong; leaving it alone cost you nothing.', false)+
+      cell(u.skipRight, 'Said skip it — it did not run', 'Arbiter was right to pass.', true)+
+      cell(u.skipWrong, 'Said skip it — it ran', 'Arbiter was wrong; the move was there.', false)+
+    '</div>'+
+    '<div class="disc" style="margin-top:12px">Nothing here is about you — you never traded these pairs, and which pairs you trade is your '+
+      'choice. It is Arbiter answering for itself, and it counts toward its accuracy in "Is it honest?".'+
+      (graded < u.total ? ' '+(u.total-graded)+' still running.' : '')+'</div>'+
+    '</div></div>';
+}
+
+function quadCard(f, title){
+  var q = f.calls.quad, mp = f.quadPL || null;
+  // money(): keeps the sign. Without it a -388 loss printed as "388.00" — a loss shown as a gain.
+  var cash = function(k, note){ return mp ? '<div class="qd">'+money(mp[k])+'. '+esc(note)+'</div>' : ''; };
+  return '<div class="card"><div class="card-h"><h3>'+esc(title)+'</h3>'+
+    '<span class="sp badge info">'+f.calls.graded+' graded · '+f.calls.stillRunning+' still running</span></div><div class="card-b">'+
+    '<div class="quad">'+
+      '<div class="q good"><div class="qn">'+q.good+'</div><div class="qt">Blackwood right, you followed</div>'+
+        cash('good','The system working as intended.')+'</div>'+
+      '<div class="q expensive"><div class="qn">'+q.expensive+'</div><div class="qt">Blackwood right, you ignored</div>'+
+        cash('expensive','The expensive box — avoidable without changing anything about the software.')+'</div>'+
+      '<div class="q ours"><div class="qn">'+q.ours+'</div><div class="qt">Blackwood wrong, you followed</div>'+
+        cash('ours','Our problem, and the box that has to stay small.')+'</div>'+
+      '<div class="q luck"><div class="qn">'+q.luck+'</div><div class="qt">Blackwood wrong, you ignored</div>'+
+        cash('luck','Recorded, never credited.')+'</div>'+
+    '</div>'+
+    (f.quadPL ? weekAnswer(f) : '')+
+    (f.sampleTooSmall ? '<div class="disc" style="margin-top:12px">'+f.calls.graded+' graded call'+(f.calls.graded===1?'':'s')+
+      ' is not enough to say anything about you or about Blackwood yet.</div>' : '')+
+    '</div></div>';
+}
+function numbersCard(f){
+  var t = f.trades, c = f.calls;
+  return '<div class="card"><div class="card-h"><h3>The numbers</h3></div><div class="card-b"><div class="split"><div>'+
+    '<div class="kv"><span class="k">Calls made</span><span class="v">'+c.total+'</span></div>'+
+    '<div class="kv"><span class="k">Trades closed</span><span class="v">'+t.closed+'</span></div>'+
+    '<div class="kv"><span class="k">Net P/L</span><span class="v" style="color:'+(t.netPL>=0?'#4ade80':'#f87171')+'">'+money(t.netPL)+'</span></div>'+
+    '<div class="kv"><span class="k">Live calls acted on</span><span class="v">'+c.liveFollowed+' of '+(c.liveFollowed+c.liveIgnored)+'</span></div>'+
+    (c.liveGraded ? '<div class="kv"><span class="k">Following all live advice was worth</span><span class="v" style="color:'+
+      (c.liveWorthR>=0?'#4ade80':'#f87171')+'">'+fmtR(c.liveWorthR)+' <span class="dim">('+c.liveGraded+' on closed trades)</span></span></div>' : '')+
+    '</div><div>'+
+    '<div class="kv"><span class="k">P/L on calls you followed</span><span class="v" style="color:'+(t.plOnFollowed>=0?'#4ade80':'#f87171')+'">'+money(t.plOnFollowed)+'</span></div>'+
+    '<div class="kv"><span class="k">P/L where you went your own way</span><span class="v" style="color:'+(t.plOnIgnored>=0?'#4ade80':'#f87171')+'">'+money(t.plOnIgnored)+'</span></div>'+
+    '<div class="kv"><span class="k">Average score of what you took</span><span class="v">'+(c.avgScoreTaken==null?'–':c.avgScoreTaken)+'</span></div>'+
+    '<div class="kv"><span class="k">Average score of what you passed on</span><span class="v">'+(c.avgScoreSkipped==null?'–':c.avgScoreSkipped)+'</span></div>'+
+    '</div></div>'+
+    (c.excludedUnclear ? '<div class="disc" style="margin-top:10px">'+c.excludedUnclear+' call'+(c.excludedUnclear===1?' was':'s were')+
+      ' unclear — both levels hit inside one candle — and '+(c.excludedUnclear===1?'is':'are')+' left out, not guessed.</div>' : '')+
+    '</div></div>';
+}
+/* ═══ THE DAY, as the prototype laid it out ═══════════════════════════
+   Every figure comes from the server's facts. The day is a UTC day, so it
+   closes at 00:00 UTC — the prototype's "Closed 16:00 UTC" was an example
+   and is not reproduced. */
+function pct(a, b){ return b ? Math.round(a / b * 100) + '%' : '–'; }
+function dayOneLine(f){
+  /* Written by RULES, not by Claude — free, always there, and each clause only
+     appears when the numbers actually support it. */
+  var c = f.calls, t = f.trades, parts = [];
+  if(t.plOnFollowed || t.plOnIgnored){
+    if(t.plOnFollowed > 0 && t.plOnIgnored < 0)
+      parts.push(Math.abs(t.plOnIgnored) > t.plOnFollowed ? 'your following trades made money, your overriding trades lost more'
+                                                          : 'your following trades made money, and your overriding trades lost less than that');
+    else if(t.plOnFollowed < 0 && t.plOnIgnored > 0) parts.push('the trades where you went your own way did better than the ones you followed');
+    else if(t.plOnFollowed > 0) parts.push('your following trades made money');
+    else if(t.plOnIgnored < 0) parts.push('your overriding trades lost money');
+  }
+  if(c.avgScoreTaken != null && c.avgScoreSkipped != null && c.avgScoreSkipped - c.avgScoreTaken >= 5)
+    parts.push('the average setup you passed on (' + c.avgScoreSkipped + ') was better than the average one you took (' + c.avgScoreTaken + ')');
+  else if(c.avgScoreTaken != null && c.avgScoreSkipped != null && c.avgScoreTaken - c.avgScoreSkipped >= 5)
+    parts.push('you took better setups (' + c.avgScoreTaken + ') than the ones you passed on (' + c.avgScoreSkipped + ')');
+  if(f.habits.unprotectedMinutes >= 5) parts.push('money sat without a stop for ' + mins(f.habits.unprotectedMinutes));
+  if(c.unactionedWarnings) parts.push(c.unactionedWarnings + ' warning' + (c.unactionedWarnings === 1 ? ' was' : 's were') + ' not acted on');
+  if(!parts.length) return c.total || t.closed ? 'Nothing in today\'s numbers stands out either way.' : 'Nothing has happened yet today.';
+  var line = parts.join(', and ').replace(/, and ([^,]*)$/, ', and $1');
+  return line.charAt(0).toUpperCase() + line.slice(1) + '.';
+}
+function dayCard(d){
+  var f = d.facts, c = f.calls, t = f.trades, h = f.habits;
+  var date = new Date(d.period + 'T12:00:00Z');
+  var today = new Date().toISOString().slice(0,10) === d.period;
+  var title = date.toLocaleDateString([], { weekday:'long', day:'numeric', month:'long' });
+  var kv = function(k, v, col){ return '<div class="kv"><span class="k">'+esc(k)+'</span><span class="v"'+(col?' style="color:'+col+'"':'')+'>'+v+'</span></div>'; };
+  var green = '#4ade80', red = '#f87171';
+  return '<div class="card"><div class="card-h"><h3>'+esc(title)+'</h3>'+
+      '<span class="sp badge '+(today?'info':'')+'">'+(today ? 'In progress · closes '+localAt(0,0)+' your time' : 'Closed')+'</span></div>'+
+    '<div class="card-b"><div class="split"><div>'+
+      kv('Calls made', c.total)+
+      kv('Resolved', c.total - c.stillRunning)+
+      kv('Blackwood was right', c.blackwoodGraded ? c.blackwoodRight+' of '+c.blackwoodGraded+' · '+pct(c.blackwoodRight, c.blackwoodGraded) : 'nothing graded yet')+
+      kv('You followed', c.youActedOn ? c.youFollowed+' of '+c.youActedOn+' · '+pct(c.youFollowed, c.youActedOn) : 'no calls on pairs you traded yet')+
+      kv('Trades closed', t.closed)+
+      kv('Day P/L', t.closed ? money(t.netPL) : '–', t.closed ? (t.netPL >= 0 ? green : red) : null)+
+    '</div><div>'+
+      kv('P/L on trades you followed', money(t.plOnFollowed), t.plOnFollowed >= 0 ? green : red)+
+      kv('P/L on trades you overrode', money(t.plOnIgnored), t.plOnIgnored >= 0 ? green : red)+
+      kv('Average score of what you took', c.avgScoreTaken == null ? '–' : c.avgScoreTaken)+
+      kv('Average score of what you passed on', c.avgScoreSkipped == null ? '–' : c.avgScoreSkipped)+
+      kv('Unactioned warnings', c.unactionedWarnings, c.unactionedWarnings ? '#fbbf24' : null)+
+      kv('Trade errors raised', h.totalRaised ? h.totalRaised+' · '+h.totalFixed+' fixed'+(h.totalOpen ? ', '+h.totalOpen+' still open' : '') : '0')+
+      kv('Time money was unprotected', mins(h.unprotectedMinutes), h.unprotectedMinutes ? red : null)+
+    '</div></div>'+
+    '<div class="note" style="margin-top:14px"><b>The day in one line:</b> '+esc(dayOneLine(f))+'</div>'+
+    '<div class="disc" style="margin-top:10px">The day is one UTC day, the same for every trader — it ends at 00:00 UTC, '+
+      'which is '+localAt(0,0)+' where you are. "Blackwood was right" counts setup calls graded right or wrong, and live advice on closed trades by '+
+      'whether following it was worth something. "You followed" counts only calls on pairs you actually traded.</div>'+
+    '</div></div>';
+}
+/* "How you traded, not what you traded" — the same habit rows as the Habits
+   tab, from the same numbers, inside the day's summary as the prototype had it. */
+function dayHabits(f){
+  var d = habitsCache.data;
+  if(!d || !d.types) return '';
+  var today = d.types.filter(function(h){ return h.today.count; });
+  var good = d.types.filter(function(h){ return d.goodToday.indexOf(h.type) >= 0; });
+  var h = f.habits;
+  return '<div class="card"><div class="card-h"><h3>How you traded, not what you traded</h3>'+
+      '<span class="sp badge '+(h.totalRaised?'warn':'ok')+'">'+(h.totalRaised ? h.totalRaised+' error'+(h.totalRaised===1?'':'s')+' · '+h.totalFixed+' fixed' : 'clean so far')+'</span></div>'+
+    '<div class="card-b"><div class="tiny muted" style="margin-bottom:6px">Everything the Trade Errors tab raised today, recorded as an episode rather than a moment. '+
+      'The number that matters is how long each one stayed true.</div>'+
+      (today.length ? today.map(habitRow).join('') : '<div class="tiny muted">Nothing raised today.</div>')+
+      (good.length ? good.map(function(x){ return '<div class="hab"><div><div class="hn">'+esc(x.label)+' <span class="badge ok">good</span></div>'+
+        '<div class="hd">None today, against your usual '+(x.counted ? x.baseline.perDay+' a day' : mins(x.baseline.minutesPerDay)+' a day')+'.</div></div>'+
+        '<div class="hr"><div class="hv">0</div><div class="hs">today</div></div></div>'; }).join('') : '')+
+      '<div class="disc" style="margin-top:10px">One rushed stop is an oversight. Repeated across a week, it is how you trade. Arbiter only calls '+
+        'something a habit once it recurs — a single episode is reported as an episode and nothing more.</div>'+
+    '</div></div>';
+}
+
+function reportBlock(kind, d, busy, err){
+  var name = kind==='daily' ? 'today\'s review' : 'this week\'s review';
+  if(d && d.report){
+    var r = d.report;
+    return '<div class="card"><div class="card-h"><h3>Claude\'s read on '+(kind==='daily'?'the day':'the week')+'</h3>'+
+      '<span class="sp badge info">'+esc(r.model||'')+(r.cost!=null?' · $'+Number(r.cost).toFixed(4):'')+'</span></div>'+
+      '<div class="card-b"><div class="rep">'+mdSafe(r.report_md)+'</div>'+
+      '<div class="disc" style="margin-top:12px">Written from the numbers above and nothing else. It does not see your charts '+
+      'and it never recommends a trade — it describes what already happened.</div>'+
+
+      '</div></div>';
+  }
+  return '<div class="card"><div class="card-b"><div class="empty">'+
+    '<div class="big">'+(busy?'<span class="spin"></span> Claude is writing '+name+'…':'No written review yet.')+'</div>'+
+    '<div class="sm">'+(err ? esc(err) :
+      'The numbers above are free. A written review is charged from your analysis credits by its length — usually a cent or two — '+
+      'and is written once: asking again shows the same review at no charge.')+'</div>'+
+    (busy?'':'<div style="margin-top:14px"><button class="btn" data-write="'+kind+'">Ask Claude to write '+name+'</button></div>')+
+    '</div></div></div>';
+}
+function daysTable(f){
+  if(!f.perDay) return '';
+  var worst = f.perDay.reduce(function(a,d){ return (!a || d.errors > a.errors) ? d : a; }, null);
+  return '<div class="card"><div class="card-h"><h3>Day by day</h3></div><div class="card-b"><div class="tbl-wrap"><table class="days">'+
+    '<thead><tr><th style="width:96px">Day</th><th style="width:64px">Calls</th><th style="width:80px">Followed</th>'+
+    '<th style="width:70px">Trades</th><th style="width:86px">P/L</th><th>Habits raised</th></tr></thead><tbody>'+
+    f.perDay.map(function(d){
+      var name = new Date(d.day+'T12:00:00Z').toLocaleDateString([], { weekday:'short', day:'numeric', month:'short' });
+      return '<tr class="'+(worst && worst.errors>1 && d===worst?'worst':'')+'"><td>'+esc(name)+'</td><td class="n">'+d.calls+'</td>'+
+        '<td class="n">'+d.followed+'</td><td class="n">'+d.trades+'</td>'+
+        '<td class="n" style="color:'+(d.pl>=0?'#4ade80':'#f87171')+'">'+(d.trades?money(d.pl):'–')+'</td>'+
+        '<td>'+(d.errors ? d.errors+' — '+esc(d.errorTypes.map(function(t){ return t.replace(/_/g,' '); }).join(', ')) : '<span class="dim">none</span>')+'</td></tr>';
+    }).join('')+'</tbody></table></div>'+
+    (worst && worst.errors>1 ? '<div class="disc" style="margin-top:10px">The highlighted day carried the most habit episodes. '+
+      'If most of the week\'s problems sit on one day, that is one bad session, not five bad habits.</div>' : '')+
+    '</div></div>';
+}
+var reportState = { daily: { busy:false, err:null }, weekly: { busy:false, err:null } };
+/* ═══ THE WEEK ════════════════════════════════════════════════════════
+   The answer to the question this module exists for, written by RULES
+   from the week's own figures — never a claim the numbers do not carry. */
+/* "Week of 14-18 September", and the download — available whether or not
+   Claude has written anything, because the document carries the numbers. */
+function weekHead(d){
+  var f = d.facts;
+  var from = new Date(f.from), to = new Date(Date.parse(f.to) - 86400000);
+  // built explicitly: a locale that puts the month first turned
+  // "21-27 September" into "21-September 27"
+  var mon = function(x){ return x.toLocaleDateString([], { month:'long' }); };
+  var title = from.getUTCMonth() === to.getUTCMonth()
+    ? 'Week of ' + from.getUTCDate() + '–' + to.getUTCDate() + ' ' + mon(to)
+    : 'Week of ' + from.getUTCDate() + ' ' + mon(from) + ' – ' + to.getUTCDate() + ' ' + mon(to);
+  var running = Date.now() < Date.parse(f.to);
+  return '<div class="card"><div class="card-h"><h3>'+esc(title)+'</h3>'+
+    '<span class="sp" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+      (running ? '<span class="badge info">still running</span>' : '')+
+      '<button class="btn" data-dl="html">Download the review</button>'+
+      '<button class="btn" data-dl="print">Print or save as PDF</button>'+
+    '</span></div></div>';
+}
+
+function weekAnswer(f){
+  var c = f.calls, mp = f.quadPL, w = f.week;
+  if(!c.blackwoodGraded || !c.youActedOn) return '';
+  var overrode = (c.quad ? (c.quad.expensive + c.quad.luck) : 0);
+  var cost = mp ? (mp.expensive + mp.luck) : null;
+  var bits = ['Blackwood was right on '+c.blackwoodRight+' of '+c.blackwoodGraded+' resolved call'+(c.blackwoodGraded===1?'':'s')+' this week.'];
+  bits.push('You acted on '+c.youFollowed+' of '+c.youActedOn+'.');
+  if(overrode && cost != null && cost < 0){
+    bits.push('The '+overrode+' call'+(overrode===1?'':'s')+' you overrode cost '+money(cost)+
+      ((w && w.netPL < 0 && Math.abs(cost) > Math.abs(w.netPL)) ? ' — more than the whole week\'s loss.' : '.'));
+    if(c.blackwoodGraded >= 10 && c.blackwoodRight / c.blackwoodGraded >= 0.6)
+      bits.push('On this week\'s evidence, the read is not what is costing you money.');
+  }
+  return '<div class="note" style="margin-top:14px"><b>The answer to the question this module exists for:</b> '+esc(bits.join(' '))+
+    (c.blackwoodGraded < 10 ? ' <span class="dim">On '+c.blackwoodGraded+' graded call'+(c.blackwoodGraded===1?'':'s')+
+      ', treat all of this as a hint, not a finding.</span>' : '')+'</div>';
+}
+function weekWentCard(f){
+  var w = f.week; if(!w) return '';
+  var kv = function(k, v, col){ return '<div class="kv"><span class="k">'+esc(k)+'</span><span class="v"'+(col?' style="color:'+col+'"':'')+'>'+v+'</span></div>'; };
+  var g = '#4ade80', r = '#f87171';
+  return '<div class="card"><div class="card-h"><h3>Where the week went</h3></div><div class="card-b">'+
+    kv('Trades', w.trades)+
+    kv('Net', w.trades ? money(w.netPL) : '–', w.netPL >= 0 ? g : r)+
+    (w.strongCallTrades ? kv('If you had taken only your 70+ calls', money(w.onlyStrongCallsPL)+
+      ' <span class="dim">('+w.strongCallTrades+' trade'+(w.strongCallTrades===1?'':'s')+')</span>', w.onlyStrongCallsPL >= 0 ? g : r) : '')+
+    (w.bestSession ? kv('Best session', esc(w.bestSession.session)+' · '+money(w.bestSession.pl), w.bestSession.pl >= 0 ? g : r) : '')+
+    (w.worstSession ? kv('Worst session', esc(w.worstSession.session)+' · '+money(w.worstSession.pl), w.worstSession.pl >= 0 ? g : r) : '')+
+    (w.avgHoldWinners != null ? kv('Average hold, winners', mins(w.avgHoldWinners)) : '')+
+    (w.avgHoldLosers != null ? kv('Average hold, losers', mins(w.avgHoldLosers)) : '')+
+    (w.strongCallTrades ? '<div class="disc" style="margin-top:10px">The 70+ figure is what your own filled trades returned, not a backtest of '+
+      'trades you never took. Setups you never entered are not counted — Blackwood will not claim profit on a trade that did not happen.</div>' : '')+
+    '</div></div>';
+}
+function weekHabitsCard(f){
+  var hw = f.habitsWeek, days = f.days;
+  if(!hw || !hw.length) return '';
+  var worse = hw.filter(function(h){ return h.direction==='worse'; }).length;
+  var better = hw.filter(function(h){ return h.direction==='better'; }).length;
+  var dayName = function(d){ return new Date(d+'T12:00:00Z').toLocaleDateString([], { weekday:'short' }); };
+  var dirText = function(h){
+    var unit = h.counted ? '' : ' of exposure';
+    if(h.direction==='worse')  return 'worse — '+h.now+(h.counted?'':'m')+unit+' vs '+h.before+(h.counted?'':'m')+' last week';
+    if(h.direction==='better') return 'better — '+h.now+(h.counted?'':'m')+unit+' vs '+h.before+(h.counted?'':'m')+' last week';
+    return 'flat — '+h.now+(h.counted?'':'m')+' vs '+h.before+(h.counted?'':'m')+' last week';
+  };
+  // the day that carried the week's problems
+  var totals = (days||[]).map(function(_, i){ return hw.reduce(function(a,h){ return a + h.perDay[i]; }, 0); });
+  var worstI = totals.indexOf(Math.max.apply(null, totals.concat([0])));
+  var typesOnWorst = worstI >= 0 ? hw.filter(function(h){ return h.perDay[worstI] > 0; }).length : 0;
+  var worstDay = worstI >= 0 && f.perDay ? f.perDay[worstI] : null;
+  var note = (typesOnWorst >= 3 && totals[worstI] >= Math.max(3, Math.round(totals.reduce(function(a,b){return a+b;},0) * 0.5)))
+    ? '<div class="note" style="margin-top:12px"><b>'+esc(new Date(days[worstI]+'T12:00:00Z').toLocaleDateString([], { weekday:'long' }))+
+      ' is every column.</b> '+typesOnWorst+' of the week\'s habit types have their spike on that one day'+
+      (worstDay && worstDay.trades ? ' — the day you also took '+worstDay.trades+' trade'+(worstDay.trades===1?'':'s')+
+        (worstDay.pl ? ' and finished '+money(worstDay.pl) : '') : '')+
+      '. That is one bad session, not '+hw.length+' bad habits, and it is a much smaller thing to fix than it looks.</div>' : '';
+  return '<div class="card"><div class="card-h"><h3>Habits across the week</h3>'+
+      '<span class="sp badge '+(worse?'warn':'ok')+'">'+worse+' getting worse · '+better+' improving</span></div><div class="card-b">'+
+    '<div class="tbl-wrap"><table class="days" style="min-width:680px"><thead><tr><th style="width:180px">From Trade Errors</th>'+
+      (days||[]).map(function(d){ return '<th class="mono" style="width:48px">'+esc(dayName(d))+'</th>'; }).join('')+
+      '<th style="width:86px">Exposed</th><th>Direction</th></tr></thead><tbody>'+
+    hw.map(function(h){
+      return '<tr><td>'+esc(h.label)+'</td>'+
+        h.perDay.map(function(n){ return '<td class="n">'+(n||'<span class="dim">0</span>')+'</td>'; }).join('')+
+        '<td class="n">'+(h.exposedMinutes != null ? mins(h.exposedMinutes) : '<span class="dim">—</span>')+'</td>'+
+        '<td><span class="trend '+h.direction+'">'+esc(dirText(h))+'</span></td></tr>';
+    }).join('')+'</tbody></table></div>'+note+
+    '<div class="disc" style="margin-top:10px">Exposed time is how long each condition was actually true, summed across the week — not how many '+
+      'times it was detected. A stop set in 90 seconds and one set after two hours are not the same error.</div>'+
+    '</div></div>';
+}
+
+function renderReport(kind, d){
+  if(!d || !d.facts) return;
+  var f = d.facts, st = reportState[kind];
+  if(kind==='daily'){
+    paint('daily', dayCard(d) + quadCard(f, 'Is it you, or is it Blackwood?') + untradedCard(f) + dayHabits(f) + numbersCard(f));
+  } else {
+    paint('weekly', weekHead(d) + quadCard(f, 'Is it you, or is it Blackwood?') + weekWentCard(f) + untradedCard(f) +
+      weekHabitsCard(f) + numbersCard(f) + daysTable(f));
+  }
+  paint(kind+'Report', reportBlock(kind, d, st.busy, st.err));
+}
+async function writeReport(kind){
+  var st = reportState[kind];
+  if(st.busy) return;
+  st.busy = true; st.err = null; renderReport(kind, reportCache[kind].data);
+  try{
+    var r = await fetch('/api/arbiter/report/'+kind, { method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body:'{}' });
+    var out = await r.json().catch(function(){ return null; });
+    if(r.ok && out && out.report){
+      var d = reportCache[kind].data || {};
+      d.report = out.report; reportCache[kind] = { at: Date.now(), data: d };
+    } else {
+      st.err = r.status===402 ? 'You are out of analysis credits for this cycle. Nothing was charged.'
+             : r.status===409 ? 'Nothing happened in this period to write about. Nothing was charged.'
+             : 'The review could not be written just now. Nothing was charged — try again shortly.';
+    }
+  }catch(e){ st.err = 'The review could not be written just now. Nothing was charged.'; }
+  st.busy = false;
+  renderReport(kind, reportCache[kind].data);
+}
+
+/* The weekly review as a standalone document the trader keeps. */
+function weeklyDocument(d){
+  var f = d.facts, q = f.calls.quad;
+  var css = 'body{font:14px/1.6 -apple-system,Segoe UI,Arial,sans-serif;color:#111;max-width:760px;margin:40px auto;padding:0 20px}'+
+    'h1{font-size:22px;margin:0}h2{font-size:15px;margin:28px 0 8px}h4{font-size:14px;margin:18px 0 6px}'+
+    '.sub{color:#666;margin-top:4px}.quad{display:grid;grid-template-columns:1fr 1fr;gap:8px}'+
+    '.q{border:1px solid #ddd;border-radius:8px;padding:10px}.q b{font-size:22px;display:block}'+
+    'table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #eee;padding:6px 8px;text-align:left;font-size:13px}'+
+    '.foot{color:#777;font-size:12px;margin-top:30px;border-top:1px solid #eee;padding-top:10px}';
+  var days = (f.perDay||[]).map(function(x){ return '<tr><td>'+esc(x.day)+'</td><td>'+x.calls+'</td><td>'+x.followed+'</td><td>'+x.trades+
+    '</td><td>'+(x.trades?money(x.pl):'–')+'</td><td>'+(x.errors?x.errors:'–')+'</td></tr>'; }).join('');
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Blackwood weekly review '+esc(d.period)+'</title>'+
+    '<style>'+css+'</style></head><body>'+
+    '<h1>Weekly performance review</h1><div class="sub">Blackwood Arbiter · '+esc(d.period)+'</div>'+
+    '<h2>Is it you, or is it Blackwood?</h2><div class="quad">'+
+      '<div class="q"><b>'+q.good+'</b>Blackwood right, you followed</div>'+
+      '<div class="q"><b>'+q.expensive+'</b>Blackwood right, you ignored</div>'+
+      '<div class="q"><b>'+q.ours+'</b>Blackwood wrong, you followed</div>'+
+      '<div class="q"><b>'+q.luck+'</b>Blackwood wrong, you ignored</div></div>'+
+    (f.sampleTooSmall?'<p><i>'+f.calls.graded+' graded calls is not enough to conclude anything yet.</i></p>':'')+
+    '<h2>The numbers</h2><table>'+
+      '<tr><td>Net P/L</td><td>'+money(f.trades.netPL)+'</td></tr>'+
+      '<tr><td>P/L on calls you followed</td><td>'+money(f.trades.plOnFollowed)+'</td></tr>'+
+      '<tr><td>P/L where you went your own way</td><td>'+money(f.trades.plOnIgnored)+'</td></tr>'+
+      '<tr><td>Trades closed</td><td>'+f.trades.closed+'</td></tr></table>'+
+    '<h2>Day by day</h2><table><tr><th>Day</th><th>Calls</th><th>Followed</th><th>Trades</th><th>P/L</th><th>Habit episodes</th></tr>'+days+'</table>'+
+    (d.report ? '<h2>Review</h2>'+mdSafe(d.report.report_md) : '')+
+    '<div class="foot">Written from Arbiter\'s own records. It describes what happened; it never recommends a trade.</div>'+
+    '</body></html>';
+}
+document.addEventListener('click', function(e){
+  var w = e.target.closest && e.target.closest('[data-write]');
+  if(w){ writeReport(w.getAttribute('data-write')); return; }
+  var dl = e.target.closest && e.target.closest('[data-dl]');
+  if(!dl) return;
+  var d = reportCache.weekly.data; if(!d) return;
+  var html = weeklyDocument(d);
+  if(dl.getAttribute('data-dl') === 'html'){
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([html], { type:'text/html' }));
+    a.download = 'blackwood-weekly-review-'+d.period+'.html';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+  } else {
+    var win = window.open('', '_blank');
+    if(win){ win.document.write(html); win.document.close(); win.focus(); win.print(); }
+  }
+});
+
+/* Risk Radar runs in the Assistant's page; the server never sees it. While
+   Arbiter is open it reports a position held on a flagged pair, so the
+   server can keep it as a habit episode with a real duration. */
+var flaggedSent = {};
+function reportFlagged(out, state){
+  var rr = null; try{ rr = JSON.parse(localStorage.getItem('bw-risk-now')||'null'); }catch(e){}
+  if(!rr || !rr.t || Date.now() - rr.t > 300000 || !rr.pairs) return;
+  var acct = state && state.accountInfo && (state.accountInfo.login || state.accountInfo.account);
+  if(!acct) return;
+  out.forEach(function(r){
+    var sym = r.world.symbol;
+    var m = rr.pairs[sym] || rr.pairs[r.position.rawSymbol];
+    var score = m && m.score;
+    if(score == null || score < 50) return;                    // flagged means elevated or worse
+    var k = r.position.ticket;
+    if(flaggedSent[k] && Date.now() - flaggedSent[k] < 60000) return;   // once a minute is enough
+    flaggedSent[k] = Date.now();
+    fetch(withSource('/api/arbiter/flagged'), { method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ account: acct, ticket: k, symbol: r.position.rawSymbol || sym,
+                             score: score, state: m.state || m.level || 'flagged' }) }).catch(function(){});
+  });
+}
+
+/* ═══ SETTINGS ═══════════════════════════════════════════════════════
+   Automatic reviews are OFF unless the trader turns them on. Turning one
+   on means ticking a statement whose words come FROM THE SERVER — the same
+   words the server records — so what they read and what is logged can
+   never differ. Every charge, automatic or asked-for, is listed. */
+var settingsCache = { at: 0, data: null };
+var settingsState = { busy: null, err: null, ticked: {} };
+async function loadSettings(force){
+  if(!force && settingsCache.data && Date.now() - settingsCache.at < 60000) return settingsCache.data;
+  var d = await fetch('/api/arbiter/settings',{credentials:'same-origin',cache:'no-store'})
+    .then(function(r){ return r.ok? r.json():null; }).catch(function(){ return null; });
+  if(d) settingsCache = { at: Date.now(), data: d };
+  return d;
+}
+/* The schedule is fixed in UTC on the server; shown in the trader's own time. */
+function localAt(utcH, utcM, weekday){
+  var d = new Date(Date.UTC(2026, 0, 3 + (weekday==null?0:weekday), utcH, utcM));   // 3 Jan 2026 is a Saturday
+  var t = d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  return weekday==null ? t : d.toLocaleDateString([], { weekday:'long' })+' '+t;
+}
+function autoBlock(key, d){
+  var on = !!(d.settings && d.settings[key]);
+  var daily = key==='auto_daily';
+  var title = daily ? 'Write my daily review automatically' : 'Write my weekly review automatically';
+  var when = daily ? 'Every day at '+localAt(0,20)+' your time, for the day that has just ended.'
+                   : 'Every '+localAt(2,0,0)+' your time, for the trading week that has just ended.';
+  var since = (d.history||[]).filter(function(h){ return h.setting===key && h.value; })[0];
+  var last = d.settings && d.settings[daily?'last_daily_run':'last_weekly_run'];
+  var busy = settingsState.busy === key, ticked = !!settingsState.ticked[key];
+  return '<div class="auto'+(on?' on':'')+'"><div class="ah">'+
+      '<span class="at">'+esc(title)+'</span>'+
+      '<span class="badge '+(on?'ok':'')+'">'+(on?'On':'Off')+'</span></div>'+
+    '<div class="as">'+esc(when)+'</div>'+
+    (on
+      ? '<div class="as">Turned on by you'+(since?' on '+new Date(since.at).toLocaleString():'')+'.</div>'+
+        '<div style="margin-top:11px"><button class="btn" data-auto="'+key+'" data-val="0"'+(busy?' disabled':'')+'>'+
+          (busy?'Saving…':'Turn off')+'</button></div>'
+      : '<label class="consent"><input type="checkbox" data-consent="'+key+'"'+(ticked?' checked':'')+'>'+
+          '<span>'+esc((d.consentText||{})[key]||'')+'</span></label>'+
+        '<div style="margin-top:11px"><button class="btn" data-auto="'+key+'" data-val="1"'+
+          ((!ticked||busy)?' disabled':'')+'>'+(busy?'Saving…':'Turn on')+'</button></div>')+
+    (last ? '<div class="lastrun">Last automatic run, '+esc(last.period)+': '+esc(last.outcome)+
+      (last.why?' — '+esc(last.why):'')+(last.cost?' · $'+Number(last.cost).toFixed(4):'')+'</div>' : '')+
+    '</div>';
+}
+function renderSettings(d){
+  if(!d || !d.settings) return;
+  var charges = d.charges || [];
+  var total = charges.reduce(function(a,c){ return a + (Number(c.cost)||0); }, 0);
+  var ch = charges.length
+    ? '<div class="tbl-wrap"><table class="days" style="min-width:520px"><thead><tr><th style="width:150px">When</th>'+
+      '<th style="width:80px">Review</th><th style="width:110px">Period</th><th style="width:120px">How</th><th>Charged</th></tr></thead><tbody>'+
+      charges.map(function(c){ return '<tr><td>'+esc(new Date(c.created_at).toLocaleString([], {dateStyle:'medium',timeStyle:'short'}))+'</td>'+
+        '<td>'+esc(c.kind)+'</td><td class="n">'+esc(c.period)+'</td>'+
+        '<td>'+(c.trigger==='auto'?'<span class="badge info">automatic</span>':'<span class="badge">you asked</span>')+'</td>'+
+        '<td class="n">$'+Number(c.cost||0).toFixed(4)+'</td></tr>'; }).join('')+
+      '</tbody></table></div><div class="disc" style="margin-top:10px">Last '+charges.length+' written review'+
+        (charges.length===1?'':'s')+': $'+total.toFixed(4)+' in total.</div>'
+    : '<div class="tiny muted">No reviews have been written yet, so nothing has been charged.</div>';
+  var hist = (d.history||[]).length
+    ? (d.history||[]).map(function(h){ return '<div class="kv"><span class="k">'+esc(new Date(h.at).toLocaleString())+'</span><span class="v">'+
+        esc((h.setting==='auto_daily'?'Daily':'Weekly')+' reviews turned '+(h.value?'on':'off'))+'</span></div>'; }).join('')
+    : '<div class="tiny muted">No changes yet.</div>';
+  paint('settings',
+    '<div class="card"><div class="card-h"><h3>Automatic reviews</h3></div><div class="card-b">'+
+      '<div class="tiny muted" style="margin-bottom:12px">Off unless you turn them on. The numbers in the Daily and Weekly tabs are always free — '+
+        'only a written review is charged, whether you ask for it or have it written for you. Nothing is charged on a day or week with '+
+        'nothing to review, when you have no credits left, or if the review fails to be written.</div>'+
+      autoBlock('auto_daily', d) + autoBlock('auto_weekly', d)+
+      (settingsState.err?'<div class="note warn" style="margin-top:12px">'+esc(settingsState.err)+'</div>':'')+
+    '</div></div>'+
+    '<div class="card"><div class="card-h"><h3>What has been charged</h3></div><div class="card-b">'+ch+'</div></div>'+
+    '<div class="card"><div class="card-h"><h3>Your changes</h3></div><div class="card-b">'+hist+
+      '<div class="disc" style="margin-top:10px">Every change you make here is recorded with the time and, when you turn something on, '+
+      'the exact statement you agreed to. The record cannot be edited afterwards.</div></div></div>');
+}
+async function saveAuto(key, value){
+  if(settingsState.busy) return;
+  var d = settingsCache.data || {};
+  settingsState.busy = key; settingsState.err = null; renderSettings(d);
+  try{
+    var body = { setting:key, value:value };
+    if(value){ body.consentAccepted = !!settingsState.ticked[key]; body.consentVersion = d.consentVersion; }
+    var r = await fetch('/api/arbiter/settings', { method:'PUT', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if(!r.ok) settingsState.err = 'That change was not saved. Nothing has changed — please try again.';
+    settingsState.ticked[key] = false;
+  }catch(e){ settingsState.err = 'That change was not saved. Nothing has changed — please try again.'; }
+  settingsState.busy = null;
+  renderSettings(await loadSettings(true));
+}
+document.addEventListener('change', function(e){
+  var k = e.target && e.target.getAttribute && e.target.getAttribute('data-consent');
+  if(!k) return;
+  settingsState.ticked[k] = !!e.target.checked;
+  renderSettings(settingsCache.data);
+});
+document.addEventListener('click', function(e){
+  var b = e.target.closest && e.target.closest('[data-auto]');
+  if(!b || b.disabled) return;
+  saveAuto(b.getAttribute('data-auto'), b.getAttribute('data-val') === '1');
+});
+
+/* ═══ PROGRESS and CALIBRATION ═══════════════════════════════════════
+   Read-only and free. Measured in R, never money, across every account
+   the trader has used. The verdict is behaviour; money is context. */
+var progCache = { at: 0, data: null }, calCache = { at: 0, data: null };
+async function loadCached(cache, url){
+  if(cache.data && Date.now() - cache.at < 300000) return cache.data;   // changes slowly: 5 minutes
+  var d = await fetch(url,{credentials:'same-origin',cache:'no-store'})
+    .then(function(r){ return r.ok? r.json():null; }).catch(function(){ return null; });
+  if(d){ cache.data = d; cache.at = Date.now(); }
+  return d;
+}
+function fmtM(v, f){
+  if(v==null) return '–';
+  if(f==='pct') return Math.round(v*100)+'%';
+  if(f==='R') return (v>=0?'+':'')+(Math.round(v*100)/100)+'R';
+  if(f==='min') return Math.round(v)+'m';
+  return String(Math.round(v*10)/10);
+}
+function sparkline(series, better, marks){
+  var pts = series.map(function(v,i){ return v==null?null:{x:i,y:v}; }).filter(Boolean);
+  if(pts.length < 2) return '<svg class="spk" viewBox="0 0 150 34"></svg>';
+  var ys = pts.map(function(p){ return p.y; }), lo = Math.min.apply(null,ys), hi = Math.max.apply(null,ys);
+  if(hi===lo){ hi+=1; lo-=1; }
+  var X = function(i){ return 4 + i*(142/(series.length-1)); }, Y = function(v){ return 30 - (v-lo)/(hi-lo)*26; };
+  var d = pts.map(function(p,k){ return (k?'L':'M')+X(p.x).toFixed(1)+' '+Y(p.y).toFixed(1); }).join(' ');
+  var last = pts[pts.length-1];
+  var ticks = (marks||[]).map(function(i){ return '<line x1="'+X(i).toFixed(1)+'" x2="'+X(i).toFixed(1)+'" y1="1" y2="33" '+
+    'stroke="var(--violet)" stroke-width="1.4" stroke-dasharray="2 2"><title>new account this week</title></line>'; }).join('');
+  return '<svg class="spk" viewBox="0 0 150 34" aria-hidden="true">'+ticks+'<path d="'+d+'" fill="none" stroke="var(--blue)" stroke-width="1.6" stroke-linejoin="round"/>'+
+    '<circle cx="'+X(last.x).toFixed(1)+'" cy="'+Y(last.y).toFixed(1)+'" r="2.6" fill="var(--blue)"/></svg>';
+}
+var DIRW = { better:['better','ok'], worse:['worse','bad'], flat:['no change','neut'], unknown:['not enough data',''] };
+function accountsCard(d){
+  var ad = d.accountsDetail; if(!ad || !ad.list || !ad.list.length) return '';
+  var money = function(v, cur){ return v==null ? 'balance not recorded' : (cur==='USD'||!cur ? '$' : cur+' ')+Number(v).toLocaleString(); };
+  var rows = ad.list.map(function(a, i){
+    var suf = a.suffix==null ? 'no positions recorded yet'
+      : a.suffix==='' ? 'symbols carry no suffix' : 'symbols carry a '+a.suffix+' suffix';
+    var matched = (i>0 && a.suffix!=null && ad.sharedPairs.length)
+      ? ' — matched to the same pairs ('+ad.sharedPairs.slice(0,3).join(', ')+'), so no pair\'s count restarted' : '';
+    var kind = a.kind==='unknown' ? 'type not reported' : a.kind;
+    return '<div class="acct"><span class="ad">'+esc(new Date(a.firstSeen).toLocaleDateString([], {day:'2-digit', month:'short'}))+'</span>'+
+      '<span>Account '+(i+1)+' · '+esc(kind)+' · '+esc(money(a.startingBalance, a.currency))+' · '+esc(suf)+esc(matched)+'</span></div>';
+  }).join('');
+  var z = ad.sizing, sizing = '';
+  if(z){
+    var lots = function(v){ return (Math.round(v*100)/100).toFixed(2); }, pct = function(v){ return (Math.round(v*100)/100)+'%'; };
+    sizing = '<div class="note" style="margin-top:12px"><b>Sizing is judged on risk, not lots.</b> Your median went from '+
+      lots(z.from.lots)+' to '+lots(z.to.lots)+' lots'+
+      (z.key==='risk_steady'
+        ? ', and that is not oversizing — as a percent of balance it barely moved ('+pct(z.from.riskPct)+' to '+pct(z.to.riskPct)+'). Judging lots would have flagged you for it.'
+        : z.key==='risk_up'
+        ? ' — and your risk per trade DID rise with it, from '+pct(z.from.riskPct)+' to '+pct(z.to.riskPct)+' of the balance. That part is real.'
+        : ', while your risk per trade fell from '+pct(z.from.riskPct)+' to '+pct(z.to.riskPct)+' of the balance.')+'</div>';
+  }
+  return '<div class="card"><div class="card-h"><h3>Your accounts</h3><span class="sp tiny dim">the record does not reset</span></div><div class="card-b">'+
+    rows+
+    (ad.list.length>1 ? '<div class="tiny muted" style="margin-top:10px;line-height:1.55">All '+ad.list.length+' accounts feed one history. Risk and pips were '+
+      'normalised at the moment they were written, so nothing in the charts above breaks at the boundary — the violet line marks the week it changed '+
+      'so you can see it rather than wonder about it.</div>' : '')+
+    sizing+'</div></div>';
+}
+
+function renderProgress(d){
+  if(!d || !d.verdict) return;
+  var v = d.verdict;
+  var word = { better:'Getting better', worse:'Getting worse', flat:'Flat', too_early:'Not enough weeks yet' }[v.key];
+  // the week index each account (after the first) appeared on, for the violet markers
+  var firstWeek = (d.accounts||[])[0] && d.accounts[0].week;
+  var marks = (d.rows||[]).map(function(r,i){ return (d.accounts||[]).some(function(a){ return a.week===r.week && a.week!==firstWeek; }) ? i : -1; })
+    .filter(function(i){ return i>=0; });
+  var mets = (d.metrics||[]).map(function(m){
+    return '<div class="met"><div><div class="ml">'+esc(m.label)+
+        (m.context?' <span class="dim xtiny">context, not counted</span>':'')+'</div>'+
+      '<span class="badge '+DIRW[m.direction][1]+'" style="margin-top:5px">'+DIRW[m.direction][0]+'</span>'+
+      (m.note?'<div class="hd" style="margin-top:6px">'+esc(m.note)+'</div>':'')+'</div>'+
+      sparkline(m.series, null, marks)+
+      '<div class="mv">'+fmtM(m.before,m.fmt)+' → '+fmtM(m.now,m.fmt)+'</div></div>';
+  }).join('');
+  var acctWeeks = {}; (d.accounts||[]).forEach(function(a){ acctWeeks[a.week] = a; });
+  var rows = (d.rows||[]).filter(function(r){ return r.calls || r.trades || acctWeeks[r.week]; }).slice(-8).map(function(r){
+    var a = acctWeeks[r.week];
+    return '<tr><td>'+esc(r.week)+(a?' <span class="badge info">new account</span>':'')+'</td>'+
+      '<td class="n">'+(r.adherence==null?'–':Math.round(r.adherence*100)+'%')+'</td>'+
+      '<td class="n">'+fmtM(r.overrideR,'R')+'</td><td class="n">'+r.unprotectedMinutes+'m</td>'+
+      '<td class="n">'+r.revenge+'</td><td class="n">'+(r.avgScoreTaken==null?'–':r.avgScoreTaken)+'</td>'+
+      '<td class="n">'+fmtM(r.expectancyR,'R')+'</td>'+
+      '<td>'+(r.note?esc(r.note):'<span class="dim">—</span>')+'</td></tr>';
+  }).join('');
+  var miles = (d.milestones||[]).map(function(m){
+    var txt = m.id==='stop_streak' ? m.label+': best '+m.value+(m.ongoing?' — and still going':'')
+      : m.label+(m.when?' — '+m.when:'')+(!m.done && m.short?' — '+m.short:(!m.done?' — not yet':''));
+    return '<div class="mile"><span class="mi'+(m.done?'':' wait')+'">'+(m.done?'✓':'·')+'</span><span>'+esc(txt)+'</span></div>';
+  }).join('');
+  var fps = (d.fingerprints||[]).slice(0,6).map(function(f){
+    return '<div class="kv"><span class="k">'+esc(f.fingerprint)+'</span><span class="v">'+f.trades+' / 30'+
+      (f.unlocked?' ✓'+(f.unlockedWeek?' <span class="dim">'+esc(f.unlockedWeek)+'</span>':''):'')+'</span></div>';
+  }).join('');
+  paint('progress',
+    '<div class="card"><div class="card-h"><h3>Are you getting better?</h3>'+
+      '<span class="sp badge info">'+d.activeWeeks+' week'+(d.activeWeeks===1?'':'s')+' · '+
+      d.accountCount+' account'+(d.accountCount===1?'':'s')+' · '+d.tradesOnFile+' trade'+(d.tradesOnFile===1?'':'s')+'</span></div>'+
+      '<div class="card-b">'+
+      '<div class="verd '+v.key+'"><div class="vw">'+esc(word)+'</div><div class="vb">'+esc(v.text)+'</div></div>'+
+    (v.key!=='too_early' ? '<div class="disc" style="margin-top:10px">Weeks '+esc((v.recentWeeks||[]).join(', '))+
+      ' compared with '+esc((v.earlierWeeks||[]).join(', '))+', on medians — one bad week cannot flip it. Built on what you control, not on what the market paid.</div>' : '')+
+    '</div></div>'+
+    (mets ? '<div class="card" style="margin-top:14px"><div class="card-h"><h3>What is actually moving</h3>'+
+      '<span class="sp tiny dim">'+esc((d.rows||[]).filter(function(r){ return r.calls || r.trades; }).map(function(r){ return r.week; }).slice(0,1)[0]||'')+
+      ' to '+esc((d.rows||[]).filter(function(r){ return r.calls || r.trades; }).map(function(r){ return r.week; }).slice(-1)[0]||'')+'</span></div><div class="card-b">'+mets+'</div></div>' : '')+
+    (rows ? '<div class="card"><div class="card-h"><h3>Week by week</h3><span class="sp tiny dim">in R — the same on any account size</span></div><div class="card-b"><div class="tbl-wrap"><table class="days">'+
+      '<thead><tr><th style="width:150px">Week</th><th style="width:90px">Followed</th><th style="width:110px">Own way</th>'+
+      '<th style="width:96px">No stop</th><th style="width:76px">Revenge</th><th style="width:84px">Avg taken</th>'+
+      '<th style="width:78px">R exp.</th><th>The week in a line</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      (d.rowThatMatters ? '<div class="note" style="margin-top:12px"><b>'+esc(d.rowThatMatters.week)+' is the row that matters.</b> '+
+        d.rowThatMatters.better+' behavioural columns improved that week and the money still went backwards. If this view were built on '+
+        'P/L it would have called that week a failure, and you might have changed something that was working.</div>' : '')+
+      ((d.accounts||[]).length>1 ? '<div class="disc" style="margin-top:10px">A new account is marked on the week it appeared, so a step in the numbers caused by the account is never read as a change in you.</div>':'')+
+      '</div></div>' : '')+
+    accountsCard(d)+
+    '<div class="split"><div class="card"><div class="card-h"><h3>Milestones</h3></div><div class="card-b">'+(miles||'<div class="tiny muted">None yet.</div>')+
+    '<div class="disc" style="margin-top:10px">These are here because weeks of small improvements are hard to feel from the inside.</div>'+
+      '</div></div>'+
+    '<div class="card"><div class="card-h"><h3>Your own odds</h3></div><div class="card-b">'+
+      (fps||'<div class="tiny muted">No closed trades on file yet.</div>')+
+      '<div class="disc" style="margin-top:10px">Each pair, direction and session needs 30 of your closed trades before its hit rate carries any weight in a score.</div></div></div></div>');
+}
+function renderCalibration(d){
+  if(!d || !d.scoreBands) return;
+  var maxN = Math.max.apply(null, d.scoreBands.map(function(b){ return b.n; }).concat([1]));
+  var bars = d.scoreBands.map(function(b){
+    var h = b.rate==null ? 2 : Math.max(4, Math.round(b.rate*100));
+    return '<div class="b"><span class="bv">'+(b.rate==null?'–':Math.round(b.rate*100)+'%')+'</span>'+
+      '<div class="bar'+(b.enough?'':' thin')+'" style="height:'+h+'%"></div>'+
+      '<span class="bl">'+esc(b.label)+'</span><span class="bl">'+b.n+' call'+(b.n===1?'':'s')+'</span></div>';
+  }).join('');
+  var ev = function(e, name){
+    return '<div class="card"><div class="card-h"><h3>'+name+' — threshold '+e.threshold+'</h3>'+
+      '<span class="sp badge '+(e.enough?(e.avgSavedR>0?'ok':'warn'):'')+'">'+e.heldAfter+' held on after it</span></div><div class="card-b">'+
+      '<div class="note'+(e.enough&&e.avgSavedR<=0?' warn':'')+'">'+esc(e.text)+'</div>'+
+      '<div class="disc" style="margin-top:10px">For every trade where Arbiter said this and you held on, the price at that moment was stamped by the server. '+
+      'The difference between acting then and how the trade actually finished, in R, is what acting would have saved — or cost.</div></div></div>';
+  };
+  paint('calibration',
+    '<div class="card"><div class="card-h"><h3>Does a higher score mean a better setup?</h3></div><div class="card-b">'+
+      '<div class="note'+(d.scoreVerdict.key==='inverted'?' warn':'')+'"><b>'+
+        ({honest:'Yes.',inverted:'Not yet.',too_early:'Too early to say.'})[d.scoreVerdict.key]+'</b> '+esc(d.scoreVerdict.text)+'</div>'+
+      '<div class="bands">'+bars+'</div>'+
+      '<div class="disc" style="margin-top:10px">How often setups in each score band went on to run one ATR their way before one against, within four hours. '+
+      'Grey bars do not yet have the 20 calls needed to mean anything. '+(d.excludedUnclear?d.excludedUnclear+' unclear outcome'+(d.excludedUnclear===1?' is':'s are')+' left out, not guessed.':'')+'</div>'+
+    '</div></div>'+
+    ev(d.cut, 'Cutting a losing trade') + ev(d.breakEven, 'Moving to break-even'));
+}
+
+/* ── the cycle ──────────────────────────────────────────────────── */
+var busy = false, lastStatus = null, lastWorld = null;
+async function cycle(){
+  if(busy) return; busy = true;
+  var btn = document.getElementById('btnRefresh');
+  btn.disabled = true;
+  try{
+    var shared = await F.fetchShared('H1');
+    var state = shared.state;
+    window.__arbLastState = state;
+    var trades = (state && state.openTrades) || [];
+    document.getElementById('ctNow').textContent = trades.length;
+
+    var acct = (state && state.accountInfo && (state.accountInfo.login || state.accountInfo.account)) || null;
+    forgetClosed(acct, trades);
+
+    // The scan runs every cycle: it feeds the Hunting tab always, and it IS
+    // the Now tab when nothing is open (state A in the spec).
+    var list = await scan(shared);
+    proposeFromScan(list);
+    var railCtx = { state: state, journal: shared.journal, status: shared.status };
+    renderCalls(railCtx.calls = await loadCalls());
+    renderHabits(railCtx.habits = await loadHabits());
+    renderSettings(railCtx.settings = await loadSettings());
+    renderProgress(railCtx.progress = await loadCached(progCache, '/api/arbiter/progress'));
+    renderCalibration(railCtx.calibration = await loadCached(calCache, '/api/arbiter/calibration'));
+    renderReport('daily', railCtx.daily = await loadReport('daily'));
+    renderReport('weekly', railCtx.weekly = await loadReport('weekly'));
+    railCtx.credits = await loadQuick(creditsCache, '/api/credits', 60000);
+    railCtx.sources = await loadQuick(sourcesCache, '/api/sources', 5000);
+    renderHunting(list, state, 'hunt');
+    if(list.length) lastWorld = list[0].world;
+    lastPositions = [];
+
+    if(!trades.length){
+      publishAttention([]);
+      renderHunting(list, state, 'main');
+      await readTF(railSubject(), 'H4', shared);
+      if(railTF !== 'H1' && railTF !== 'H4') await readTF(railSubject(), railTF, shared);
+      renderRail(railCtx);
+      document.getElementById('sub').textContent = 'No open positions · scanning '+list.length+
+        ' pair'+(list.length===1?'':'s')+' · '+new Date().toLocaleTimeString();
+      return;
+    }
+
+    var out = [];
+    for(var i=0;i<trades.length;i++){
+      var t = trades[i];
+      var built = await F.buildPositionWorld(t, { shared: shared });
+      var key = caseKey(acct, t.ticket);
+      if(!entryCases[key]){
+        entryCases[key] = { at: Date.now(), case: E.freezeEntryCase(built.world, built.position),
+                            volume: built.position.volume };
+        saveFrozen();
+      }
+      var ev = entryCases[key].volume;
+      built.position.partialTaken = (ev != null && built.position.volume != null && built.position.volume < ev - 1e-9);
+      built.position.entryCase = entryCases[key].case;
+      var j = E.judgePosition(built.world, built.position);
+      j.settled = stabiliser.settle(key, j.action);
+      j.verdictText = j.score==null ? 'Not enough is reaching Arbiter to judge this trade.' : null;
+      var res = { world: built.world, position: built.position, judgement: j,
+                  frozenAt: entryCases[key].at, raw: t };
+      proposeLive(key, res);
+      out.push(res);
+      lastWorld = built.world; lastStatus = built.world.arbiter;
+    }
+
+    paint('main', exposureCard(out) + out.map(positionCard).join(''));
+    publishAttention(out);
+    reportFlagged(out, state);
+    lastPositions = out.map(function(r){ return { world: r.world, judgement: r.judgement, position: r.position }; });
+    if(focus.position && !lastPositions.some(function(r){ return r.position.ticket === focus.position; })) focus.position = null;
+    await readTF(railSubject(), 'H4', shared);
+    if(railTF !== 'H1' && railTF !== 'H4') await readTF(railSubject(), railTF, shared);
+    renderRail(railCtx);
+    document.getElementById('sub').textContent =
+      trades.length+' open position'+(trades.length===1?'':'s')+' · judged '+new Date().toLocaleTimeString();
+  }catch(e){
+    console.warn('[ARBITER]', e);
+    document.getElementById('sub').textContent = 'Could not complete a read — retrying.';
+  }finally{
+    busy = false; btn.disabled = false;
+  }
+}
+
+document.getElementById('btnRefresh').addEventListener('click', function(){
+  F._internals.resetCaches(); cycle();            // "re-read everything" means everything
+});
+/* The shell keeps every module's iframe alive in the background. A hidden
+   Arbiter scanning at 5s would load the server for a screen nobody sees,
+   so it pauses while hidden and re-reads the moment it is shown again. */
+function visible(){ return !document.hidden; }
+document.addEventListener('visibilitychange', function(){ if(visible()) cycle(); });
+if(window.bwSourceReady && window.bwSourceReady.then) window.bwSourceReady.then(cycle);
+else cycle();
+setInterval(function(){ if(visible()) cycle(); }, REFRESH_MS);
+window.BWArbiterPage = { cycle: cycle, stabiliser: stabiliser };
+})();
+</script>
+</body>
+</html>
