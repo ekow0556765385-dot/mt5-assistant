@@ -124,5 +124,64 @@ check('nothing to imply a target from: still honestly unknown', () => {
   assert.strictEqual(j.conditions.find(c => c.id === 'room').state, 'unknown');
 });
 
+console.log('\nARBITER\'S OWN ZONES — the EA\'s SMC_DetectOBs(), ported exactly');
+function base(n, p) { const out = []; let t = 1790000000;
+  for (let i = 0; i < n; i++) out.push({ t: (t += 3600), o: p, h: p + 0.0003, l: p - 0.0003, c: p + 0.00005 });
+  return out; }
+
+check('a bearish candle then a bullish impulse closing above its high, body > 1.5x = a BULLISH block', () => {
+  const cd = base(40, 1.0800);
+  cd[20] = { t: cd[20].t, o: 1.0810, h: 1.0812, l: 1.0798, c: 1.0800 };   // bearish, body 10 pips
+  cd[21] = { t: cd[21].t, o: 1.0800, h: 1.0830, l: 1.0799, c: 1.0828 };   // bullish, closes ABOVE 1.0812, body 28
+  for (let k = 22; k < 40; k++) cd[k] = { t: cd[k].t, o: 1.0840, h: 1.0845, l: 1.0835, c: 1.0842 };  // never returns
+  const r = F.ownOrderBlocks(cd);
+  const b = r.orderBlocks.find(x => x.direction === 'Bullish');
+  assert.ok(b, 'found');
+  assert.strictEqual(b.high, 1.0810, 'from the bearish candle\'s OPEN');
+  assert.strictEqual(b.low, 1.0800, 'to its CLOSE — exactly as the EA stores it');
+  assert.strictEqual(r.own, true);
+});
+
+check('the mirror image is a BEARISH block, stored close-to-open like the EA', () => {
+  const cd = base(40, 1.0800);
+  cd[20] = { t: cd[20].t, o: 1.0800, h: 1.0812, l: 1.0798, c: 1.0810 };   // bullish
+  cd[21] = { t: cd[21].t, o: 1.0810, h: 1.0811, l: 1.0780, c: 1.0782 };   // bearish, closes BELOW 1.0798
+  for (let k = 22; k < 40; k++) cd[k] = { t: cd[k].t, o: 1.0760, h: 1.0765, l: 1.0755, c: 1.0758 };
+  const b = F.ownOrderBlocks(cd).orderBlocks.find(x => x.direction === 'Bearish');
+  assert.ok(b);
+  assert.strictEqual(b.high, 1.0810); assert.strictEqual(b.low, 1.0800);
+});
+
+check('NOT a block when the impulse fails to close beyond the high, or its body is too small', () => {
+  const cd = base(40, 1.0800);
+  cd[20] = { t: cd[20].t, o: 1.0810, h: 1.0812, l: 1.0798, c: 1.0800 };
+  cd[21] = { t: cd[21].t, o: 1.0800, h: 1.0815, l: 1.0799, c: 1.0811 };   // closes BELOW 1.0812
+  assert.ok(!F.ownOrderBlocks(cd).orderBlocks.some(x => x.direction === 'Bullish' && x.high === 1.0810));
+});
+
+check('a MITIGATED block (price came back inside it within 20 candles) is not sent — same as the EA', () => {
+  const cd = base(40, 1.0800);
+  cd[20] = { t: cd[20].t, o: 1.0810, h: 1.0812, l: 1.0798, c: 1.0800 };
+  cd[21] = { t: cd[21].t, o: 1.0800, h: 1.0830, l: 1.0799, c: 1.0828 };
+  for (let k = 22; k < 40; k++) cd[k] = { t: cd[k].t, o: 1.0840, h: 1.0845, l: 1.0835, c: 1.0842 };
+  cd[25] = { t: cd[25].t, o: 1.0820, h: 1.0822, l: 1.0805, c: 1.0815 };   // low 1.0805 is inside 1.0800-1.0810
+  assert.ok(!F.ownOrderBlocks(cd).orderBlocks.some(x => x.high === 1.0810));
+});
+
+check('at most 5 blocks, the most recent first — the EA\'s own selection', () => {
+  const cd = base(120, 1.0800);
+  for (let i = 5; i < 110; i += 12) {
+    cd[i] = { t: cd[i].t, o: 1.0810 + i * 1e-5, h: 1.0812 + i * 1e-5, l: 1.0798, c: 1.0800 };
+    cd[i + 1] = { t: cd[i + 1].t, o: 1.0800, h: 1.0840 + i * 1e-5, l: 1.0799, c: 1.0838 + i * 1e-5 };
+  }
+  const out = F.ownOrderBlocks(cd).orderBlocks;
+  assert.ok(out.length <= 5, 'got ' + out.length);
+  for (let k = 1; k < out.length; k++) assert.ok(out[k - 1].timeStart >= out[k].timeStart, 'most recent first');
+});
+
+check('fewer than the EA\'s minimum of 35 candles: no own read at all', () => {
+  assert.strictEqual(F.ownOrderBlocks(base(30, 1.08)), null);
+});
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
