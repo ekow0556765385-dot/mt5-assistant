@@ -1532,7 +1532,7 @@ module.exports = function mountArbiter(app, deps) {
       ' (' + (body.direction === 'bull' ? 'buy' : 'sell') + ')\n' +
       (route ? escHtml(route[0].toUpperCase() + route.slice(1)) + ' route · ' : '') + 'pressure ' + escHtml(body.score) + (price ? ' · price ' + escHtml(price) : '') + '\n' +
       (reason ? escHtml(reason) + '\n' : '') +
-      '<i>No Arbiter page was open — Arbiter judged this on the server.</i>\n' + APP_URL + '/arbiter';
+      (route === 'test' ? '' : '<i>No Arbiter page was open — Arbiter judged this on the server.</i>\n') + APP_URL + '/arbiter';   // a test is sent FROM an open page
   }
   /* N-2: EMAIL, through the Resend account the website already uses. Resend's free plan is 3,000 a month and
      100 A DAY, shared with the website's own emails; at the limit it pauses (no bill). So: CUTs only; at most
@@ -2204,6 +2204,40 @@ module.exports = function mountArbiter(app, deps) {
     res.json({ ok: true });
   });
 
+  /* N-4: the trader's alert choices — read, change, and test */
+  const maskEmail = e => { const m = /^(.)([^@]*)(@.*)$/.exec(String(e || '')); return m ? m[1] + '***' + m[3] : null; };
+  const testLog = new Map();          // userId -> times a test was sent (at most 3 an hour)
+  app.get('/api/arbiter/alerts', gate, async (req, res) => {
+    try {
+      const uid = req.user.id, a = (((getRiskSettings ? await getRiskSettings(uid) : {}) || {}).arbiterAlerts) || {};
+      const linked = deps.telegramLinked ? !!(await deps.telegramLinked(uid).catch(() => false)) : false;
+      const env = deps.env || process.env;
+      res.json({ ok: true,
+        telegram: { linked, on: linked && a.telegram !== false },
+        email: { available: !!env.RESEND_API_KEY, on: a.email === true, to: maskEmail(await addressOf(uid).catch(() => null)),
+                 perDay: EMAIL_PER_TRADER_DAY },
+        push: { available: !!pushLib(), on: a.push === true, devices: (a.pushSubs || []).length },
+        perHour: NOTIFY_MAX_PER_HOUR });
+    } catch (e) { log.warn('[ARBITER] alerts read failed:', e.message); res.status(500).json({ ok: false, error: 'Could not read your alert settings' }); }
+  });
+  app.post('/api/arbiter/alerts', gate, async (req, res) => {
+    try {
+      const b = req.body || {};
+      const a = await updateAlerts(req.user.id, x => {
+        if (typeof b.telegram === 'boolean') x.telegram = b.telegram;
+        if (typeof b.email === 'boolean') x.email = b.email; });     // push is switched by subscribing a device
+      res.json({ ok: true, telegram: a.telegram !== false, email: a.email === true });
+    } catch (e) { log.warn('[ARBITER] alerts save failed:', e.message); res.status(500).json({ ok: false, error: 'Could not save your alert settings' }); }
+  });
+  app.post('/api/arbiter/alerts/test', gate, async (req, res) => {
+    const uid = req.user.id, t = Date.now(), recent = (testLog.get(uid) || []).filter(x => t - x < 3600e3);
+    if (recent.length >= 3) return res.status(429).json({ ok: false, error: 'Three tests an hour — try again later' });
+    recent.push(t); testLog.set(uid, recent);
+    const body = { kind: 'live', action: 'cut', symbol: 'TEST', direction: 'bear', ticket: '0', score: 0, snapshot: { route: 'test' } };
+    const r = await notifyTrader(uid, body, null, 'This is a TEST of Arbiter\'s alerts — no trade was touched.');
+    res.json({ ok: true, sent: r.sent || [] });
+  });
+
   app.get('/api/arbiter/push/key', gate, (req, res) => {
     const env = deps.env || process.env;
     res.json({ ok: true, publicKey: pushLib() ? env.VAPID_PUBLIC_KEY : null });
@@ -2741,7 +2775,7 @@ module.exports = function mountArbiter(app, deps) {
   });
 
   return { onHeartbeat, runAuto, writeReport, serverJudgement: (u, src) => { const j = judging.get(u + '|' + src); return j ? j.last : null; },
-           _test: { evaluateErrors, excursionFrom, pipSizeFor, RULES, scopes, judgeAccount, judging, statusFor, world, recordCall, parityLog, presence, spent, loadShare, notifyTrader, alertText, sentLog, emailDay, emailOf, updateAlerts, sendPush } };
+           _test: { evaluateErrors, excursionFrom, pipSizeFor, RULES, scopes, judgeAccount, judging, statusFor, world, recordCall, parityLog, presence, spent, loadShare, notifyTrader, alertText, sentLog, emailDay, emailOf, updateAlerts, sendPush, testLog } };
 };
 
 module.exports.evaluateErrors = evaluateErrors;
