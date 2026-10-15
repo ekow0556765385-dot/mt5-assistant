@@ -1,6 +1,5 @@
-/* risk-radar.js - EXTRACTED EXACTLY from index.html (the Assistant), the copy that actually runs.
-   Arbiter runs this same code when the Assistant is not publishing, READ-ONLY: it must never
-   write the Assistant's bw-risk-log. Do not edit here alone: test-engines.js fails on drift. */
+/* risk-radar.js — GENERATED from index.html by build-host.js. Do not edit by hand:
+   the Risk Radar engine block from the MT5 Assistant, copied VERBATIM. */
 (function boot(){
 'use strict';
 
