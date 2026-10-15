@@ -1,4 +1,5 @@
-/* break-confirm.js — EXTRACTED EXACTLY from patterns.html (the parsed top-level statement). Do not edit alone: test-combined-read.js fails on drift. */
+/* break-confirm.js — GENERATED from patterns.html by build-host.js. Do not edit by hand:
+   it is the engine block from the page, copied VERBATIM. */
 (function(root){
 'use strict';
 
