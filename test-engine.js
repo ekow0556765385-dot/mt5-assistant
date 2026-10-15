@@ -30,7 +30,7 @@ function goodWorld(over = {}) {
     expectedMinutes: 240,
     radar: { score: 14, state: 'clear', stateName: 'Clear' },
     openPositions: [], correlations: [],
-    spread: 0.8, medianSpread: 0.9,
+    spread: 0.8, medianSpread: 0.9, spreadPoints: 8, medianSpreadPoints: 9,   // the engine judges POINTS now (what the broker reports)
     edge: { sample: 38, hitRate: 0.61, baseline: 0.52 }
   }, over);
 }
@@ -106,7 +106,7 @@ check('reachability: a target beyond the session is flagged', () => {
 });
 
 check('spread is judged against this pair\'s own median, with the cost of the move', () => {
-  const j = E.judgeSetup(goodWorld({ spread: 3.4, medianSpread: 2.6 }), { direction: 'bear' });
+  const j = E.judgeSetup(goodWorld({ spread: 3.4, medianSpread: 2.6, spreadPoints: 34, medianSpreadPoints: 26 }), { direction: 'bear' });
   const s = byId(j, 'spread');
   assert.strictEqual(s.state, 'warn');
   assert.ok(/% of the intended move/.test(s.detail));
@@ -164,75 +164,101 @@ function position(over = {}) {
   return Object.assign({ ticket: '1', side: 'sell', floatingPips: 8, mfePips: 22, maePips: 4, stopPips: 26 }, over);
 }
 
-check('every pillar standing → HOLD', () => {
-  const w = goodWorld();
-  const frozen = E.freezeEntryCase(w, position());
+/* THE LIVE RULES AS THEY STAND (Phase C onwards). A changed pillar or a counter-signal RAISES PRESSURE;
+   an action needs a ROUTE — a witnessed reversal (the decisive level CLOSED through on H1), the damage
+   route, the profit ladder or the floor. These checks describe the engine as it is, so a change to any of
+   these rules shows up here. (They replaced the Phase 2 checks, which expected an action from a pillar
+   change alone.) */
+const baseP = () => { const w = goodWorld(); return { w, frozen: E.freezeEntryCase(w, position()) }; };
+
+check('every pillar standing → HOLD, calm', () => {
+  const { w, frozen } = baseP();
   const j = E.judgePosition(w, position({ entryCase: frozen }));
   assert.strictEqual(j.action.key, 'hold');
   assert.strictEqual(j.broken, 0);
-  assert.ok(/still standing/.test(j.action.reason));
+  assert.ok(j.pressure.score < E.STAGE.CALM, 'pressure ' + j.pressure.score);
 });
 
-check('the zone is closed through → pillar BROKEN → TAKE PARTIAL, not cut', () => {
-  const w = goodWorld();
-  const frozen = E.freezeEntryCase(w, position());
-  const later = goodWorld();
-  later.zones[0].spent = true;                       // the reason for entry is gone
+check('the zone is closed through → the pillar reads BROKEN and pressure rises (no action without a route)', () => {
+  const { w, frozen } = baseP();
+  const calm = E.judgePosition(w, position({ entryCase: frozen }));
+  const later = goodWorld(); later.zones[0].spent = true;
   const j = E.judgePosition(later, position({ entryCase: frozen }));
-  assert.strictEqual(j.action.key, 'partial');
-  assert.ok(j.pillars.find(p => p.id === 'zone_trust').change === 'broken');
-  assert.ok(/structural case still holds/.test(j.action.reason));
+  assert.strictEqual(j.pillars.find(p => p.id === 'zone_trust').change, 'broken');
+  assert.ok(j.pressure.score > calm.pressure.score, 'pressure rose: ' + calm.pressure.score + ' → ' + j.pressure.score);
 });
 
-check('structure turning against the trade → CUT', () => {
-  const w = goodWorld();
-  const frozen = E.freezeEntryCase(w, position());
-  const later = goodWorld({ structure: { regime: 'uptrend', confidence: 0.85 } });
-  const j = E.judgePosition(later, position({ entryCase: frozen }));
+check('structure turning against the trade → the structure pillar BREAKS and pressure rises', () => {
+  const { frozen } = baseP();
+  const j = E.judgePosition(goodWorld({ structure: { regime: 'uptrend', confidence: 0.85 } }), position({ entryCase: frozen }));
+  assert.strictEqual(j.pillars.find(p => p.id === 'structure').change, 'broken');
+  assert.ok(j.pressure.score > 4);
+});
+
+check('the decisive level CLOSED through on H1, well beyond it → CUT by the damage route, stop untouched', () => {
+  const { frozen } = baseP();
+  const t0 = 1.79e9, c = []; let p = 1.0840;
+  for (let i = 0; i < 40; i++) c.push({ t: t0 + i * 3600, o: p, h: p + 0.0004, l: p - 0.0004, c: p });
+  [[1.0850, 1.0872, 1.0848, 1.0870], [1.0870, 1.0880, 1.0868, 1.0878], [1.0878, 1.0885, 1.0874, 1.0882]]
+    .forEach((r, k) => c.push({ t: t0 + (40 + k) * 3600, o: r[0], h: r[1], l: r[2], c: r[3] }));
+  c.push({ t: t0 + 43 * 3600, o: 1.0882, h: 1.0884, l: 1.0880, c: 1.0882 });                 // the forming bar
+  const w = goodWorld({ price: 1.0882, invalidationLevel: 1.0865, candles: c, atr: 0.0010, patterns: [] });
+  const j = E.judgePosition(w, position({ entryCase: frozen, openPrice: 1.0840, floatingPips: -42, mfePips: 5, maePips: -42, stopPips: 60 }));
   assert.strictEqual(j.action.key, 'cut');
+  assert.strictEqual(j.action.route, 'damage');
 });
 
-check('the structural level breaking is a CUT even while the stop is untouched', () => {
-  const w = goodWorld();
-  const frozen = E.freezeEntryCase(w, position());
-  const later = goodWorld({ price: 1.0869, invalidationLevel: 1.0865 });
-  const j = E.judgePosition(later, position({ entryCase: frozen }));
-  assert.strictEqual(j.action.key, 'cut');
-  assert.ok(j.invalidation.brokenNow);
-});
-
-check('a live counter-pattern → TAKE PARTIAL; the same pattern stale → no change', () => {
-  const w = goodWorld();
-  const frozen = E.freezeEntryCase(w, position());
+check('a live counter-pattern raises pressure; the same pattern stale does not', () => {
+  const { w, frozen } = baseP();
+  const calm = E.judgePosition(w, position({ entryCase: frozen })).pressure.score;
   const live = goodWorld(); live.patterns = live.patterns.concat([{ name: 'Bullish Engulfing', type: 'bullish', confidence_pct: 79, bar_index: 1 }]);
-  assert.strictEqual(E.judgePosition(live, position({ entryCase: frozen })).action.key, 'partial');
   const stale = goodWorld(); stale.patterns = stale.patterns.concat([{ name: 'Bullish Engulfing', type: 'bullish', confidence_pct: 79, bar_index: 9 }]);
-  assert.strictEqual(E.judgePosition(stale, position({ entryCase: frozen })).action.key, 'hold', 'stale is not a live threat');
+  assert.ok(E.judgePosition(live, position({ entryCase: frozen })).pressure.score > calm, 'live raises it');
+  assert.strictEqual(E.judgePosition(stale, position({ entryCase: frozen })).pressure.score, calm, 'stale is not a live threat');
 });
 
-check('a formation escalates: forming → in reach → broken is a cut', () => {
-  const w = goodWorld();
-  const frozen = E.freezeEntryCase(w, position());
-  const f = (over) => {
-    const world = goodWorld();
+check('a formation escalates its pressure: forming < in reach < broken', () => {
+  const { frozen } = baseP();
+  const f = (over) => { const world = goodWorld();
     world.formations = [Object.assign({ name: 'Inverse Head and Shoulders', type: 'bullish', completion: 0.6 }, over)];
-    return E.judgePosition(world, position({ entryCase: frozen }));
-  };
-  assert.strictEqual(f({}).counterSignals[0].severity, 'forming');
-  assert.strictEqual(f({}).action.key, 'hold', 'a forming pattern is a watch, not an action');
-  assert.strictEqual(f({ necklinePips: 8 }).action.key, 'partial');
-  assert.strictEqual(f({ broken: true }).action.key, 'cut');
+    return E.judgePosition(world, position({ entryCase: frozen })); };
+  const a = f({}), b = f({ necklinePips: 8 }), c = f({ broken: true });
+  assert.strictEqual(a.counterSignals[0].severity, 'forming');
+  assert.strictEqual(a.action.key, 'hold', 'a forming pattern is a watch, not an action');
+  assert.ok(a.pressure.score < b.pressure.score && b.pressure.score < c.pressure.score,
+    a.pressure.score + ' < ' + b.pressure.score + ' < ' + c.pressure.score);
 });
 
-check('a weakened pillar in profit → MOVE TO BREAK-EVEN', () => {
-  const w = goodWorld();
-  const frozen = E.freezeEntryCase(w, position());
+check('a weakened pillar alone is not an action', () => {
+  const { frozen } = baseP();
   const later = goodWorld({ session: { name: 'Tokyo', depth: 0.45 } });
-  later.zones[0].touches = 4;                        // trust weakens, nothing breaks
-  const j = E.judgePosition(later, position({ entryCase: frozen, floatingPips: 12 }));
-  assert.strictEqual(j.action.key, 'be');
-  const losing = E.judgePosition(later, position({ entryCase: frozen, floatingPips: -6 }));
-  assert.strictEqual(losing.action.key, 'hold', 'nothing to protect yet');
+  later.zones[0].touches = 4;
+  assert.strictEqual(E.judgePosition(later, position({ entryCase: frozen, floatingPips: 12 })).action.key, 'hold');
+});
+
+console.log('\nLOCATION IS ON THE TRADE\'S SIDE');
+
+check('a demand block ABOVE price (fallen through) gives a buy no location', () => {
+  const w = goodWorld({ structure: { regime: 'uptrend', confidence: 0.9 }, price: 1.0750,
+    zones: [{ kind: 'demand', lo: 1.0758, hi: 1.0759, touches: 1, ageHours: 5, spent: true }] });
+  const l = byId(E.judgeSetup(w, { direction: 'bull' }), 'location');
+  assert.strictEqual(l.state, 'fail');
+  assert.ok(/no longer underneath/.test(l.detail), l.detail);
+});
+
+check('with a demand block below too, location measures to the one below', () => {
+  const w = goodWorld({ structure: { regime: 'uptrend', confidence: 0.9 }, price: 1.0750,
+    zones: [{ kind: 'demand', lo: 1.0758, hi: 1.0759, touches: 1, ageHours: 5, spent: true },
+            { kind: 'demand', lo: 1.0740, hi: 1.0745, touches: 1, ageHours: 5, spent: false }] });
+  const l = byId(E.judgeSetup(w, { direction: 'bull' }), 'location');
+  assert.strictEqual(l.state, 'pass');
+  assert.ok(/1\.07400/.test(l.detail), l.detail);
+});
+
+check('price inside its zone is unchanged', () => {
+  const l = byId(E.judgeSetup(goodWorld(), { direction: 'bear' }), 'location');
+  assert.strictEqual(l.state, 'pass');
+  assert.ok(/inside/.test(l.detail));
 });
 
 check('excursion and giveback are computed from the water marks', () => {
@@ -262,13 +288,16 @@ check('escalation needs 2 cycles, relaxing back needs 3', () => {
   assert.strictEqual(s.settle('1', hold).action.key, 'hold', 'relaxes only on the third');
 });
 
-check('a single flickering cycle never reaches the screen', () => {
+check('a single spike never reaches the screen; a warning on 2 of the last 3 cycles does', () => {
   const s = E.createStabiliser();
   const hold = { key: 'hold' }, partial = { key: 'partial' };
   s.settle('9', hold);
-  assert.strictEqual(s.settle('9', partial).action.key, 'hold');
+  assert.strictEqual(s.settle('9', partial).action.key, 'hold', 'one spike: not shown');
   assert.strictEqual(s.settle('9', hold).action.key, 'hold');
-  assert.strictEqual(s.settle('9', partial).action.key, 'hold', 'the count restarts, it does not accumulate');
+  assert.strictEqual(s.settle('9', partial).action.key, 'partial', '2 of the last 3: shown (pressure hovering at the line)');
+  const t = E.createStabiliser();
+  t.settle('8', hold); t.settle('8', partial); t.settle('8', hold); t.settle('8', hold);
+  assert.strictEqual(t.settle('8', partial).action.key, 'hold', '1 of the last 3: not shown');
 });
 
 check('positions are tracked separately', () => {
