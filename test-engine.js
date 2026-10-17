@@ -261,10 +261,40 @@ check('the calm HOLD sentence names a reason that broke', () => {
 });
 
 check('LOSING is the money after swap and commission when it is sent', () => {
-  const j = E.judgePosition(goodWorld(), position({ floatingPips: 1, profit: 1, netProfit: -3.5, mfePips: 2 }));
+  // dead zone here: the smaller of 1/4 x 26-pip stop (6.5) and 0.2 x 60-pip ATR (12) = 6.5 pips. +1 pip, -$40 after costs = -4 pips net: inside it
+  const j0 = E.judgePosition(goodWorld(), position({ floatingPips: 1, profit: 10, netProfit: -40, mfePips: 2 }));
+  assert.ok(!/^Losing/.test(j0.action.reason), 'inside the dead zone it is flat: ' + j0.action.reason);
+  // +1 pip on the chart, -$80 after costs = -8 pips net: losing, as MT5 shows it
+  const j = E.judgePosition(goodWorld(), position({ floatingPips: 1, profit: 10, netProfit: -80, mfePips: 2 }));
   assert.ok(/^Losing/.test(j.action.reason), j.action.reason);
   const k = E.judgePosition(goodWorld(), position({ floatingPips: 1, profit: 1, mfePips: 2 }));
   assert.ok(!/^Losing/.test(k.action.reason), 'without net money, the pips decide: ' + k.action.reason);
+});
+
+check('a trade a fraction of a pip down is NOT judged as a loser (the dead zone)', () => {
+  const { frozen } = baseP();
+  const w = goodWorld({ structure: { regime: 'uptrend', confidence: 0.8 },
+    patterns: [{ name: 'Bullish Engulfing', type: 'bullish', confidence_pct: 75, bar_index: 1 }] });
+  const j = E.judgePosition(w, position({ entryCase: frozen, floatingPips: -0.5, mfePips: 1, maePips: -0.5, profit: -2 }));
+  assert.notStrictEqual(j.action.key, 'cut', j.action.reason);
+  const deep = E.judgePosition(w, position({ entryCase: frozen, floatingPips: -9, mfePips: 1, maePips: -9, profit: -36 }));
+  assert.ok(/^Losing|losing/.test(deep.action.reason), 'beyond the dead zone the loser rules apply: ' + deep.action.reason);
+});
+
+check('a trigger getting old LAPSES — it is not a broken reason', () => {
+  const { frozen } = baseP();
+  const j = E.judgePosition(goodWorld({ patterns: [{ name: 'Bearish Engulfing', type: 'bearish', confidence_pct: 81, bar_index: 4 }] }), position({ entryCase: frozen }));
+  assert.strictEqual(j.pillars.find(p => p.id === 'trigger').change, 'lapsed');
+  assert.ok(!j.pressure.factors.some(f => f.id === 'pillars_broken'), JSON.stringify(j.pressure.factors));
+});
+
+check('a structure label counts as a witness only once it has held 2 closed bars', () => {
+  const { frozen } = baseP();
+  const at = held => E.judgePosition(goodWorld({ structure: { regime: 'uptrend', confidence: 0.8 }, structureHeld: held }), position({ entryCase: frozen }));
+  const has = j => ((j.pressure.reversal && j.pressure.reversal.witnesses) || []).some(w => w.id === 'label');
+  assert.ok(!has(at(false)), 'just flipped: not yet');
+  assert.ok(has(at(true)), 'held: counted');
+  assert.ok(has(at(undefined)), 'cannot tell: counted, as before');
 });
 
 check('a late first look rebuilds the entry case at the entry, not now', () => {
