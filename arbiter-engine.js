@@ -274,10 +274,50 @@ const CONDITIONS = {
   },
 
   // 6 ── pullback vs reversal, from the retracement engine
-  pullback(w) {
+  pullback(w, want) {
     const r = w.retracement;
-    if (!r || r.score == null) return res(UNKNOWN, 'No retracement reading.', 'retracement');
-    const s = n(r.score);
+    if (!r || (r.score == null && !r.verdict)) return res(UNKNOWN, 'No retracement reading.', 'retracement');
+    const s = r.score == null ? null : n(r.score);
+    /* THE TAB'S OWN VERDICT, when there is one (Oct 2026): the words the trader sees on
+       the Retracement tab decide, not a second set of score bands. A broken structure
+       is a reversal at ANY score — the old bands could pass it as "Pullback, score 30". */
+    if (r.verdict) {
+      const sc = s != null ? `, score ${s}` : '';
+      const m = { score: s, verdict: r.verdict };
+      /* THE MARKET IS RANGING: say so, and where price sits in the range */
+      if (r.standDown && r.holder === 'range') {
+        const g = r.range, p = n(w.price);
+        if (g && p != null && g.hi > g.lo) {
+          const pct = Math.round((p - g.lo) / (g.hi - g.lo) * 100), pip = pipSizeFor(w.symbol);
+          const toSup = Math.abs(p - g.lo) / pip, toRes = Math.abs(g.hi - p) / pip;
+          const where = p > g.hi ? `above the top of it, ${toRes.toFixed(0)} pips past resistance`
+            : p < g.lo ? `below the bottom of it, ${toSup.toFixed(0)} pips past support`
+            : pct >= 45 && pct <= 55 ? `in the middle of it (${pct}% of the way up)`
+            : toRes < toSup ? `closer to resistance — ${pct}% of the way up, ${toRes.toFixed(0)} pips below ${fmt(g.hi, w.symbol)}`
+            : `closer to support — ${pct}% of the way up, ${toSup.toFixed(0)} pips above ${fmt(g.lo, w.symbol)}`;
+          return res(UNKNOWN, `The market is ranging between ${fmt(g.lo, w.symbol)} and ${fmt(g.hi, w.symbol)}. Price is ${where}.`,
+            'retracement', Object.assign({}, m, { rangeLo: g.lo, rangeHi: g.hi, rangePct: pct }));
+        }
+        return res(UNKNOWN, 'The market is ranging — the range engine has this market.', 'retracement', m);
+      }
+      if (r.standDown) return res(UNKNOWN, `The Retracement tab has stood its pullback view down — ${
+        r.holder === 'range' ? 'the range engine has this market' : r.holder === 'chop' ? 'the chop engine has this market'
+        : r.holder === 'drift' ? 'nothing is holding here' : 'structure has this market'}.`, 'retracement', m);
+      /* a pullback IN THE OTHER DIRECTION is not this trade's pullback */
+      const wd = want === 'bull' ? 1 : want === 'bear' ? -1 : 0;
+      if (wd && r.dir && r.dir !== wd && (r.verdict === 'pullback' || r.verdict === 'leaning-pullback'))
+        return res(FAIL, `The tab reads a pullback in the ${r.dir > 0 ? 'uptrend' : 'downtrend'}${sc} — against this ${wd > 0 ? 'buy' : 'sell'}.`, 'retracement', m);
+      switch (r.verdict) {
+        case 'pullback':          return res(PASS, `Pullback — the trend is intact${sc}. ${r.note || ''}`.trim(), 'retracement', m);
+        case 'leaning-pullback':  return res(WARN, `Leaning pullback — nothing has broken yet, but not clearly a pullback${sc}.`, 'retracement', m);
+        case 'leaning-reversal':  return res(FAIL, `Leaning reversal${sc} — tighten, do not assume.`, 'retracement', m);
+        case 'reversal-warning':  return res(FAIL, `Deep pullback — the evidence is bad, though structure still holds${sc}.`, 'retracement', m);
+        case 'reversal-unconfirmed': return res(FAIL, `Structure has broken — reversal not yet confirmed${sc}.`, 'retracement', m);
+        case 'reversal':
+        case 'reversal-by-structure': return res(FAIL, `Reversal — the trend structure is gone${sc}.`, 'retracement', m);
+      }
+      if (s == null) return res(UNKNOWN, 'No retracement reading.', 'retracement', m);
+    }
     if (s <= 35) return res(PASS, `Pullback, score ${s}. ${r.note || ''}`.trim(), 'retracement', { score: s });
     if (s <= 65) return res(WARN, `Undecided, score ${s} — not clearly a pullback.`, 'retracement', { score: s });
     return res(FAIL, `Leaning reversal, score ${s}.`, 'retracement', { score: s });
