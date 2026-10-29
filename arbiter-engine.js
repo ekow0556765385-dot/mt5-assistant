@@ -919,11 +919,12 @@ function judgePosition(world, position, opts = {}) {
     conditions: live.conditions, target, progress });
   const losing = isLosing(world, position);
   const stopUsed = (now != null && now < 0 && n(position.stopPips)) ? Math.min(1, Math.abs(now) / n(position.stopPips)) : null;
+  const deep = losing ? deepStopRead(world, position, want, stopUsed) : null;
   const ladder = losing ? null : ladderOf(world, position, pressure.reversal);
   const floor = losing ? null : profitFloor(world, position, target);
   const action = stageAction({ pressure, losing, progress, peakProgress, travelledPips: now,
     partialPips, partialTaken: !!position.partialTaken, target,
-    stopUsed, pullback: world.pullbackExposure || null, ladder, floor });
+    stopUsed, deep, pullback: world.pullbackExposure || null, ladder, floor });
   action.route = routeOf(action, pressure);
   /* inside the dead zone the trade is FLAT, not in profit — the words must say so */
   const flat = !losing && (n(position.netProfit) != null ? n(position.netProfit) < 0 : now != null && now < 0);
@@ -973,6 +974,34 @@ function judgePosition(world, position, opts = {}) {
 
 /* The structural level that would make the trade wrong — NOT the stop.
    The two are often different, and this one decides cut vs partial. */
+/* How deep into its stop a losing trade has EVER been, and whether the decisive level it broke has been won back.
+   Stateless — read from the recorded worst point (maePips) and the H1 candles since the entry (bars that opened
+   at or after it, the same rule the server's excursionFrom uses: the entry bar may predate the fill), plus now.
+   So the page and the server always agree, and a restart forgets nothing. */
+function deepStopRead(world, position, want, stopUsed) {
+  const stop = n(position.stopPips), op = n(position.openPrice), openT = n(position.openTime);
+  if (!stop || op == null) return { peak: stopUsed, reclaimed: false };
+  const tS = b => (b.t > 1e12 ? b.t / 1000 : b.t), pip = pipSizeFor(world.symbol);
+  let worst = n(position.maePips) != null ? Math.abs(n(position.maePips)) : 0;
+  const cd = world.candles || [];
+  if (openT != null) cd.forEach(b => {
+    if (n(b.t) == null || tS(b) < openT) return;
+    const adv = (want === 'bull' ? op - n(b.l) : n(b.h) - op) / pip;
+    if (Number.isFinite(adv)) worst = Math.max(worst, adv);
+  });
+  let peak = Math.min(1, worst / stop);
+  if (stopUsed != null) peak = Math.max(peak, stopUsed);
+  let reclaimed = false;
+  const lvl = n(world.invalidationLevel);
+  if (lvl != null && openT != null && cd.length > 2) {
+    const closed = cd.slice(0, -1).filter(b => n(b.t) != null && tS(b) >= openT && n(b.c) != null);   // CLOSED bars only
+    const against = c => (want === 'bull' ? c < lvl : c > lvl);
+    const k = closed.findIndex(b => against(n(b.c)));
+    if (k >= 0 && closed.length - 1 > k) reclaimed = !against(n(closed[closed.length - 1].c));
+  }
+  return { peak, reclaimed };
+}
+
 function isInvalidated(world, position, want) {
   const lvl = n(world.invalidationLevel);
   if (lvl == null) return { level: null, brokenNow: false, pipsAway: null, note: 'No structural level quoted.' };
@@ -1108,6 +1137,7 @@ const STAGE = {
   LOSING_CUT: 45,             // PROVISIONAL — Assan: "it has to be accurate"; it moves on his data
   LOSING_WATCH: 25,
   STOP_DEEP_CUT: 0.75,        // a LOSER with 3/4 of its stop gone is CUT on stop depth alone (Assan: never HOLD it into the stop)
+  STOP_DEEP_RELEASE: 0.50,    // ...and that CUT STANDS until it is back under half the stop, or the broken level is reclaimed (Oct 2026)
   CALM: 30,                   // below this, "all the factors still hold"
   WIN_CUT_BASE: 70, WIN_CUT_SPAN: 20,   // winner's cut bar = 70 + 20 x reward still left
   BE_REACHED: 0.60, BE_REVERSE: 0.10,   // reached 60% of the way, then gave back 10% of the path
@@ -1445,7 +1475,7 @@ function pressureOf(ctx) {
    decides between them. HOLD is the default at every stage, and gives way
    only when the things that turn a winner into a loser start appearing. */
 function stageAction(ctx) {
-  const { pressure, losing, progress, peakProgress, travelledPips, partialPips, partialTaken, target, stopUsed, pullback, ladder, floor } = ctx;
+  const { pressure, losing, progress, peakProgress, travelledPips, partialPips, partialTaken, target, stopUsed, deep, pullback, ladder, floor } = ctx;
   const p = pressure.score;
   const top = pressure.factors.slice(0, 3).map(x => x.label.toLowerCase()).join(', ');
   const tag = (key, label, reason, stage) => ({ key, label, pressure: p, reason, stage, top: pressure.factors.slice(0, 3) });
@@ -1459,6 +1489,15 @@ function stageAction(ctx) {
        too late to save anything — and a HOLD there reads as if Arbiter expected a recovery. */
     if (stopUsed != null && stopUsed >= STAGE.STOP_DEEP_CUT)
       return tag('cut', 'CUT', `Losing, ${Math.round(stopUsed * 100)}% of the stop already used. The market has mostly disproved this trade, and nothing on the chart says it is turning back — cut it here rather than give up the last of the stop.`, 'losing_deep');
+    /* ...AND IT STANDS (Oct 2026, Assan's GBPUSD): the rule above was a line with no memory. A CUT at 75% became
+       a HOLD two minutes later when price bounced to 58% — nothing about the trade had improved — and the stop
+       was hit. Once a loser HAS been three-quarters into its stop, the CUT holds until the trade genuinely
+       recovers: back under half the stop, or the decisive level it broke reclaimed on a CLOSED H1 candle. */
+    if (stopUsed != null && deep && deep.peak != null && deep.peak >= STAGE.STOP_DEEP_CUT &&
+        stopUsed >= STAGE.STOP_DEEP_RELEASE && !deep.reclaimed)
+      return tag('cut', 'CUT', `Losing, ${Math.round(stopUsed * 100)}% of the stop used — and it has already been ${Math.round(deep.peak * 100)}% in. ` +
+        `A bounce this deep inside a losing trade does not undo that: the cut stands until the trade is back under ` +
+        `${Math.round(STAGE.STOP_DEEP_RELEASE * 100)}% of the stop, or the broken level is reclaimed on a closed candle.`, 'losing_deep');
     if (p >= STAGE.LOSING_WATCH) return tag('hold', 'HOLD', `Losing, and pressure is building — ${top}. Not enough to cut yet; watch it. This is not a forecast that it comes back — your stop is the limit.`, 'losing_watch');
     // Never call it "a normal pullback" unless that was actually measured.
     // Past half the stop, say how deep it is and what is (not) known.
@@ -1563,7 +1602,7 @@ const API = {
   CONDITIONS, GATES, GATE_CAP, GATE_CAPS, WEIGHTS, CORE, ADJUSTERS, ORDER, LABELS,
   PILLARS, EDGE_MIN_SAMPLE,
   _internals: { judge, score, applyGates, applyRadar, decideAction, counterSignals,
-                pressureOf, stageAction, targetFor, patternPoints,
+                pressureOf, stageAction, deepStopRead, targetFor, patternPoints,
                 patDir, patConf, patAge, pipSizeFor, nearestZone, opposingZone }
 };
 
