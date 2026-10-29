@@ -413,5 +413,50 @@ check('gold and JPY use their own pip sizes throughout', () => {
   assert.ok(/2336.90/.test(byId(g, 'location').detail), byId(g, 'location').detail);
 });
 
+
+console.log('\nDEEP IN THE STOP — the CUT stands until the trade really recovers (Assan, GBPUSD, 29 Oct)');
+{
+  // a SELL from 1.0840 with a 20-pip stop; the decisive level is 1.0850 (above the entry, below the stop)
+  const T0 = 1700000000, OP = 1.0840;
+  const bar = (k, o, h, l, c) => ({ t: T0 + k * 3600, o, h, l, c });
+  const calmBars = [bar(-1, 1.0845, 1.0870, 1.0830, 1.0842), bar(0, 1.0842, 1.0848, 1.0836, 1.0846), bar(1, 1.0846, 1.0849, 1.0840, 1.0847), bar(2, 1.0847, 1.0849, 1.0843, 1.0848)];
+  const W = (over) => goodWorld(Object.assign({ invalidationLevel: 1.0850, candles: calmBars }, over));
+  const P = (floating, mae, extra) => position(Object.assign({ openPrice: OP, openTime: T0, stopPips: 20, floatingPips: floating,
+    mfePips: 2, maePips: mae, profit: floating * 4 }, extra || {}));
+  const { frozen } = baseP();
+  const act = (w, p) => E.judgePosition(w, Object.assign(p, { entryCase: frozen })).action;
+
+  check('75% of the stop used -> CUT (the rule as it was)', () => {
+    const a = act(W(), P(-15, 15));
+    assert.strictEqual(a.key, 'cut'); assert.strictEqual(a.stage, 'losing_deep');
+  });
+  check('HIS CASE: it bounced back to 58% -> the CUT STANDS (it used to become HOLD)', () => {
+    const a = act(W(), P(-11.6, 15));
+    assert.strictEqual(a.key, 'cut', a.reason); assert.strictEqual(a.stage, 'losing_deep');
+    assert.ok(/already been 75% in/.test(a.reason), a.reason);
+  });
+  check('it recovers to under half the stop -> released', () => {
+    const a = act(W(), P(-9, 15));
+    assert.notStrictEqual(a.stage, 'losing_deep', a.reason);
+  });
+  check('the decisive level it broke is reclaimed on a CLOSED candle -> released, even at 58%', () => {
+    const broke = calmBars.slice(0, 2).concat([bar(1, 1.0846, 1.0856, 1.0844, 1.0853), bar(2, 1.0853, 1.0856, 1.0845, 1.0847), bar(3, 1.0847, 1.0849, 1.0845, 1.0848)]);
+    const a = act(W({ candles: broke }), P(-11.6, 15));
+    assert.notStrictEqual(a.stage, 'losing_deep', a.reason);
+    const notYet = broke.slice(0, 3).concat([bar(2, 1.0853, 1.0856, 1.0845, 1.0847)]);   // back below only on the FORMING bar
+    assert.strictEqual(act(W({ candles: notYet }), P(-11.6, 15)).key, 'cut', 'a forming candle does not reclaim it');
+  });
+  check('the depth is read from the candles too, so a slow-to-save worst point cannot let a bounce through', () => {
+    const wick = calmBars.slice(0, 3).concat([bar(2, 1.0847, 1.0856, 1.0843, 1.0848)]);   // high 1.0856 = 16 pips against
+    assert.strictEqual(act(W({ candles: wick }), P(-11.6, 4)).key, 'cut');
+    const before = [bar(-1, 1.0845, 1.0899, 1.0830, 1.0842)].concat(calmBars.slice(1));   // the spike was BEFORE the entry
+    assert.notStrictEqual(act(W({ candles: before }), P(-11.6, 4)).stage, 'losing_deep', 'the entry bar may predate the fill');
+  });
+  check('a trade that never reached 75% is judged exactly as before at 58%', () => {
+    const a = act(W(), P(-11.6, 12));
+    assert.notStrictEqual(a.stage, 'losing_deep', a.reason);
+  });
+}
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
