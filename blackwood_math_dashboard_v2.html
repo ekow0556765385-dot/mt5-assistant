@@ -301,6 +301,30 @@ body{font-family:Archivo,-apple-system,sans-serif;background:var(--bg);color:var
 .ig select{max-width:100%}
 .ig:has(#psType){flex:1 1 210px;min-width:0}
 #psType{width:100%!important;min-width:0}
+/* THE HEADLINE STRIP spreads its eight figures evenly across a wide screen instead of bunching them on
+   the left with an empty gap on the right. Narrower screens keep the sideways-scrolling row. */
+@media (min-width:1100px){.strip{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:20px}}
+/* EVEN COLUMNS (Nov 2026): every table splits its width into equal columns, so the gaps between columns
+   are the same all the way across, and each figure sits centred directly under its heading. The first
+   column is the row's label (week, symbol, run, drawdown, stop) and reads from the left, as does Symbol
+   in the two history tables. On a phone the wider tables keep enough width for equal columns and scroll
+   sideways inside their card. */
+.tbl{table-layout:fixed}
+.tbl :is(th,td){text-align:center}
+.tbl :is(th,td):first-child,
+table:has(#histBody) :is(th,td):nth-child(2),
+#calDay .tbl :is(th,td):nth-child(2){text-align:left}
+.tbl td{overflow:hidden;text-overflow:ellipsis}
+table:has(#openBody){min-width:900px}
+table:has(#histBody){min-width:1320px}
+table:has(#calWk){min-width:620px}
+#calDay .tbl{min-width:960px}
+@media (max-width:480px){
+  .tbl th,.tbl td{padding-left:6px;padding-right:6px}
+  .tbl td{font-size:11px}
+  table:has(#stkBody){min-width:360px}
+}
+.tbl td[colspan]{text-align:left!important}      /* an empty-table message reads from the left */
 @media (max-width:780px){
   .cd{padding:6px 5px}
   .cd .amt{display:none}
