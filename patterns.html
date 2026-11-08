@@ -13110,6 +13110,11 @@ function drawConfChart(cd, o){
   { const N2=window.__cfRead2; if(N2 && N2.ok && N2.box && ON('range')){
       const yt=y(N2.box.hi), yb=y(N2.box.lo); g.save(); g.fillStyle='rgba(201,130,10,.07)'; g.fillRect(PADL, yt, W-PADL-PADR, yb-yt); g.restore();
       line(N2.box.hi, C_GD, 'range', [5,4]); line(N2.box.lo, C_GD, 'range', [5,4]); } }
+  /* CHANGE OF DIRECTION (Nov 2026): the broken swing, and the two milestones while the break is followed */
+  { const CD=window.__cfCdo; if(CD && CD.state!=='inval'){ const pp=v=>(Math.abs(v)/pipOf(pair)).toFixed(1), lc=view[show-1]?view[show-1].c:null;
+      const lab=(v,t)=>{ const yy=y(v); if(yy<PADT||yy>PH-PADB) return; g.save(); g.font='10px ui-monospace,monospace'; const tw=g.measureText(t).width; g.fillStyle=V('--surface','#0f0f16'); g.globalAlpha=.8; g.fillRect(PADL+2,yy-13,tw+6,12); g.globalAlpha=1; g.fillStyle=C_GD; g.fillText(t,PADL+5,yy-3); g.restore(); };
+      line(CD.lv, C_GD, '', []); lab(CD.lv, 'broken '+CD.word);
+      [[CD.oneT,'one average candle',CD.oneI],[CD.prior,'the swing before',CD.priorI]].forEach(([v,t,ri])=>{ line(v, C_GD, '', [2,3]); lab(v, t+(ri>=0?' ✓':lc!=null?' · '+pp(v-lc)+' pips to go':'')); }); } }
   /* THE EXHAUSTION LADDER (Nov 2026): halfway back and the run's start while a tiring signal is followed */
   { const EX=window.__cfExh; if(EX){ const pp=v=>(Math.abs(v)/pipOf(pair)).toFixed(1), lc=view[show-1]?view[show-1].c:null;
       [[EX.mid,'halfway back',EX.midI],[EX.start,'run start',EX.startI]].forEach(([v,lab,ri])=>{ line(v, C_GD, '', [2,3]);
@@ -14201,6 +14206,109 @@ function exCard(cd, alerts, raised){ let R = null; try{ R = exPick(cd, alerts, r
       '<div><div class="k">The run</div><div class="v n">'+R.F(Math.min(R.start, R.lv.p))+' – '+R.F(Math.max(R.start, R.lv.p))+' · '+Math.abs(exPips(R.lv.p - R.start)).toFixed(1)+' pips</div></div></div>')+
     exMathHtml(R)+'<div class="cf-n" style="margin:12px 0 6px">Since the new '+(dir < 0 ? 'high' : 'low')+'</div><ul class="pr-path">'+path+'</ul>'+
     '<div class="pr-foot">The exhaustion ladder describes where price is in the turn and what comes next. It does not place trades or tell you to take one.</div></div>'; }
+
+/* ═══ CHANGE OF DIRECTION (Nov 2026, approved prototype: change_of_direction_prototype.html) ═════════════════════
+   Swings of 2 candles each side (known 2 candles after they form). An uptrend = the last two swing highs AND lows
+   rising (a downtrend: both falling). A candle CLOSES below the last higher low (above the last lower high), the candle
+   before had not, and the Combined Read's own trend engine says uptrend or downtrend (not range or transition).
+   Then: holding · being tested when price closes back past the broken swing (that is normal and never ends it) ·
+   the first counter swing · the new direction (a close past the low/high made before it). Ends when the old trend is
+   back (price past the last high/low), the new direction is in place, or after 40 candles. H1 and H4.
+   Its own name on purpose: the SMC panel's CHoCH (major swings, 10 candles each side) is separate and untouched. */
+function cdoT(b){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(b.t).getUTCDay()]+' '+cxSrv(b.t); }
+function cdoAtr(cd,e){ let s=0,m=0; for(let i=Math.max(1,e-13);i<=e;i++){ s+=cd[i].h-cd[i].l; m++; } return m?s/m:0; }
+function cdoFind(cd){ const last=cd.length-1, SH=[], SL=[], done={}; let ev=null;
+  for(let k=5;k<=last;k++){ const j=k-3; if(j>=2&&j+2<=last){ const x=cd[j];
+      if(x.h>cd[j-1].h&&x.h>cd[j-2].h&&x.h>=cd[j+1].h&&x.h>=cd[j+2].h) SH.push({p:x.h,j});
+      if(x.l<cd[j-1].l&&x.l<cd[j-2].l&&x.l<=cd[j+1].l&&x.l<=cd[j+2].l) SL.push({p:x.l,j}); }
+    if(SH.length<2||SL.length<2) continue;
+    const h1=SH[SH.length-1],h0=SH[SH.length-2],l1=SL[SL.length-1],l0=SL[SL.length-2];
+    const up=h1.p>h0.p&&l1.p>l0.p, down=h1.p<h0.p&&l1.p<l0.p; if(!up&&!down) continue;
+    const dir=up?-1:1, lv=up?l1:h1, past=c=>dir<0?c.c<lv.p:c.c>lv.p, key=dir+':'+lv.j; if(done[key]) continue;
+    if(!past(cd[k])||past(cd[k-1])) continue; done[key]=1;
+    const reg=cd[k-1].reg, te=reg==='u'?'up':reg==='d'?'down':reg==='r'?'range':'transition';
+    if(te!=='up'&&te!=='down') continue;
+    ev={k,dir,lv,h0,h1,l0,l1,te,agree:(dir<0&&te==='up')||(dir>0&&te==='down'),a:cdoAtr(cd,k)}; }
+  return ev&&last-ev.k<=40?ev:null; }
+function cdoRead(closed,f){ const ev=cdoFind(closed); if(!ev) return {state:'idle'};
+  const dir=ev.dir, last=closed.length-1, F=v=>(+v).toFixed(digitsOf(pair)), b0=closed[ev.k], lvP=ev.lv.p;
+  const R={ev,dir,F,last,closed,f,path:[],state:'holding'}, word=dir<0?'higher low':'lower high', w2=dir<0?'lower high':'higher low';
+  R.oneT=b0.c+dir*ev.a; R.prior=dir<0?ev.l0.p:ev.h0.p; R.inval=dir<0?ev.h1.p:ev.l1.p;
+  R.path.push({i:ev.k,c:'touch',w:'Closed '+(dir<0?'below':'above')+' the last '+word+' '+F(lvP)+' · <b>change of direction</b>'});
+  let back=0, rebreaks=0, ended=null, ext=b0.c, extI=ev.k, oneI=-1, priorI=-1, cs=null, newI=-1;
+  for(let i=ev.k+1;i<=last;i++){ const b=closed[i];
+    if(newI>=0) break;   /* the new direction is in place: the steps are done, the structure reading takes over */
+    /* going back past the broken swing does NOT end it: tested over 10 years, 3 in 4 breaks did that at some point,
+       and the result above was measured with them in. It is shown as a fact; closing past it again is shown too. */
+    const isBack=dir<0?b.c>lvP:b.c<lvP;
+    if(isBack){ back++; if(back===1) R.path.push({i,c:'one',w:'Closed back '+(dir<0?'above':'below')+' the broken '+word+' · <b>being tested</b>'}); }
+    else if(back>0){ rebreaks++; back=0; R.path.push({i,c:'touch',w:'Closed '+(dir<0?'below':'above')+' it again · <b>broke it again</b>'}); }
+    if(dir<0?b.l<ext:b.h>ext){ ext=dir<0?b.l:b.h; extI=i; }
+    if(oneI<0&&(dir<0?b.l<=R.oneT:b.h>=R.oneT)){ oneI=i; R.path.push({i,c:'far',w:'One average candle from the break · '+F(R.oneT)}); }
+    if(priorI<0&&(dir<0?b.l<=R.prior:b.h>=R.prior)){ priorI=i; R.path.push({i,c:'far',w:'<b>Reached the swing before</b> · '+F(R.prior)}); }
+    /* the first counter swing after the break (known 2 candles later) */
+    if(!cs&&i-2>ev.k+1){ const j=i-2, x=closed[j]; const isSw=dir<0?(x.h>closed[j-1].h&&x.h>closed[j-2].h&&x.h>=closed[j+1].h&&x.h>=closed[j+2].h):(x.l<closed[j-1].l&&x.l<closed[j-2].l&&x.l<=closed[j+1].l&&x.l<=closed[j+2].l);
+      if(isSw&&(dir<0?x.h<ev.h1.p:x.l>ev.l1.p)){ cs={j,p:dir<0?x.h:x.l,extAt:ext}; R.path.push({i:j,c:'ret',w:'First '+w2+' after the break · '+F(cs.p)}); } }
+    if(cs&&newI<0&&i>cs.j+2&&(dir<0?b.c<cs.extAt:b.c>cs.extAt)){ newI=i; R.path.push({i,c:'far',w:'<b>New '+(dir<0?'low':'high')+'</b> after the '+w2+' · the new direction is in place'}); }
+    if(dir<0?b.h>R.inval:b.l<R.inval){ ended='inval'; R.path.push({i,c:'brk',w:'Back past the last '+(dir<0?'high':'low')+' '+F(R.inval)+' · the old trend is back'}); break; } }
+  Object.assign(R,{back,rebreaks,ended,ext,extI,oneI,priorI,cs,newI});
+  R.state=ended==='inval'?'inval':back>=1&&newI<0?'back':newI>=0?'new':cs?'lh':oneI>=0?'moving':'holding';
+  if(R.state==='holding'&&last-ev.k>=24) R.state='faded';
+  const fp=(f.c-lvP)*dir; R.fw=fp<0?'back '+(dir<0?'above':'below')+' the broken '+word+' so far · one close would not undo it':'holding · '+Math.abs(exPips(fp)).toFixed(1)+' pips past the broken '+word;
+  R.word=word; R.w2=w2; return R; }
+function cdoHead(R){ const F=R.F, dir=R.dir, ev=R.ev, from=dir<0?'uptrend':'downtrend', to=dir<0?'down':'up';
+  const ctx=ev.agree?'The trend engine still says '+from+'.':'The trend engine already says '+(dir<0?'downtrend':'uptrend')+'; this break brings the swings into line.';
+  if(R.state==='false') return ['A false break: the '+from+' held','Two closes back '+(dir<0?'above':'below')+' '+F(ev.lv.p)+'. The change of direction did not hold.','strong','False break'];
+  if(R.state==='inval') return ['The old trend is back','Price went back past the last '+(dir<0?'high':'low')+' '+F(R.inval)+'.','strong','Undone'];
+  if(R.state==='back') return ['Back '+(dir<0?'above':'below')+' the broken '+R.word+': being tested',R.back+' close'+(R.back===1?'':'s')+' back '+(dir<0?'above':'below')+' '+F(ev.lv.p)+'. That is common after a change of direction; it only ends if price goes back past the last '+(dir<0?'high ':'low ')+F(R.inval)+'.','watch','Tested'];
+  if(R.state==='new') return ['The new direction is in place','After the break, a '+R.w2+' formed and price made a new '+(dir<0?'low':'high')+'. The '+from+' has turned '+to+'.','failed','Turned'];
+  if(R.state==='lh') return ['Change of direction: the first '+R.w2+' has formed','Price bounced to '+F(R.cs.p)+' and turned back. A close past '+F(R.cs.extAt)+' puts the new direction in place.','building','Turning'];
+  if(R.state==='moving') return ['Change of direction: moving '+to,'Price has gone one average candle past the break. '+ctx,'building','Moving'];
+  if(R.state==='faded') return ['Change of direction: going nowhere','24 candles since the break, and price has not moved one average candle on.','watch','Stalled'];
+  return ['Change of direction: the '+from+' broke','A candle closed '+(dir<0?'below':'above')+' the last '+R.word+' '+F(ev.lv.p)+'. '+ctx,'building','Changed']; }
+function cdoLadder(R){ const dir=R.dir, F=R.F, ev=R.ev, cd=R.closed, f=R.f, S=[], st=(n,ok,short,title,sub,lv)=>S.push({n,ok,short,title,sub,lv});
+  const from=dir<0?'Uptrend':'Downtrend', dead=R.state==='inval';
+  st(1,'done',from,'The '+from.toLowerCase(),(dir<0?'higher highs ':'lower highs ')+F(ev.h0.p)+' → '+F(ev.h1.p)+' and '+(dir<0?'higher lows ':'lower lows ')+F(ev.l0.p)+' → '+F(ev.l1.p)+' (swings of 2 candles each side) · the trend engine: <b>'+(ev.te==='up'?'uptrend':'downtrend')+'</b>');
+  st(2,'done','Broke the '+R.word,'Closed '+(dir<0?'below':'above')+' the last '+R.word+' '+F(ev.lv.p),cdoT(cd[ev.k])+' · closed '+Math.abs(exPips(cd[ev.k].c-ev.lv.p)).toFixed(1)+' pips past it · a wick would not count');
+  if(R.state==='inval') st(3,'fail','Old trend back','The old trend is back','price went back past the last '+(dir<0?'high ':'low ')+F(R.inval));
+  else if(R.state==='back') st(3,'now','Being tested','Back '+(dir<0?'above':'below')+' the broken '+R.word+' · '+R.back+' close'+(R.back===1?'':'s'),'being tested; a close '+(dir<0?'below':'above')+' it again shows as broken again. It ends only past the last '+(dir<0?'high ':'low ')+F(R.inval)+(R.rebreaks?' · broken again '+R.rebreaks+' time'+(R.rebreaks===1?'':'s')+' so far':''),'Forming candle: '+R.fw);
+  else st(3,R.last>ev.k?'done':'now','Holding','Holding past the broken '+R.word,R.last>ev.k?(R.last-ev.k)+' close'+(R.last-ev.k===1?'':'s')+' since'+(R.rebreaks?' · it was tested and broken again '+R.rebreaks+' time'+(R.rebreaks===1?'':'s'):''):'waiting for the next close','Forming candle: '+R.fw);
+  if(dead) st(4,'skip','First '+R.w2,'The first '+R.w2,'not reached');
+  else if(R.cs) st(4,'done','First '+R.w2+' '+F(R.cs.p),'The first '+R.w2+' after the break',F(R.cs.p)+' at '+cdoT(cd[R.cs.j])+(dir<0?' · below the last high ':' · above the last low ')+F(dir<0?ev.h1.p:ev.l1.p));
+  else st(4,(R.state==='holding'||R.state==='moving')&&R.last>ev.k?'now':'todo','First '+R.w2,'Waiting for the first '+R.w2,'a bounce that turns back '+(dir<0?'below the last high ':'above the last low ')+F(dir<0?ev.h1.p:ev.l1.p)+' (known 2 candles after it forms)');
+  if(dead) st(5,'skip','New '+(dir<0?'low':'high'),'The new direction','not reached');
+  else if(R.newI>=0) st(5,'done','New '+(dir<0?'low':'high'),'The new direction is in place','a close past '+F(R.cs.extAt)+' at '+cdoT(cd[R.newI]));
+  else st(5,R.cs?'now':'todo','New '+(dir<0?'low':'high'),'The new direction',R.cs?'a close '+(dir<0?'below ':'above ')+F(R.cs.extAt)+' (the '+(dir<0?'low':'high')+' before the '+R.w2+')':'after the first '+R.w2+', a close past the '+(dir<0?'low':'high')+' made since the break');
+  const next=dead?'Nothing: the old trend is back.':R.state==='back'?'A close '+(dir<0?'below ':'above ')+F(ev.lv.p)+' again, or price going back past the last '+(dir<0?'high ':'low ')+F(R.inval)+' (the old trend back).':R.newI>=0?'Nothing: the new direction is in place. The structure reading takes it from here.':R.cs?'A close '+(dir<0?'below ':'above ')+F(R.cs.extAt)+'.':'The first '+R.w2+' to form.';
+  return {S,next,dNow:prDomAt(cd,R.last)}; }
+function cdoMathHtml(R){ if(['false','inval','new','faded'].includes(R.state)) return '';
+  const F=R.F, p=R.f.c, dir=R.dir, stop=R.ev.lv.p-dir*R.ev.a, risk=(p-stop)*dir; if(!(risk>0)) return '';
+  const row=(lab,t,done)=>{ const rew=(t-p)*dir; if(done||rew<=0) return '<li class="dim"><span>'+lab+' '+F(t)+'<small>already reached from here</small></span><b>—</b></li>';
+    const rr=rew/risk, be=Math.round(100*risk/(risk+rew)); return '<li><span>'+lab+' '+F(t)+' · '+Math.abs(exPips(rew)).toFixed(1)+' pips<small>reward:risk <b>'+rr.toFixed(1)+'</b> · needs to work about <b>'+be+' times in 100</b> to break even, before spread</small></span><b>'+rr.toFixed(1)+'</b></li>'; };
+  return '<div class="cf-n" style="margin:12px 0 6px">The trade’s numbers from here</div><ul class="pr-bk rr-math"><li><span>'+(dir<0?'A sell':'A buy')+' at the current price '+F(p)+'<small>the forming candle’s price; it moves until the candle closes</small></span><b></b></li>'+
+    '<li><span>Stop one average candle back past the broken '+R.word+' · '+F(stop)+' · '+Math.abs(exPips(risk)).toFixed(1)+' pips<small>back past the broken '+R.word+' by one average candle: well inside the old trend again, where the change of direction is wrong</small></span><b>risk</b></li>'+
+    row('One average candle from the break',R.oneT,R.oneI>=0)+row('The swing before',R.prior,R.priorI>=0)+'</ul><div class="pr-foot">These are the trade’s numbers from the current price, not its odds.</div>'; }
+
+function cdoCard(cd, B){ let R = null;
+  try{ if(B && B.length > 60){ const closed = B.map(b => ({t:b.t, o:b.o, h:b.h, l:b.l, c:b.c, reg: b.reg && b.reg.r ? b.reg.r : null})), f = cd[cd.length-1];
+      R = cdoRead(closed, f); if(R && R.state === 'idle') R = null; } }catch(e){ console.warn('[change of direction]', e && e.message); R = null; }
+  window.__cfCdo = R ? {lv:R.ev.lv.p, oneT:R.oneT, prior:R.prior, oneI:R.oneI, priorI:R.priorI, dir:R.dir, state:R.state, word:R.word} : null;
+  if(!R) return '';
+  const [w, l, cls, band] = cdoHead(R), V = cdoLadder(R), ic = {done:'✓', now:'●', fail:'✕', info:'i', todo:'○', skip:'–'}, dir = R.dir, closed = R.closed, f = R.f;
+  const box = (lab, v, i) => { const d = (f.c - v)*dir; return '<div class="'+(i >= 0 ? 'past' : '')+'"><div class="k">'+lab+' · '+R.F(v)+'</div><div class="v n">'+(i >= 0 ? 'reached ✓ '+cdoT(closed[i])+' · price '+Math.abs(exPips(d)).toFixed(1)+' pips '+(d >= 0 ? 'past it' : 'short of it now') : Math.abs(exPips(d)).toFixed(1)+' pips to go')+'</div></div>'; };
+  const path = R.path.map((p, n) => ({p, n})).sort((a, b) => (a.p.i - b.p.i) || (a.n - b.n)).map(x => x.p).map(p => '<li><span class="t">'+cdoT(closed[p.i])+'</span><span class="d '+p.c+'"></span><span>'+p.w+'</span></li>').join('')+
+    '<li class="live"><span class="t">now</span><span class="d live"></span><span>Forming candle: '+R.fw+' <small>· not final</small></span></li>';
+  return '<div class="card pr-card rr-card cdo-card"><div class="ct">The combined read · change of direction <span class="r mut">'+(dir < 0 ? 'uptrend turning down' : 'downtrend turning up')+'</span></div>'+
+    '<div class="pr-top rr-top"><div><div class="pr-num rr-'+cls+'">'+band+'</div><div class="pr-band rr-'+cls+'">'+(dir < 0 ? 'turn down' : 'turn up')+'</div></div>'+
+    '<div class="pr-head '+cls+'"><div class="pr-word">'+w+'</div><div class="pr-line">'+l+'</div></div></div>'+
+    '<div class="cf-n" style="margin:12px 0 6px">The steps</div><div class="lad-chain">'+V.S.map(x => '<span class="'+x.ok+'">'+ic[x.ok]+' '+x.short+'</span>').join('<i>→</i>')+'</div>'+
+    '<ol class="lad">'+V.S.map(x => '<li class="'+x.ok+'"><span class="b">'+(x.ok === 'todo' ? x.n : ic[x.ok])+'</span><div><div class="tt">'+x.title+'</div><div class="sb">'+x.sub+'</div>'+(x.lv ? '<div class="lv">'+x.lv+' <small>· not final</small></div>' : '')+'</div></li>').join('')+'</ol>'+
+    '<div class="lad-next"><b>Waiting for:</b> '+V.next+'</div>'+
+    '<div class="lad-dom">Dominance now ('+tf+', last 24 closed): <b>'+(V.dNow ? (V.dNow.side > 0 ? 'Buyers dominant' : V.dNow.side < 0 ? 'Sellers dominant' : 'Balanced')+' · '+Math.round(V.dNow.share*100)+'% buyers' : '—')+'</b> · pill: '+(V.dNow ? V.dNow.w.toLowerCase() : '—')+'</div>'+
+    '<div class="cf-n" style="margin:12px 0 6px">Where price is now</div><div class="pr-now"><div><div class="k">The broken '+R.word+'</div><div class="v n">'+R.F(R.ev.lv.p)+' · price '+Math.abs(exPips(f.c - R.ev.lv.p)).toFixed(1)+' pips '+((f.c - R.ev.lv.p)*dir >= 0 ? 'past it' : 'back from it')+'</div></div>'+
+    box('One average candle from the break', R.oneT, R.oneI)+box('The swing before', R.prior, R.priorI)+'</div>'+
+    cdoMathHtml(R)+'<div class="cf-n" style="margin:12px 0 6px">Since the break</div><ul class="pr-path">'+path+'</ul>'+
+    '<div class="pr-foot">Change of direction describes where price is after the trend broke and what comes next. It does not place trades or tell you to take one. It is separate from the SMC panel’s CHoCH, which uses larger swings.</div></div>'; }
 
 function pressureCard(P){
   if(!P || P.state === 'idle' || P.state === 'nolevels') return '';
@@ -15581,6 +15689,9 @@ function renderConf(){
   /* the exhaustion ladder: a run tiring into a new high or low, in any market (Nov 2026) */
   window.__cfExh = null;
   try{ h += exCard(cd, alerts, raised); }catch(e){ console.warn('[exhaustion card]', e && e.message); }
+  /* change of direction: the last higher low / lower high broken on a close, H1 and H4 (Nov 2026) */
+  window.__cfCdo = null;
+  try{ h += cdoCard(cd, CXB); }catch(e){ console.warn('[change of direction card]', e && e.message); }
   if(prLead) try{ h += pressureCard(PR); }catch(e){ console.warn('[pressure card]', e && e.message); }
   /* the RSI meter (Momentum), exactly as before, under the read */
   if(rx.html) h += '<div class="card">'+rx.html+'</div>';
@@ -15942,6 +16053,9 @@ var CH=[
   {el:function(){return document.querySelector('#confBody .ex-card')||document.querySelector('#confBody .rr-card')||filled('confBody')||$('confChartCard')},
    h:'Exhaustion',
    p:'<p>When a run of 3 or more average candles makes a <b>new high or low</b>, this card checks whether it is <b>tiring</b>: the last candles have <b>shrunk</b> to under 60% of the run’s earlier ones, and dominance is <b>not pressing harder</b>. Both are needed; otherwise <b>the run still has fuel</b>.</p><ul><li>The tiring candle stays in charge until <b>two closes</b> go past its high (low): then <b>the run kept going</b>.</li><li>Then the same steps as the other ladders: <b>the shift</b>, <b>the trigger</b>, <b>the follow-through</b>.</li><li><b>The turn back</b>: halfway, then the run’s start, in pips. Both are drawn on the chart.</li></ul><p>It shows where the story is, with the trade’s numbers from the current price. It does not tell you the turn is coming.</p>'},
+  {el:function(){return document.querySelector('#confBody .cdo-card')||document.querySelector('#confBody .ex-card')||filled('confBody')||$('confChartCard')},
+   h:'Change of direction',
+   p:'<p>When an <b>uptrend</b> (higher highs and higher lows, swings of 2 candles each side) <b>closes below its last higher low</b>, or a downtrend closes above its last lower high, while the trend engine says uptrend or downtrend, this card follows what comes next. A wick is not a break.</p><ul><li><b>Holding</b>, or <b>being tested</b> when price closes back past the broken swing. That is common and does not end it.</li><li><b>The first lower high</b> (higher low) after the break.</li><li><b>The new direction</b>: a close past the low (high) made before it.</li></ul><p>It ends if the old trend comes back (price past the last high or low), once the new direction is in place, or after 40 candles. The broken swing and the milestones are drawn on the chart.</p><p>It is separate from the SMC panel’s CHoCH, which uses larger swings.</p>'},
   {el:function(){return document.querySelector('#confBody .pr-card')||filled('confBody')||$('confChartCard')},
    h:'Reversal pressure',
    p:'<p>When price reaches a major or medium level, this scores out of 100 how it is turning off it: the reversal candle, follow-through, H4 and RSI.</p><p>The <b>check marks</b> show how far a reversal has got: first the <b>early line</b> (the last leg\u2019s HL or LH) broken on two closes, then the <b>full reversal line</b> broken on two closes with RSI agreeing. It is an early warning, not a confirmed reversal, until that last mark is ticked.</p>'},
