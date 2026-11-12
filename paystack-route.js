@@ -9,7 +9,7 @@ const express = require('express');
 const router  = express.Router();
 const axios   = require('axios');
 const crypto  = require('crypto');
-const { sendWelcomeEmail } = require('./email-service');
+const { sendWelcomeEmail, sendLicenceRenewed } = require('./email-service');
 const { requireAuth } = require('./auth-middleware');
 
 // ── Configuration ─────────────────────────────────────────────
@@ -122,7 +122,8 @@ async function updateSubscription(userId, planKey, paystackRef, legalMeta, card)
     const row = existing.data && existing.data[0];
     if (row && row.paystack_ref === paystackRef && row.licence_key) {
       console.log(`[PAYSTACK] updateSubscription — ref=${paystackRef} already processed, reusing key`);
-      return { licenceKey: row.licence_key, expiresAt: row.expires_at, plan: row.plan, planKey, wasRenewal: true };
+      return { licenceKey: row.licence_key, expiresAt: row.expires_at, plan: row.plan, planKey, wasRenewal: true,
+               alreadyProcessed: true };
     }
     // Kept for the renewal case below: a different ref, same customer.
     if (row && row.licence_key) existingKey = row.licence_key;
@@ -330,6 +331,57 @@ async function renewLicence(userId, paystackRef, planKey, legalMeta) {
   return { licenceKey: row.licence_key, licenceExpiresAt: next.toISOString(), alreadyApplied: false };
 }
 
+// ── Payment emails: sent at once, and once ────────────────────
+// Paystack confirms a payment twice: it sends the customer's browser back
+// to /api/pay/callback, and separately calls /api/pay/webhook. The welcome
+// email used to be sent ONLY from the webhook, so it waited on Paystack's
+// own delivery — and the licence renewal sent nothing from either.
+// Now whichever confirmation APPLIES the payment sends the email, straight
+// away. The other one finds the payment already applied (the same check
+// that stops a second licence key or a doubled term) and sends nothing.
+// A failed send is tried once more, because the second confirmation will
+// not send it for us.
+const EMAILED_REFS = new Set();          // refs this process has already emailed
+function claimEmail(ref) {
+  if (!ref || EMAILED_REFS.has(ref)) return false;
+  if (EMAILED_REFS.size > 5000) EMAILED_REFS.clear();
+  EMAILED_REFS.add(ref);
+  return true;
+}
+function custOf(tx) {
+  return {
+    email: (tx && ((tx.customer && tx.customer.email) || tx.email)) || null,
+    name:  (tx && tx.metadata && Array.isArray(tx.metadata.custom_fields) &&
+            (tx.metadata.custom_fields.find(f => f.variable_name === 'name') || {}).value)
+           || (tx && tx.customer && tx.customer.first_name) || ''
+  };
+}
+function sendWithRetry(label, to, send) {
+  const attempt = n => Promise.resolve().then(send).then(r => {
+    if (r && r.ok) { console.log(`[PAYSTACK] ${label} email sent to ${to}`); return; }
+    console.warn(`[PAYSTACK] ${label} email failed for ${to}: ${r && r.error}`);
+    if (n < 2) setTimeout(() => attempt(n + 1), 4000);
+  }).catch(e => {
+    console.warn(`[PAYSTACK] ${label} email error for ${to}: ${e.message}`);
+    if (n < 2) setTimeout(() => attempt(n + 1), 4000);
+  });
+  attempt(1);                            // never awaited: an email must not hold up the payment
+}
+function emailPurchase(tx, ref, result) {
+  if (!result || result.alreadyProcessed || !claimEmail(ref)) return;
+  const c = custOf(tx);
+  // planKey, not plan: 'pro' alone cannot tell Monthly from Yearly.
+  sendWithRetry('Welcome', c.email, () =>
+    sendWelcomeEmail(c.email, c.name, result.planKey || result.plan, result.licenceKey,
+                     result.expiresAt, result.licenceExpiresAt));
+}
+function emailLicenceRenewal(tx, ref, r) {
+  if (!r || r.alreadyApplied || !claimEmail(ref)) return;
+  const c = custOf(tx);
+  sendWithRetry('Licence renewed', c.email, () =>
+    sendLicenceRenewed(c.email, c.name, { licenceExpiresAt: r.licenceExpiresAt }));
+}
+
 // ── GET /api/pay/initiate ─────────────────────────────────────
 // Called from website when user clicks a pricing button
 router.post('/api/pay/initiate', requireAuth, async (req, res) => {
@@ -476,6 +528,7 @@ router.get('/api/pay/callback', async (req, res) => {
 
     if (isRenewal(planKey)) {
       const r = await renewLicence(userId, reference, planKey, legalMeta);
+      emailLicenceRenewal(tx, reference, r);
       console.log(`[PAYSTACK] Callback success — licence renewal for ${userId}`);
       return res.redirect(
         `${SITE_URL}/account?renewal=success&until=` + encodeURIComponent(r.licenceExpiresAt.slice(0, 10))
@@ -483,6 +536,7 @@ router.get('/api/pay/callback', async (req, res) => {
     }
 
     const result = await updateSubscription(userId, planKey, reference, legalMeta, tx.authorization);
+    emailPurchase(tx, reference, result);
     console.log(`[PAYSTACK] Callback success — ${planKey} for ${userId}${result.wasRenewal ? ' (renewal)' : ''}`);
 
     // A RENEWAL goes back to the account page, not the marketing site. The
@@ -551,6 +605,7 @@ router.post('/api/pay/webhook', async (req, res) => {
     if (isRenewal(planKey)) {
       try {
         const r = await renewLicence(userId, tx.reference, planKey, legalMeta);
+        emailLicenceRenewal(tx, tx.reference, r);
         console.log(`[PAYSTACK] Webhook — licence renewed for ${userId} until ${r.licenceExpiresAt}`);
       } catch (e) {
         console.error('[PAYSTACK] Webhook — licence renewal error:', e.message);
@@ -562,20 +617,9 @@ router.post('/api/pay/webhook', async (req, res) => {
       const result = await updateSubscription(userId, planKey, tx.reference, legalMeta, tx.authorization);
       console.log(`[PAYSTACK] Webhook — subscription activated: ${planKey} for ${userId} key=${result.licenceKey}`);
 
-      // Send welcome email with licence key
-      const custEmail = tx.customer?.email || tx.email;
-      const custName  = tx.metadata?.custom_fields?.find(f => f.variable_name === 'name')?.value
-                       || tx.customer?.first_name
-                       || '';
-      // planKey, not plan: 'pro' alone cannot tell Monthly from Yearly, so
-      // every Pro customer was getting identical copy about a renewal date
-      // that is a month away for one of them and a year away for the other.
-      sendWelcomeEmail(custEmail, custName, result.planKey || result.plan, result.licenceKey,
-                       result.expiresAt, result.licenceExpiresAt)
-        .then(r => {
-          if (r.ok) console.log(`[PAYSTACK] Welcome email sent to ${custEmail}`);
-          else       console.warn(`[PAYSTACK] Welcome email failed for ${custEmail}: ${r.error}`);
-        });
+      // Welcome email with the licence key — unless the callback already
+      // applied this payment and sent it (see emailPurchase above).
+      emailPurchase(tx, tx.reference, result);
 
     } catch (e) {
       console.error('[PAYSTACK] Webhook — update error:', e.message);
